@@ -1,37 +1,44 @@
 import { RatingBadge } from "../components/RatingBadge";
 import { leerdoelen } from "../lib/curriculum";
-import { RATINGS } from "../lib/ratings";
-import { useStore } from "../lib/store";
+import { telKleuren } from "../lib/kleurstats";
+import { ALGEMEEN } from "../lib/periode";
+import { isAfgesloten } from "../lib/schooljaar";
+import { getDoelKleur, useStore } from "../lib/store";
 import type { Rating } from "../lib/types";
 
 export function Dashboard() {
-  const { students, kleuren } = useStore();
+  const { students, kleuren, schooljaar } = useStore();
 
-  const waarden = Object.values(kleuren);
+  const telling = telKleuren(
+    students.flatMap((s) =>
+      leerdoelen.map((d) => getDoelKleur(kleuren, schooljaar, ALGEMEEN, s.id, d.id)),
+    ),
+  );
   const totaalCellen = students.length * leerdoelen.length;
-  const nietAangeboden = totaalCellen - waarden.length;
+  const ingevuld = totaalCellen - telling.leeg;
 
   const buckets: { rating: Rating | null; count: number }[] = [
-    ...RATINGS.map((rating) => ({
-      rating,
-      count: waarden.filter((k) => k === rating).length,
-    })),
-    { rating: null, count: nietAangeboden },
+    { rating: "red", count: telling.red },
+    { rating: "yellow", count: telling.yellow },
+    { rating: "green", count: telling.green },
+    { rating: "blue", count: telling.blue },
+    { rating: null, count: telling.leeg },
   ];
 
   return (
     <section>
       <h1>Overzicht</h1>
       <p style={{ color: "var(--text-muted)" }}>
-        Kleur per leerdoel over alle leerlingen (rood → blauw, zwak → excellent). Voorlopige
-        versie — later koppelen aan echte data.
+        Algemene kleur per badge over alle leerlingen, schooljaar <strong>{schooljaar}</strong>
+        {isAfgesloten(schooljaar) ? " (afgesloten)" : ""}. Voorlopige versie — later koppelen
+        aan echte data.
       </p>
 
       <div style={{ display: "flex", gap: 16, margin: "24px 0", flexWrap: "wrap" }}>
         <Stat label="Leerlingen" value={students.length} />
-        <Stat label="Leerdoelen" value={leerdoelen.length} />
-        <Stat label="Ingevuld" value={waarden.length} />
-        <Stat label="Nog niet aangeboden" value={nietAangeboden} />
+        <Stat label="Badges" value={leerdoelen.length} />
+        <Stat label="Ingevuld" value={ingevuld} />
+        <Stat label="Nog niet aangeboden" value={telling.leeg} />
       </div>
 
       <h2>Verdeling van de kleuren</h2>

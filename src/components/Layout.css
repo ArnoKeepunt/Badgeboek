@@ -1,6 +1,8 @@
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  /* minmax(0, …) laat de contentkolom krimpen zodat brede tabellen binnenin
+     horizontaal kunnen scrollen i.p.v. de hele pagina te verbreden. */
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100svh;
 }
 
@@ -56,6 +58,7 @@
   background: var(--surface);
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 0 24px;
 }
 
@@ -63,15 +66,48 @@
   font-weight: 600;
 }
 
+.schooljaar-kiezer {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.schooljaar-kiezer-label {
+  color: var(--text-muted);
+}
+
+.schooljaar-kiezer select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.schooljaar-slot {
+  font-size: 13px;
+}
+
 .content {
   padding: 28px 24px;
   max-width: 960px;
   width: 100%;
+  min-width: 0;
+}
+
+/* Volle breedte voor de doelenmatrix; scrollt horizontaal als het niet past. */
+.content--breed {
+  max-width: none;
 }
 
 @media (max-width: 720px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {

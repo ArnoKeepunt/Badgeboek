@@ -112,57 +112,7 @@ th {
 }
 
 /* ---------------------------------------------------------------------------
-   Rating picker — click a swatch to set (or clear) a color.
-   --------------------------------------------------------------------------- */
-
-.rating-picker {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.rating-swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 8px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid var(--rating-border, var(--border));
-  background: var(--rating-bg, var(--surface));
-  color: var(--rating-fg, var(--text-muted));
-  opacity: 0.55;
-  transition: opacity 0.12s ease, box-shadow 0.12s ease;
-}
-
-.rating-swatch:hover {
-  opacity: 0.85;
-}
-
-.rating-swatch.is-selected {
-  opacity: 1;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--rating-solid, var(--text-muted));
-}
-
-/* Compact picker (matrix cells): dots only. */
-.rating-picker.compact {
-  gap: 3px;
-  flex-wrap: nowrap;
-}
-
-.rating-picker.compact .rating-swatch {
-  padding: 3px;
-  border-radius: 50%;
-}
-
-.rating-picker.compact .rating-dot {
-  width: 12px;
-  height: 12px;
-}
-
-/* ---------------------------------------------------------------------------
-   Chips (cursusfilter) + doelenmatrix
+   Chips (cursusfilter)
    --------------------------------------------------------------------------- */
 
 .chip {
@@ -185,60 +135,776 @@ th {
   color: var(--accent-contrast);
 }
 
-.matrix {
-  width: auto;
-  min-width: 100%;
+.periode-balk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
 }
 
-.matrix th,
-.matrix td {
+.periode-balk-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+}
+
+.grid-col-periode {
+  min-width: 74px;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+   Doelenpagina (minimumdoelen / eindtermen)
+   --------------------------------------------------------------------------- */
+
+.soort-chip {
+  border-color: var(--rating-border);
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+}
+
+.soort-chip.is-active {
+  background: var(--rating-solid);
+  border-color: var(--rating-solid);
+  color: #fff;
+}
+
+.doel-comp {
+  border-bottom: 1px solid var(--border);
+}
+
+.doel-comp-kop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 14px 4px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+}
+
+.doel-comp-nr {
+  min-width: 22px;
+  color: var(--text-muted);
+}
+
+.doel-lijst {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.doel-item {
+  padding: 8px 4px 8px 36px;
+  border-top: 1px solid var(--border);
+}
+
+.doel-item-rij {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.soort-tag {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rating-border);
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+  white-space: nowrap;
+}
+
+.doel-nr {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.doel-omschrijving {
+  flex: 1 1 300px;
+}
+
+.doel-uitleg-knop {
+  flex: none;
+}
+
+.doel-uitleg {
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  background: var(--bg);
   border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.doel-uitleg p {
+  margin: 0 0 8px;
+}
+
+.doel-uitleg p:last-child {
+  margin-bottom: 0;
+}
+
+.doel-opmerking {
+  color: #92400e;
+}
+
+.doel-code {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Doelenmatrix — rustig raster met in-/uitklapbare cursussen en rubrics
+   --------------------------------------------------------------------------- */
+
+/* Horizontaal schuiven binnen dit kader; geen vaste hoogte, geen verticale scroll. */
+.grid-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: auto;
+  min-width: 100%;
+  font-size: 13px;
+}
+
+/* Leerlingkolommen krijgen een vaste minimumbreedte zodat de tabel echt
+   breed wordt (en dus scrollt) bij veel leerlingen. */
+.grid-col-leerling,
+.grid-cel,
+.grid-tel-cel,
+.grid-foot-cel {
+  min-width: 96px;
+}
+
+.grid th,
+.grid td {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 9px 14px;
   vertical-align: middle;
 }
 
-.matrix-doel-kop {
-  min-width: 260px;
-}
-
-.matrix-leerling-kop {
+/* Koprij blijft in beeld bij het scrollen van de pagina. */
+.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
   text-align: center;
   white-space: nowrap;
 }
 
-.matrix-leerling-kop a {
-  text-decoration: none;
-  font-weight: 700;
+/* Eerste kolom blijft in beeld bij horizontaal schuiven. */
+.grid-col-doel {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 220px;
+  max-width: 340px;
+  text-align: left;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--text);
 }
 
-.matrix-leerling-sub {
+@media (min-width: 720px) {
+  .grid-col-doel {
+    min-width: 300px;
+  }
+}
+
+.grid thead .grid-col-doel {
+  z-index: 3;
+}
+
+.grid-col-kleur {
+  width: 160px;
+}
+
+.grid-col-leerling a {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.grid-col-leerling-sub {
   display: block;
   font-weight: 400;
   font-size: 11px;
   color: var(--text-muted);
-  text-transform: none;
-  letter-spacing: 0;
 }
 
-.matrix-rubric-rij th {
-  background: var(--accent-soft);
+.grid-doel {
+  font-weight: 400;
+  line-height: 1.4;
   color: var(--text);
-  text-align: left;
+  padding-left: 28px;
+}
+
+.grid tbody tr:hover td,
+.grid tbody tr:hover .grid-col-doel {
+  background: #fafafc;
+}
+
+/* Cursus-rij (bovenste inklapniveau). */
+.grid-cursus th,
+.grid-cursus td {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.grid-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+}
+
+.grid-cursus .grid-toggle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.grid-caret {
+  width: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Rubric-rij (tweede inklapniveau). */
+.grid-group th,
+.grid-group td {
+  background: #fbfbfc;
   font-size: 12px;
 }
 
-.matrix-doel {
-  font-size: 13px;
-  line-height: 1.35;
+.grid-group .grid-toggle {
+  font-weight: 600;
+  padding-left: 14px;
 }
 
-.matrix-cel {
+.grid-count {
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.grid-tel-cel {
   text-align: center;
-  padding: 6px 8px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 
-.matrix-cel .rating-picker {
-  justify-content: center;
+.grid-cel {
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.grid tfoot th,
+.grid tfoot td {
+  background: var(--surface);
+  border-top: 2px solid var(--border);
+  border-bottom: 0;
+}
+
+.grid tfoot .grid-col-doel {
+  font-weight: 700;
+}
+
+.grid-foot-cel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.grid-foot-cel > div {
+  margin-bottom: 4px;
+}
+
+.matrix-acties {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.linkknop {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.lege-staat {
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.jaar-melding {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* Afgesloten schooljaar: neutraler, "op slot". */
+.jaar-melding-slot {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------------------
+   Filterbalk voor leerlingen
+   --------------------------------------------------------------------------- */
+
+.filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.filterbar input,
+.filterbar select {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.filterbar-zoek {
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+
+.filterbar-telling {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.filterbar-groep {
+  flex: 1 1 200px;
+  min-width: 160px;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Knoppen + paginakop
+   --------------------------------------------------------------------------- */
+
+.pagina-kop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.knop-primair {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.knop-primair:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkknop-gevaar {
+  color: #b91c1c;
+}
+
+/* ---------------------------------------------------------------------------
+   Foutpagina (404 + crash)
+   --------------------------------------------------------------------------- */
+
+.foutpagina {
+  max-width: 460px;
+  margin: 8vh auto 0;
+  text-align: center;
+  padding: 24px;
+}
+
+.foutpagina-emoji {
+  font-size: 64px;
+  line-height: 1;
+  animation: foutpagina-wiebel 2.4s ease-in-out infinite;
+}
+
+@keyframes foutpagina-wiebel {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foutpagina-emoji {
+    animation: none;
+  }
+}
+
+.foutpagina h1 {
+  margin: 16px 0 8px;
+}
+
+.foutpagina p {
+  color: var(--text-muted);
+  margin: 0 0 20px;
+}
+
+.foutpagina-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 20px;
+  overflow-x: auto;
+  text-align: left;
+}
+
+.foutpagina-knop {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Groepen
+   --------------------------------------------------------------------------- */
+
+.groep-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 16px;
+  margin: 16px 0 24px;
+}
+
+.groep-editor h2 {
+  margin-top: 0;
+}
+
+.groep-editor-rij {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.groep-editor-rij input {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.groep-editor-naam {
+  flex: 1 1 220px;
+  font-weight: 600;
+}
+
+.groep-editor-rij input[type="search"] {
+  flex: 1 1 180px;
+}
+
+.groep-editor-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 12px 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.groep-editor-lijst {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.groep-editor-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.groep-editor-item:last-child {
+  border-bottom: 0;
+}
+
+.groep-editor-item:hover {
+  background: #fafafc;
+}
+
+.groep-editor-item-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.groep-editor-acties {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.groep-kaarten {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.groep-kaart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+  min-width: 220px;
+  flex: 1 1 240px;
+}
+
+.groep-kaart-naam {
+  font-weight: 700;
+}
+
+.groep-kaart-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 10px;
+}
+
+.groep-kaart-acties {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.groep-lijst {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.groep-rij {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.groep-rij:hover {
+  border-color: var(--accent);
+}
+
+.groep-rij-meta {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Cel-editor (Notion "status"-stijl)
+   --------------------------------------------------------------------------- */
+
+.rating-cell {
+  position: relative;
+}
+
+.rating-cell-btn {
+  width: 100%;
+  min-width: 74px;
+  border: 1px solid var(--rating-border, var(--border));
+  background: var(--rating-bg, var(--surface));
+  color: var(--rating-fg, var(--text-muted));
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rating-cell-btn.rating-empty {
+  border-style: dashed;
+}
+
+.rating-cell-btn:hover {
+  filter: brightness(0.97);
+}
+
+/* Alleen-lezen cel (afgesloten schooljaar). */
+.rating-cell-btn.is-readonly {
+  display: inline-block;
+  cursor: default;
+  opacity: 0.75;
+}
+
+.rating-cell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.rating-cell-menu {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 150px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: 4px;
+}
+
+.rating-cell-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rating-fg, var(--text));
+  text-align: left;
+}
+
+.rating-cell-option:hover {
+  background: var(--rating-bg, var(--accent-soft));
+}
+
+.rating-cell-option.is-current {
+  background: var(--rating-bg, var(--accent-soft));
+  box-shadow: inset 0 0 0 1px var(--rating-border, var(--border));
+}
+
+/* ---------------------------------------------------------------------------
+   Kleurbalk + cursuskop
+   --------------------------------------------------------------------------- */
+
+.colorbar {
+  display: flex;
+  height: 6px;
+  min-width: 90px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.colorbar > i {
+  display: block;
+  height: 100%;
+}
+
+.colorbar-empty {
+  opacity: 0.5;
+}
+
+.cursus-kop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.cursus-kop h2 {
+  margin: 0;
+}
+
+.cursus-kop-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cursus-kop .colorbar {
+  flex: 1 1 120px;
+  max-width: 220px;
 }

@@ -22,12 +22,13 @@ Two kinds of evaluation:
    good, the leerling earns the badge for that instance (e.g. one actuaronde: *thema gekozen →
    bronnen vermeld → gepresenteerd*).
 2. **Per rapport invullen (kleur).** Ongoing evaluations scored with a color each rapport:
-   - `rood` = nog niet gehaald / zwaar onvoldoende
-   - `geel` = onderweg, nog niet voldoende
-   - `groen` = voldoende, goed — doelen behaald
-   - `blauw` = boven verwachting / excellent
-   - (`wit` = werd nog niet aangeboden)
+   `rood`, `geel`, `groen`, `blauw`, plus `wit` = werd nog niet aangeboden.
    The end-of-graad badge is awarded on the basis of these evaluations **and the leerling's evolution**.
+
+   > The paper badgeboek phrases the colors as rood = "nog niet gehaald", geel = "onderweg",
+   > groen = "voldoende/goed", blauw = "boven de verwachting". **Arno (2026-08-31): do not carry
+   > those pass/fail-style labels into the app — Keerpunt does not work with geslaagd/gefaald.
+   > In the app it is only the color + "Niet aangeboden".**
 
 When all badges of a cursus are earned, the leerling has completed that cursus's programme for the
 graad and may work on self-chosen projects (a mentor can still require participation in a specific task).

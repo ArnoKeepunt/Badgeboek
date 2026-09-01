@@ -1,4 +1,4 @@
-/** Beoordelingskleuren, zwak → sterk. `null` = nog niet aangeboden / geëvalueerd. */
+/** De evaluatiekleuren. `null` = nog niet aangeboden / geëvalueerd (de lege staat). */
 export type Rating = 'red' | 'yellow' | 'green' | 'blue'
 
 /**
@@ -35,14 +35,30 @@ export interface Student {
   firstName: string;
   lastName: string;
   vestiging: string;
+  /** 1 t/m 6. De graad is hieruit afgeleid (1-2 = 1e graad, 3-4 = 2e, 5-6 = 3e). */
   leerjaar: number;
+  /** Klasgroep binnen het leerjaar, bv. "A" of "B". */
+  klasgroep: string;
+}
+
+/** Zelfgemaakte leerlingengroep: een naam + een verzameling leerlingen. */
+export interface Groep {
+  id: string;
+  naam: string;
+  leerlingIds: string[];
 }
 
 /**
- * Kleur per (leerling, leerdoel). Bewaard als map met sleutel `${studentId}:${leerdoelId}`.
- * Een ontbrekende sleutel betekent "nog niet aangeboden / geëvalueerd".
+ * Kleur per (schooljaar, periode, leerling, leerdoel). Bewaard als één map met sleutel
+ * `${schooljaar}:${periode}:${studentId}:${leerdoelId}`, waarbij `periode` "algemeen" of
+ * een rapportperiode ("p1"…"p4") is. Een ontbrekende sleutel betekent "nog niet
+ * aangeboden / geëvalueerd".
  */
 export type DoelKleuren = Record<string, Rating>;
 
-export const doelSleutel = (studentId: string, leerdoelId: string): string =>
-  `${studentId}:${leerdoelId}`;
+export const doelSleutel = (
+  schooljaar: string,
+  periode: string,
+  studentId: string,
+  leerdoelId: string,
+): string => `${schooljaar}:${periode}:${studentId}:${leerdoelId}`;

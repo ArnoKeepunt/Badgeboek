@@ -1,86 +1,163 @@
-import { Fragment, useState } from "react";
-import { Link } from "react-router-dom";
-import { RatingPicker } from "../components/RatingPicker";
+import { useMemo, useState } from "react";
 import {
-  cursussen,
-  leerdoelenVoorRubric,
-  rubricsVoorCursus,
-} from "../lib/curriculum";
-import { getDoelKleur, setDoelKleur, useStore } from "../lib/store";
+  type DoelSoort,
+  SOORT_KLEUR,
+  SOORT_LABEL,
+  competentieKort,
+  competenties,
+  minimumdoelen,
+} from "../lib/minimumdoelen";
+
+const SOORTEN: DoelSoort[] = ["standaard", "basisgeletterdheid", "uitbreiding", "freinet"];
 
 /**
- * Doelenmatrix: per cursus krijgt elke leerling een kleur per leerdoel.
- * Rijen = leerdoelen (gegroepeerd per rubric), kolommen = leerlingen.
+ * Doelen: de minimumdoelen / eindtermen (los van de badges). Voorlopig om in te kijken —
+ * gegroepeerd per sleutelcompetentie, met zoeken en een filter per soort. De soort krijgt
+ * dezelfde kleurcode als de badge-evaluatie.
  */
 export function Doelen() {
-  const { students, kleuren } = useStore();
-  const [cursusId, setCursusId] = useState(cursussen[0]?.id ?? "");
-  const rubrieken = rubricsVoorCursus(cursusId);
+  const [zoek, setZoek] = useState("");
+  const [soort, setSoort] = useState<DoelSoort | "">("");
+  const [dicht, setDicht] = useState<Set<number>>(new Set());
+  const [uitlegOpen, setUitlegOpen] = useState<Set<string>>(new Set());
+
+  const filterActief = Boolean(zoek.trim() || soort);
+
+  const gefilterd = useMemo(() => {
+    const q = zoek.trim().toLowerCase();
+    return minimumdoelen.filter((d) => {
+      if (soort && d.soort !== soort) return false;
+      if (q) {
+        const hooi = `${d.code} ${d.nummer} ${d.omschrijving} ${d.uitleg}`.toLowerCase();
+        if (!hooi.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [zoek, soort]);
+
+  const comps = useMemo(() => competenties(gefilterd), [gefilterd]);
+
+  const perSoort = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const d of minimumdoelen) t[d.soort] = (t[d.soort] ?? 0) + 1;
+    return t;
+  }, []);
+
+  const toggleComp = (nr: number) =>
+    setDicht((prev) => {
+      const next = new Set(prev);
+      if (next.has(nr)) next.delete(nr);
+      else next.add(nr);
+      return next;
+    });
+
+  const toggleUitleg = (code: string) =>
+    setUitlegOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
 
   return (
     <section>
       <h1>Doelen</h1>
       <p style={{ color: "var(--text-muted)" }}>
-        Klik in een cel een kleur aan om die voor de leerling in te vullen. Klik de kleur
-        opnieuw aan om terug op "niet aangeboden" te zetten. Aanpassingen worden lokaal bewaard.
+        {minimumdoelen.length} minimumdoelen en eindtermen voor de eerste graad A, per
+        sleutelcompetentie. Voorlopig om in te kijken — later ook aanpasbaar. Los van de badges.
       </p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
-        {cursussen.map((c) => (
+      <div className="filterbar">
+        <input
+          type="search"
+          className="filterbar-zoek"
+          placeholder="Zoek op code of tekst…"
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <button
+          type="button"
+          className={`chip${soort === "" ? " is-active" : ""}`}
+          onClick={() => setSoort("")}
+        >
+          Alle ({minimumdoelen.length})
+        </button>
+        {SOORTEN.map((s) => (
           <button
-            key={c.id}
+            key={s}
             type="button"
-            className={`chip${c.id === cursusId ? " is-active" : ""}`}
-            onClick={() => setCursusId(c.id)}
+            className={`chip soort-chip rating-${SOORT_KLEUR[s]}${soort === s ? " is-active" : ""}`}
+            onClick={() => setSoort(soort === s ? "" : s)}
           >
-            {c.naam}
+            {SOORT_LABEL[s]} ({perSoort[s] ?? 0})
           </button>
         ))}
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table className="matrix">
-          <thead>
-            <tr>
-              <th className="matrix-doel-kop">Leerdoel</th>
-              {students.map((s) => (
-                <th key={s.id} className="matrix-leerling-kop">
-                  <Link to={`/students/${s.id}`}>{s.firstName}</Link>
-                  <span className="matrix-leerling-sub">
-                    {s.lastName} · {s.leerjaar}e jaar
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rubrieken.map((rubric) => {
-              const doelen = leerdoelenVoorRubric(rubric.id);
-              return (
-                <Fragment key={rubric.id}>
-                  <tr className="matrix-rubric-rij">
-                    <th colSpan={students.length + 1}>{rubric.naam}</th>
-                  </tr>
-                  {doelen.map((doel) => (
-                    <tr key={doel.id}>
-                      <td className="matrix-doel">{doel.omschrijving}</td>
-                      {students.map((s) => (
-                        <td key={s.id} className="matrix-cel">
-                          <RatingPicker
-                            compact
-                            value={getDoelKleur(kleuren, s.id, doel.id)}
-                            onChange={(next) => setDoelKleur(s.id, doel.id, next)}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {comps.length === 0 ? (
+        <p className="lege-staat">Geen doelen voor deze zoekopdracht.</p>
+      ) : (
+        comps.map((c) => {
+          const open = filterActief || !dicht.has(c.nr);
+          return (
+            <div key={c.nr} className="doel-comp">
+              <button
+                type="button"
+                className="doel-comp-kop"
+                onClick={() => toggleComp(c.nr)}
+              >
+                <span className="grid-caret">{open ? "▾" : "▸"}</span>
+                <span className="doel-comp-nr">{c.nr}</span>
+                {competentieKort(c.naam)}
+                <span className="grid-count">{c.doelen.length}</span>
+              </button>
+
+              {open && (
+                <ul className="doel-lijst">
+                  {c.doelen.map((d) => {
+                    const heeftUitleg = Boolean(d.uitleg || d.opmerking);
+                    const toon = uitlegOpen.has(d.code);
+                    return (
+                      <li key={d.code} className="doel-item">
+                        <div className="doel-item-rij">
+                          <span
+                            className={`soort-tag rating-${SOORT_KLEUR[d.soort]}`}
+                            title={SOORT_LABEL[d.soort]}
+                          >
+                            {SOORT_LABEL[d.soort]}
+                          </span>
+                          <span className="doel-nr">{d.nummer}</span>
+                          <span className="doel-omschrijving">{d.omschrijving}</span>
+                          {heeftUitleg && (
+                            <button
+                              type="button"
+                              className="linkknop doel-uitleg-knop"
+                              onClick={() => toggleUitleg(d.code)}
+                            >
+                              {toon ? "Minder" : "Meer"}
+                            </button>
+                          )}
+                        </div>
+                        {heeftUitleg && toon && (
+                          <div className="doel-uitleg">
+                            {d.uitleg && <p>{d.uitleg}</p>}
+                            {d.opmerking && (
+                              <p className="doel-opmerking">
+                                <strong>Opmerking:</strong> {d.opmerking}
+                              </p>
+                            )}
+                            <p className="doel-code">Code: {d.code}</p>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })
+      )}
     </section>
   );
 }

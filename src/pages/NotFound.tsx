@@ -1,11 +1,10 @@
-import { Link } from 'react-router-dom'
+import { Foutmelding } from "../components/Foutmelding";
 
 export function NotFound() {
   return (
-    <section>
-      <h1>404</h1>
-      <p style={{ color: 'var(--text-muted)' }}>Deze pagina bestaat niet.</p>
-      <Link to="/">Naar het overzicht</Link>
-    </section>
-  )
+    <Foutmelding emoji="🧭" titel="Deze pagina bestaat niet">
+      Hier is niets te vinden — de link klopt niet (meer) of je typte iets verkeerd. Geen paniek,
+      er ging niets kapot.
+    </Foutmelding>
+  );
 }
