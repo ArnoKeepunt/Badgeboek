@@ -1,0 +1,6 @@
+{
+  "name": "Keerpunt Badgeboek",
+  "description": "Student grading and competence tracking badgebook application for Keerpunt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
