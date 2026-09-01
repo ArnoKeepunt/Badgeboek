@@ -1,6 +1,5 @@
 {
   "name": "Keerpunt Badgeboek",
-  "description": "Student grading and competence tracking badgebook application for Keerpunt.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Badgeboek voor de dagelijkse evaluatie (kleuren per badge) van Keerpunt Freinetscholen. Draait volledig in de browser, zonder ingebouwde AI.",
+  "requestFramePermissions": []
 }

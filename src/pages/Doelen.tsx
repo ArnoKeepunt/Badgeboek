@@ -1,31 +1,53 @@
 import { useMemo, useState } from "react";
+import { DoelEditor } from "../components/DoelEditor";
 import {
   type DoelSoort,
+  type Stroom,
   SOORT_KLEUR,
   SOORT_LABEL,
+  STROMEN,
+  STROOM_LABEL,
+  alleMinimumdoelen,
   competentieKort,
   competenties,
-  minimumdoelen,
+  metWijzigingen,
 } from "../lib/minimumdoelen";
+import { useStore } from "../lib/store";
 
 const SOORTEN: DoelSoort[] = ["standaard", "basisgeletterdheid", "uitbreiding", "freinet"];
 
+/** "alle" = alle stromen samen. */
+type StroomKeuze = Stroom | "alle";
+
 /**
- * Doelen: de minimumdoelen / eindtermen (los van de badges). Voorlopig om in te kijken —
- * gegroepeerd per sleutelcompetentie, met zoeken en een filter per soort. De soort krijgt
- * dezelfde kleurcode als de badge-evaluatie.
+ * Doelen: de minimumdoelen / eindtermen (los van de badges). Bovenaan kies je de graad/stroom
+ * (zoals de periodes bij de badges); daaronder zoek en filter je per soort. Gegroepeerd per
+ * sleutelcompetentie. Elk doel is bewerkbaar.
  */
 export function Doelen() {
+  const { doelWijzigingen, doelenImport } = useStore();
+  const minimumdoelen = useMemo(
+    () => metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen),
+    [doelenImport, doelWijzigingen],
+  );
+  const [stroom, setStroom] = useState<StroomKeuze>("1A");
   const [zoek, setZoek] = useState("");
   const [soort, setSoort] = useState<DoelSoort | "">("");
   const [dicht, setDicht] = useState<Set<number>>(new Set());
-  const [uitlegOpen, setUitlegOpen] = useState<Set<string>>(new Set());
+  const [bewerken, setBewerken] = useState<string | null>(null);
+
+  const alleStromen = stroom === "alle";
+
+  const stroomDoelen = useMemo(
+    () => (alleStromen ? minimumdoelen : minimumdoelen.filter((d) => d.stroom === stroom)),
+    [minimumdoelen, stroom, alleStromen],
+  );
 
   const filterActief = Boolean(zoek.trim() || soort);
 
   const gefilterd = useMemo(() => {
     const q = zoek.trim().toLowerCase();
-    return minimumdoelen.filter((d) => {
+    return stroomDoelen.filter((d) => {
       if (soort && d.soort !== soort) return false;
       if (q) {
         const hooi = `${d.code} ${d.nummer} ${d.omschrijving} ${d.uitleg}`.toLowerCase();
@@ -33,15 +55,15 @@ export function Doelen() {
       }
       return true;
     });
-  }, [zoek, soort]);
+  }, [stroomDoelen, zoek, soort]);
 
   const comps = useMemo(() => competenties(gefilterd), [gefilterd]);
 
   const perSoort = useMemo(() => {
     const t: Record<string, number> = {};
-    for (const d of minimumdoelen) t[d.soort] = (t[d.soort] ?? 0) + 1;
+    for (const d of stroomDoelen) t[d.soort] = (t[d.soort] ?? 0) + 1;
     return t;
-  }, []);
+  }, [stroomDoelen]);
 
   const toggleComp = (nr: number) =>
     setDicht((prev) => {
@@ -51,21 +73,43 @@ export function Doelen() {
       return next;
     });
 
-  const toggleUitleg = (code: string) =>
-    setUitlegOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-
   return (
     <section>
       <h1>Doelen</h1>
       <p style={{ color: "var(--text-muted)" }}>
-        {minimumdoelen.length} minimumdoelen en eindtermen voor de eerste graad A, per
-        sleutelcompetentie. Voorlopig om in te kijken — later ook aanpasbaar. Los van de badges.
+        De minimumdoelen en eindtermen per sleutelcompetentie. Los van de badges. Kies de
+        graad/stroom, zoek en filter per soort. Elk doel kan je bewerken.
       </p>
+
+      <div className="periode-balk">
+        <span className="periode-balk-label">Stroom</span>
+        <button
+          type="button"
+          className={`chip${alleStromen ? " is-active" : ""}`}
+          onClick={() => {
+            setStroom("alle");
+            setBewerken(null);
+          }}
+        >
+          Alle stromen ({minimumdoelen.length})
+        </button>
+        {STROMEN.map((s) => {
+          const aantal = minimumdoelen.filter((d) => d.stroom === s).length;
+          return (
+            <button
+              key={s}
+              type="button"
+              className={`chip${s === stroom ? " is-active" : ""}`}
+              onClick={() => {
+                setStroom(s);
+                setBewerken(null);
+              }}
+            >
+              {STROOM_LABEL[s]} ({aantal})
+            </button>
+          );
+        })}
+      </div>
 
       <div className="filterbar">
         <input
@@ -80,7 +124,7 @@ export function Doelen() {
           className={`chip${soort === "" ? " is-active" : ""}`}
           onClick={() => setSoort("")}
         >
-          Alle ({minimumdoelen.length})
+          Alle ({stroomDoelen.length})
         </button>
         {SOORTEN.map((s) => (
           <button
@@ -94,7 +138,11 @@ export function Doelen() {
         ))}
       </div>
 
-      {comps.length === 0 ? (
+      {!alleStromen && stroomDoelen.length === 0 ? (
+        <p className="lege-staat">
+          Nog geen doelen voor {STROOM_LABEL[stroom]}. Dit bestand is nog niet aangeleverd.
+        </p>
+      ) : comps.length === 0 ? (
         <p className="lege-staat">Geen doelen voor deze zoekopdracht.</p>
       ) : (
         comps.map((c) => {
@@ -114,11 +162,11 @@ export function Doelen() {
 
               {open && (
                 <ul className="doel-lijst">
-                  {c.doelen.map((d) => {
-                    const heeftUitleg = Boolean(d.uitleg || d.opmerking);
-                    const toon = uitlegOpen.has(d.code);
-                    return (
-                      <li key={d.code} className="doel-item">
+                  {c.doelen.map((d) => (
+                    <li key={d.code} className="doel-item">
+                      {bewerken === d.code ? (
+                        <DoelEditor doel={d} onSluit={() => setBewerken(null)} />
+                      ) : (
                         <div className="doel-item-rij">
                           <span
                             className={`soort-tag rating-${SOORT_KLEUR[d.soort]}`}
@@ -126,32 +174,24 @@ export function Doelen() {
                           >
                             {SOORT_LABEL[d.soort]}
                           </span>
+                          {alleStromen && (
+                            <span className="doel-stroom" title={STROOM_LABEL[d.stroom]}>
+                              {d.stroom}
+                            </span>
+                          )}
                           <span className="doel-nr">{d.nummer}</span>
                           <span className="doel-omschrijving">{d.omschrijving}</span>
-                          {heeftUitleg && (
-                            <button
-                              type="button"
-                              className="linkknop doel-uitleg-knop"
-                              onClick={() => toggleUitleg(d.code)}
-                            >
-                              {toon ? "Minder" : "Meer"}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="linkknop doel-uitleg-knop"
+                            onClick={() => setBewerken(d.code)}
+                          >
+                            Bewerk
+                          </button>
                         </div>
-                        {heeftUitleg && toon && (
-                          <div className="doel-uitleg">
-                            {d.uitleg && <p>{d.uitleg}</p>}
-                            {d.opmerking && (
-                              <p className="doel-opmerking">
-                                <strong>Opmerking:</strong> {d.opmerking}
-                              </p>
-                            )}
-                            <p className="doel-code">Code: {d.code}</p>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
+                      )}
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>

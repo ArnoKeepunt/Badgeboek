@@ -1,51 +1,76 @@
-# Student Points
+# Keerpunt Badgeboek
 
-Webapp to register a grading **color** for students. This is scaffolding only.
+Webapp om het **dagelijks werk** van leerlingen te registreren met het Keerpunt-badgeboek:
+per badge een **kleur** i.p.v. een cijfer. Vier kleuren, slechtst → best:
 
-The school doesn't use a numeric point system (they'd use Smartschool for that).
-Students are graded on a four-color scale, worst → best:
+`rood` → `geel` → `groen` → `blauw`   (wit / leeg = *niet aangeboden of nog niet geëvalueerd*)
 
-`red` → `yellow` → `green` → `blue`
+Geen cijfers, geen "geslaagd/gefaald" — enkel de kleur. Zie `src/lib/ratings.ts`.
 
-See `lib/ratings.ts` for the ordered list, labels, and `ratingRank()` for comparing.
+## Status
+
+Dit is een **prototype / testversie**, geen productie-app:
+
+- **Geen echte login** — `/aanmelden` is een demo; standaard ben je "beheerder" met volledige toegang.
+- **Alle data leeft in de browser** (`localStorage`). Niets wordt gedeeld tussen toestellen of
+  gebruikers en er is geen back-up. Cache wissen = data weg.
+- De leerlingen/mentoren zijn **fictief** (`docs/reference/fictieve_gebruikers_150ll_20mentoren.csv`).
+- **Geen ingebouwde AI**, geen server, geen externe calls.
+
+Voor een echte uitrol is nog nodig: echte authenticatie + autorisatie, een database/back-end,
+dagelijkse back-up, hosting in de Google-omgeving en een verwerkersovereenkomst (GDPR).
 
 ## Stack
 
 - React 19 + TypeScript
-- Vite
-- React Router (`createBrowserRouter`)
+- Vite 8
+- React Router 7 (`createHashRouter` — zie hieronder)
 
 ## Scripts
 
 ```bash
-npm run dev      # start dev server
-npm run build    # typecheck + production build
-npm run preview  # preview production build
+npm install
+npm run dev      # dev-server (http://localhost:3000)
+npm run build    # typecheck + productiebuild → dist/
+npm run preview  # dist/ lokaal bekijken
 npm run lint     # oxlint
 ```
 
-## Structure
+## Online zetten
+
+`npm run build` maakt een statische map `dist/`. Die kan je op **elk** adres of elke submap
+zetten (gewone webhosting, S3, Netlify, …) — er is geen server-side nodig.
+
+De routing gebruikt **hash-URLs** (`.../#/badges`), zodat deep links en verversen werken zonder
+dat de host onbekende paden naar `index.html` moet herschrijven. Wil je nette URLs
+(`.../badges`)? Zet `createHashRouter` in `src/router.tsx` terug naar `createBrowserRouter` en
+regel een SPA-fallback op de host.
+
+De asset-paden zijn relatief (`base: "./"` in `vite.config.ts`), dus `dist/` werkt zowel op een
+domein-root als in een submap.
+
+## Structuur (grote lijnen)
 
 ```
 src/
-  main.tsx            # entry, mounts RouterProvider
-  router.tsx          # route definitions
-  components/
-    Layout.tsx        # sidebar + topbar shell, renders <Outlet />
-    RatingBadge.tsx   # colored pill for a Rating
+  main.tsx              # entry
+  router.tsx            # routes (hash router)
+  components/           # Layout/Shell, RatingCell, ColorBar, BulkKnop, filterbalk, …
   pages/
-    Dashboard.tsx     # color distribution overview
-    Students.tsx      # student list with current color
-    StudentDetail.tsx # single student + color history
-    NotFound.tsx
+    Dashboard.tsx       # Overzicht (mentor): periode + voortgang per groep
+    Badges.tsx          # badgematrix: leerlingen × badges, kleur per rapport/periode
+    Doelen.tsx          # minimumdoelen-lijst per stroom (los van de badges)
+    Groepen.tsx         # eigen + systeemgroepen
+    Students.tsx        # leerlingenlijst
+    StudentDetail.tsx   # één leerling: badges × periodes
+    Aanmelden.tsx       # demo-login
+    LeerlingHome/Cursus # aparte, kindvriendelijke leerlingweergave
+    Gegevens.tsx        # CSV import/export
   lib/
-    types.ts          # Rating, Student, RatingEntry
-    ratings.ts        # RATINGS order, labels, ratingRank()
-    mockData.ts       # placeholder data — replace with API/store
+    store.ts            # useSyncExternalStore + localStorage
+    curriculum*.ts      # badgeboek 1A/1B/2A/3A (auto-gegenereerd uit de Word-docs)
+    minimumdoelen*.ts   # eindtermen per stroom (auto-gegenereerd uit de xlsx)
+    seedGebruikers.ts   # fictieve leerlingen/mentoren
+scripts/
+  extract_badgeboeken.py # regenereert curriculum*.ts uit docs/reference/*.docx
 ```
-
-## Next steps
-
-- Replace `lib/mockData.ts` with a real data source (API + fetch, or a state store).
-- Add a form to assign a color (with a reason) to a student.
-- Add auth if teachers need separate accounts.

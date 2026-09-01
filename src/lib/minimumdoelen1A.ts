@@ -5,6 +5,7 @@ import type { Minimumdoel } from "./minimumdoelen";
 export const minimumdoelen1A: Minimumdoel[] = [
   {
     code: "1A.ST.01.01",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.01",
@@ -14,6 +15,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.02",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.02",
@@ -23,6 +25,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.03",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.03",
@@ -32,6 +35,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.04",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.04",
@@ -41,6 +45,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.05",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.05",
@@ -50,6 +55,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.06",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.06",
@@ -59,6 +65,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.01.07",
+    stroom: "1A",
     competentieNr: 1,
     competentie: "1. Competenties op het vlak van lichamelijk, geestelijk en emotioneel bewustzijn en op vlak van lichamelijke, geestelijke en emotionele gezondheid",
     nummer: "01.07",
@@ -68,6 +75,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.01",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.01",
@@ -77,6 +85,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.02",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.02",
@@ -86,6 +95,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.03",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.03",
@@ -95,6 +105,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.04",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.04",
@@ -104,6 +115,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.05",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.05",
@@ -113,6 +125,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.06",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.06",
@@ -122,6 +135,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.07",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.07",
@@ -131,6 +145,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.08",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.08",
@@ -140,6 +155,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.09",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.09",
@@ -149,6 +165,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.10",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.10",
@@ -159,6 +176,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.11",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.11",
@@ -168,6 +186,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.12",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.12",
@@ -177,6 +196,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.02.13",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "02.13",
@@ -186,6 +206,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.02.01",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "BG02.01",
@@ -195,6 +216,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.02.02",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "BG02.02",
@@ -204,6 +226,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.02.03",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "BG02.03",
@@ -213,6 +236,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.01",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.01",
@@ -222,6 +246,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.02",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.02",
@@ -231,6 +256,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.03",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.03",
@@ -240,6 +266,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.04",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.04",
@@ -249,6 +276,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.05",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.05",
@@ -258,6 +286,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.06",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.06",
@@ -267,6 +296,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.07",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.07",
@@ -276,6 +306,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.08",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.08",
@@ -285,6 +316,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.09",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.09",
@@ -294,6 +326,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.10",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.10",
@@ -303,6 +336,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.11",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.11",
@@ -312,6 +346,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.UD.02.12",
+    stroom: "1A",
     competentieNr: 2,
     competentie: "2. Competenties in het Nederlands",
     nummer: "UD02.12",
@@ -321,6 +356,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.01",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.01",
@@ -330,6 +366,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.02",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.02",
@@ -339,6 +376,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.03",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.03",
@@ -348,6 +386,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.04",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.04",
@@ -357,6 +396,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.05",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.05",
@@ -366,6 +406,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.06",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.06",
@@ -375,6 +416,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.07",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.07",
@@ -384,6 +426,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.08",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.08",
@@ -393,6 +436,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.03.09",
+    stroom: "1A",
     competentieNr: 3,
     competentie: "3. Competenties in andere talen",
     nummer: "03.09",
@@ -402,6 +446,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.04.01",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "04.01",
@@ -411,6 +456,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.04.02",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "04.02",
@@ -420,6 +466,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.04.03",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "04.03",
@@ -429,6 +476,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.04.04",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "04.04",
@@ -438,6 +486,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.04.05",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "04.05",
@@ -447,6 +496,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.04.01",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "BG04.01",
@@ -456,6 +506,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.04.02",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "BG04.02",
@@ -465,6 +516,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.04.03",
+    stroom: "1A",
     competentieNr: 4,
     competentie: "4. Digitale competentie en mediawijsheid",
     nummer: "BG04.03",
@@ -474,6 +526,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.05.01",
+    stroom: "1A",
     competentieNr: 5,
     competentie: "5. Sociaal-relationele competenties",
     nummer: "05.01",
@@ -483,6 +536,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.01",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.01",
@@ -492,6 +546,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.02",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.02",
@@ -501,6 +556,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.03",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.03",
@@ -510,6 +566,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.04",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.04",
@@ -519,6 +576,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.05",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.05",
@@ -528,6 +586,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.06",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.06",
@@ -537,6 +596,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.07",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.07",
@@ -546,6 +606,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.08",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.08",
@@ -555,6 +616,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.09",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.09",
@@ -564,6 +626,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.10",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.10",
@@ -573,6 +636,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.11",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.11",
@@ -582,6 +646,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.12",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.12",
@@ -591,6 +656,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.13",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.13",
@@ -600,6 +666,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.14",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.14",
@@ -609,6 +676,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.15",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.15",
@@ -618,6 +686,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.16",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.16",
@@ -627,6 +696,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.17",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.17",
@@ -636,6 +706,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.18",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.18",
@@ -645,6 +716,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.19",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.19",
@@ -654,6 +726,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.20",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.20",
@@ -663,6 +736,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.21",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.21",
@@ -672,6 +746,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.22",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.22",
@@ -681,6 +756,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.23",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.23",
@@ -690,6 +766,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.24",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.24",
@@ -699,6 +776,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.25",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.25",
@@ -708,6 +786,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.26",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.26",
@@ -717,6 +796,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.27",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.27",
@@ -726,6 +806,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.28",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.28",
@@ -735,6 +816,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.29",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.29",
@@ -744,6 +826,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.30",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.30",
@@ -753,6 +836,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.31",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.31",
@@ -762,6 +846,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.32",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.32",
@@ -771,6 +856,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.33",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.33",
@@ -780,6 +866,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.34",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.34",
@@ -789,6 +876,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.35",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.35",
@@ -798,6 +886,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.36",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.36",
@@ -807,6 +896,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.37",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.37",
@@ -816,6 +906,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.38",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.38",
@@ -825,6 +916,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.39",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.39",
@@ -834,6 +926,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.40",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.40",
@@ -843,6 +936,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.41",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.41",
@@ -852,6 +946,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.42",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.42",
@@ -861,6 +956,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.43",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.43",
@@ -870,6 +966,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.06.44",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "06.44",
@@ -879,6 +976,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.06.01",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "BG06.01",
@@ -888,6 +986,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.06.02",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "BG06.02",
@@ -897,6 +996,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.06.03",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "BG06.03",
@@ -906,6 +1006,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.BG.06.04",
+    stroom: "1A",
     competentieNr: 6,
     competentie: "6. Competenties inzake wiskunde, exacte wetenschappen en technologie/STEM",
     nummer: "BG06.04",
@@ -915,6 +1016,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.07.01",
+    stroom: "1A",
     competentieNr: 7,
     competentie: "7. Burgerschapscompetenties met inbegrip van competenties inzake samenleven",
     nummer: "07.01",
@@ -924,6 +1026,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.07.02",
+    stroom: "1A",
     competentieNr: 7,
     competentie: "7. Burgerschapscompetenties met inbegrip van competenties inzake samenleven",
     nummer: "07.02",
@@ -933,6 +1036,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.07.03",
+    stroom: "1A",
     competentieNr: 7,
     competentie: "7. Burgerschapscompetenties met inbegrip van competenties inzake samenleven",
     nummer: "07.03",
@@ -942,6 +1046,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.07.04",
+    stroom: "1A",
     competentieNr: 7,
     competentie: "7. Burgerschapscompetenties met inbegrip van competenties inzake samenleven",
     nummer: "07.04",
@@ -951,6 +1056,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.01",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.01",
@@ -960,6 +1066,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.02",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.02",
@@ -969,6 +1076,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.03",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.03",
@@ -978,6 +1086,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.04",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.04",
@@ -987,6 +1096,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.05",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.05",
@@ -996,6 +1106,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.06",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.06",
@@ -1005,6 +1116,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.07",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.07",
@@ -1014,6 +1126,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.08",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.08",
@@ -1023,6 +1136,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.08.09",
+    stroom: "1A",
     competentieNr: 8,
     competentie: "8. Competenties met betrekking tot historisch bewustzijn",
     nummer: "08.09",
@@ -1032,6 +1146,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.01",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.01",
@@ -1041,6 +1156,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.02",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.02",
@@ -1050,6 +1166,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.03",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.03",
@@ -1059,6 +1176,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.04",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.04",
@@ -1068,6 +1186,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.05",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.05",
@@ -1077,6 +1196,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.06",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.06",
@@ -1086,6 +1206,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.07",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.07",
@@ -1095,6 +1216,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.09.08",
+    stroom: "1A",
     competentieNr: 9,
     competentie: "9. Competenties met betrekking tot ruimtelijk bewustzijn",
     nummer: "09.08",
@@ -1104,6 +1226,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.11.01",
+    stroom: "1A",
     competentieNr: 11,
     competentie: "11. Economische en financiële competenties",
     nummer: "11.01",
@@ -1113,6 +1236,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.11.02",
+    stroom: "1A",
     competentieNr: 11,
     competentie: "11. Economische en financiële competenties",
     nummer: "11.02",
@@ -1122,6 +1246,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.11.03",
+    stroom: "1A",
     competentieNr: 11,
     competentie: "11. Economische en financiële competenties",
     nummer: "11.03",
@@ -1131,6 +1256,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.13.01",
+    stroom: "1A",
     competentieNr: 13,
     competentie: "13. Leercompetenties met inbegrip van onderzoekscompetenties, innovatiedenken, creativiteit, probleemoplossend en kritisch denken, systeemdenken, informatieverwerking en samenwerken",
     nummer: "13.01",
@@ -1140,6 +1266,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.13.02",
+    stroom: "1A",
     competentieNr: 13,
     competentie: "13. Leercompetenties met inbegrip van onderzoekscompetenties, innovatiedenken, creativiteit, probleemoplossend en kritisch denken, systeemdenken, informatieverwerking en samenwerken",
     nummer: "13.02",
@@ -1149,6 +1276,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.13.03",
+    stroom: "1A",
     competentieNr: 13,
     competentie: "13. Leercompetenties met inbegrip van onderzoekscompetenties, innovatiedenken, creativiteit, probleemoplossend en kritisch denken, systeemdenken, informatieverwerking en samenwerken",
     nummer: "13.03",
@@ -1158,6 +1286,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.13.04",
+    stroom: "1A",
     competentieNr: 13,
     competentie: "13. Leercompetenties met inbegrip van onderzoekscompetenties, innovatiedenken, creativiteit, probleemoplossend en kritisch denken, systeemdenken, informatieverwerking en samenwerken",
     nummer: "13.04",
@@ -1167,6 +1296,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.15.01",
+    stroom: "1A",
     competentieNr: 15,
     competentie: "15. Ontwikkeling van initiatief, ambitie, ondernemingszin en loopbaancompetenties",
     nummer: "15.01",
@@ -1176,6 +1306,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.15.02",
+    stroom: "1A",
     competentieNr: 15,
     competentie: "15. Ontwikkeling van initiatief, ambitie, ondernemingszin en loopbaancompetenties",
     nummer: "15.02",
@@ -1185,6 +1316,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.16.01",
+    stroom: "1A",
     competentieNr: 16,
     competentie: "16. Cultureel bewustzijn en culturele expressie",
     nummer: "16.01",
@@ -1194,6 +1326,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.16.02",
+    stroom: "1A",
     competentieNr: 16,
     competentie: "16. Cultureel bewustzijn en culturele expressie",
     nummer: "16.02",
@@ -1203,6 +1336,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.16.03",
+    stroom: "1A",
     competentieNr: 16,
     competentie: "16. Cultureel bewustzijn en culturele expressie",
     nummer: "16.03",
@@ -1212,6 +1346,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.16.04",
+    stroom: "1A",
     competentieNr: 16,
     competentie: "16. Cultureel bewustzijn en culturele expressie",
     nummer: "16.04",
@@ -1221,6 +1356,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.ST.16.05",
+    stroom: "1A",
     competentieNr: 16,
     competentie: "16. Cultureel bewustzijn en culturele expressie",
     nummer: "16.05",
@@ -1230,6 +1366,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.01",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F1",
@@ -1239,6 +1376,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.02",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F2",
@@ -1248,6 +1386,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.03",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F3",
@@ -1257,6 +1396,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.04",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F4",
@@ -1266,6 +1406,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.05",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F5",
@@ -1275,6 +1416,7 @@ export const minimumdoelen1A: Minimumdoel[] = [
   },
   {
     code: "1A.FR.17.06",
+    stroom: "1A",
     competentieNr: 17,
     competentie: "17. Freinetvaardigheden",
     nummer: "F6",

@@ -1,17 +1,24 @@
-import type { Rating } from "./types";
+import type { Rating, Stroom } from "./types";
 import { minimumdoelen1A } from "./minimumdoelen1A";
+import { minimumdoelen1B } from "./minimumdoelen1B";
+import { minimumdoelen2A } from "./minimumdoelen2A";
 
 /**
- * De minimumdoelen / eindtermen (los van de badges). Voorlopig een vaste, ingekeken lijst;
- * de bedoeling is dat deze later ook aangepast kan worden. Bron: het decretale
- * eindtermenbestand voor de eerste graad A (zie docs/reference/doelen1GRA_volledig.xlsx).
+ * De minimumdoelen / eindtermen (los van de badges). Bron: de decretale eindtermenbestanden
+ * per graad/stroom (zie docs/reference/doelen*_volledig.xlsx). Dit is de basislijst; de app
+ * bewaart bewerkingen apart (doelWijzigingen in de store) en legt die er bovenop.
+ * 3e graad (3A) is nog niet aangeleverd.
  */
+
+export { STROMEN, STROOM_LABEL } from "./types";
+export type { Stroom } from "./types";
 
 export type DoelSoort = "standaard" | "basisgeletterdheid" | "uitbreiding" | "freinet";
 
 export interface Minimumdoel {
   /** Unieke code, bv. "1A.ST.01.01". */
   code: string;
+  stroom: Stroom;
   competentieNr: number;
   /** Volledige naam van de sleutelcompetentie. */
   competentie: string;
@@ -23,7 +30,23 @@ export interface Minimumdoel {
   opmerking?: string;
 }
 
-export const minimumdoelen: Minimumdoel[] = minimumdoelen1A;
+/** De volledige basislijst over alle aangeleverde stromen (1A + 1B + 2A). */
+export const alleMinimumdoelen: Minimumdoel[] = [
+  ...minimumdoelen1A,
+  ...minimumdoelen1B,
+  ...minimumdoelen2A,
+];
+
+/** Een doelenlijst met de opgeslagen per-doel-bewerkingen erover gelegd. */
+export function metWijzigingen(
+  basis: Minimumdoel[],
+  wijzigingen: Record<string, Partial<Minimumdoel>>,
+): Minimumdoel[] {
+  return basis.map((d) => {
+    const patch = wijzigingen[d.code];
+    return patch ? { ...d, ...patch } : d;
+  });
+}
 
 export const SOORT_LABEL: Record<DoelSoort, string> = {
   standaard: "Standaard",
@@ -50,7 +73,7 @@ export interface Competentie {
   doelen: Minimumdoel[];
 }
 
-export function competenties(lijst: Minimumdoel[] = minimumdoelen): Competentie[] {
+export function competenties(lijst: Minimumdoel[]): Competentie[] {
   const kaart = new Map<number, Competentie>();
   for (const d of lijst) {
     let c = kaart.get(d.competentieNr);

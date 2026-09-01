@@ -1,25 +1,68 @@
-import { Fragment } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ColorBar } from "../components/ColorBar";
+import { Fragment, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
 import { telKleuren } from "../lib/kleurstats";
 import {
-  cursussen,
+  cursussenVoorStroom,
   leerdoelenVoorCursus,
   leerdoelenVoorRubric,
   rubricsVoorCursus,
 } from "../lib/curriculum";
-import { GRAAD_LABEL, graadVan } from "../lib/leerlingen";
-import { ALGEMEEN, PERIODES } from "../lib/periode";
+import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
+import { PERIODES } from "../lib/periode";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { getDoelKleur, setDoelKleur, useStore } from "../lib/store";
+
+/**
+ * Leerlingdetail: dezelfde badges als in de badgematrix (`Badges.tsx`), maar met de vijf
+ * periodes als kolommen voor één leerling. Cursussen en rubrics zijn in- en uitklapbaar op
+ * exact dezelfde manier als in de matrix; de koprij en de eerste kolom (badgetekst) blijven
+ * leesbaar staan bij het scrollen.
+ */
+
+const FOLD_KEY = "keerpunt-badgeboek:student-fold";
+
+interface Fold {
+  cursus: string[];
+  rubric: string[];
+}
+
+function loadFold(): Fold {
+  try {
+    const raw = localStorage.getItem(FOLD_KEY);
+    if (raw) return JSON.parse(raw) as Fold;
+  } catch {
+    // geen opgeslagen stand — begin volledig uitgeklapt
+  }
+  return { cursus: [], rubric: [] };
+}
+
+const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
+const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id]);
 
 export function StudentDetail() {
   const { studentId } = useParams();
   const { students, kleuren, schooljaar } = useStore();
+  const [fold, setFold] = useState<Fold>(loadFold);
   const student = students.find((s) => s.id === studentId);
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  // "Terug" gaat naar de vorige pagina (bv. de matrix), of naar de leerlingenlijst als er
+  // geen geschiedenis is (rechtstreeks geopende link).
+  const kanTerug = location.key !== "default";
+  const terug = () => (kanTerug ? navigate(-1) : navigate("/students"));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FOLD_KEY, JSON.stringify(fold));
+    } catch {
+      // opslag niet beschikbaar — stand blijft enkel voor deze sessie
+    }
+  }, [fold]);
 
   if (!student) {
     return (
@@ -30,9 +73,38 @@ export function StudentDetail() {
     );
   }
 
+  const stroom = stroomVan(student);
+  const cursussen = cursussenVoorStroom(stroom);
+
+  const toggleCursus = (id: string) =>
+    setFold((f) => ({
+      ...f,
+      cursus: f.cursus.includes(id) ? zonder(f.cursus, id) : met(f.cursus, id),
+    }));
+  const toggleRubric = (id: string) =>
+    setFold((f) => ({
+      ...f,
+      rubric: f.rubric.includes(id) ? zonder(f.rubric, id) : met(f.rubric, id),
+    }));
+
+  const allesDicht = () => {
+    const cursusIds = cursussen.map((c) => c.id);
+    const rubricIds = cursusIds.flatMap((id) => rubricsVoorCursus(id).map((r) => r.id));
+    setFold({ cursus: cursusIds, rubric: rubricIds });
+  };
+  const allesOpen = () => setFold({ cursus: [], rubric: [] });
+
+  const telVoor = (doelen: { id: string }[], periodeId: string) =>
+    telKleuren(doelen.map((d) => getDoelKleur(kleuren, schooljaar, periodeId, student.id, d.id)));
+
   return (
     <section>
-      <Link to="/students">&larr; Leerlingen</Link>
+      <div className="detail-terug">
+        <button type="button" className="linkknop" onClick={terug}>
+          &larr; Terug
+        </button>
+        <Link to="/students">Alle leerlingen</Link>
+      </div>
       <h1>
         {student.firstName} {student.lastName}
       </h1>
@@ -53,76 +125,129 @@ export function StudentDetail() {
       )}
 
       <p style={{ color: "var(--text-muted)" }}>
-        Per badge: een kleur per rapport (R1–R4) en een algemene kleur.
+        Badgeboek {stroom}. Elke badge krijgt een kleur per rapport (R1–R4) en een algemene
+        kleur — net dezelfde gegevens als in de <Link to="/badges">badgematrix</Link>.
       </p>
 
-      {cursussen.map((cursus) => {
-        const cursusDoelen = leerdoelenVoorCursus(cursus.id);
-        // De cursussamenvatting kijkt naar de algemene kleur.
-        const telling = telKleuren(
-          cursusDoelen.map((d) => getDoelKleur(kleuren, schooljaar, ALGEMEEN, student.id, d.id)),
-        );
-        return (
-          <div key={cursus.id} style={{ marginTop: 28 }}>
-            <div className="cursus-kop">
-              <h2>{cursus.naam}</h2>
-              <span className="cursus-kop-meta">
-                {cursusDoelen.length - telling.leeg}/{cursusDoelen.length} algemeen ingevuld
-              </span>
-              <ColorBar telling={telling} />
-            </div>
+      <div className="matrix-acties">
+        <button type="button" className="linkknop" onClick={allesOpen}>
+          Alles uitklappen
+        </button>
+        <button type="button" className="linkknop" onClick={allesDicht}>
+          Alles inklappen
+        </button>
+      </div>
 
-            <div className="grid-wrap">
-              <table className="grid">
-                <thead>
-                  <tr>
-                    <th className="grid-col-doel">Badge</th>
-                    {PERIODES.map((p) => (
-                      <th key={p.id} className="grid-col-periode" title={p.label}>
-                        {p.kort}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rubricsVoorCursus(cursus.id).map((rubric) => (
-                    <Fragment key={rubric.id}>
-                      <tr className="grid-group">
-                        <th className="grid-col-doel" colSpan={PERIODES.length + 1}>
-                          {rubric.naam}
-                        </th>
-                      </tr>
-                      {leerdoelenVoorRubric(rubric.id).map((doel) => (
-                        <tr key={doel.id}>
-                          <td className="grid-col-doel grid-doel">{doel.omschrijving}</td>
-                          {PERIODES.map((p) => (
-                            <td key={p.id} className="grid-cel">
-                              <RatingCell
-                                label={`${doel.omschrijving} — ${p.label}`}
-                                readonly={vergrendeld}
-                                value={getDoelKleur(
-                                  kleuren,
-                                  schooljaar,
-                                  p.id,
-                                  student.id,
-                                  doel.id,
-                                )}
-                                onChange={(next) =>
-                                  setDoelKleur(schooljaar, p.id, student.id, doel.id, next)
-                                }
-                              />
-                            </td>
-                          ))}
+      <div className="grid-wrap">
+        <table className="grid grid--rustig">
+          <thead>
+            <tr>
+              <th className="grid-col-doel">Badge</th>
+              {PERIODES.map((p) => (
+                <th key={p.id} className="grid-col-periode" title={p.label}>
+                  {p.kort}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          {cursussen.map((cursus) => {
+            const cursusDicht = fold.cursus.includes(cursus.id);
+            const cursusDoelen = leerdoelenVoorCursus(cursus.id);
+            return (
+              <tbody key={cursus.id}>
+                <tr className="grid-cursus">
+                  <th className="grid-col-doel">
+                    <button
+                      type="button"
+                      className="grid-toggle"
+                      onClick={() => toggleCursus(cursus.id)}
+                    >
+                      <span className="grid-caret">{cursusDicht ? "▶" : "▼"}</span>
+                      {cursus.naam}
+                      <span className="grid-count">{cursusDoelen.length}</span>
+                    </button>
+                  </th>
+                  {PERIODES.map((p) => {
+                    const t = telVoor(cursusDoelen, p.id);
+                    return (
+                      <td key={p.id} className="grid-tel-cel">
+                        {cursusDoelen.length - t.leeg}/{cursusDoelen.length}
+                      </td>
+                    );
+                  })}
+                </tr>
+
+                {!cursusDicht &&
+                  rubricsVoorCursus(cursus.id).map((rubric) => {
+                    const rubricDicht = fold.rubric.includes(rubric.id);
+                    const doelen = leerdoelenVoorRubric(rubric.id);
+                    return (
+                      <Fragment key={rubric.id}>
+                        <tr className="grid-group">
+                          <th className="grid-col-doel">
+                            <button
+                              type="button"
+                              className="grid-toggle"
+                              onClick={() => toggleRubric(rubric.id)}
+                            >
+                              <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
+                              {rubric.naam}
+                              <span className="grid-count">{doelen.length}</span>
+                            </button>
+                          </th>
+                          {PERIODES.map((p) => {
+                            const t = telVoor(doelen, p.id);
+                            return (
+                              <td key={p.id} className="grid-tel-cel">
+                                {doelen.length - t.leeg}/{doelen.length}
+                              </td>
+                            );
+                          })}
                         </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })}
+
+                        {!rubricDicht &&
+                          doelen.map((doel) => (
+                            <tr key={doel.id}>
+                              <td className="grid-col-doel grid-doel">
+                                <div className="grid-doel-rij">
+                                  <span className="grid-doel-tekst">{doel.omschrijving}</span>
+                                  <NotitieVeld
+                                    schooljaar={schooljaar}
+                                    studentId={student.id}
+                                    leerdoelId={doel.id}
+                                    readonly={vergrendeld}
+                                  />
+                                </div>
+                              </td>
+                              {PERIODES.map((p) => (
+                                <td key={p.id} className="grid-cel">
+                                  <RatingCell
+                                    label={`${doel.omschrijving} — ${p.label}`}
+                                    readonly={vergrendeld}
+                                    value={getDoelKleur(
+                                      kleuren,
+                                      schooljaar,
+                                      p.id,
+                                      student.id,
+                                      doel.id,
+                                    )}
+                                    onChange={(next) =>
+                                      setDoelKleur(schooljaar, p.id, student.id, doel.id, next)
+                                    }
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
+              </tbody>
+            );
+          })}
+        </table>
+      </div>
     </section>
   );
 }

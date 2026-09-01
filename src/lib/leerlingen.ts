@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
-import type { Student } from "./types";
+import type { Stroom, Student } from "./types";
 
 /** 1-2 → 1e graad, 3-4 → 2e graad, 5-6 → 3e graad. */
 export const graadVan = (leerjaar: number): number => Math.ceil(leerjaar / 2);
+
+/**
+ * De stroom (badgeboek) van een leerling. In de 1e graad bestaat A én B; vanaf de 2e graad
+ * werken we (voorlopig) enkel met de A-stroom.
+ */
+export const stroomVan = (s: Student): Stroom => {
+  const g = graadVan(s.leerjaar);
+  if (g === 1) return s.klasgroep === "B" ? "1B" : "1A";
+  if (g === 2) return "2A";
+  return "3A";
+};
 
 export const GRAAD_LABEL: Record<number, string> = {
   1: "1e graad",

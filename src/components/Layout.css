@@ -13,6 +13,12 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* Blijft in beeld, ook op lange pagina's — het account onderaan is altijd bereikbaar. */
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100svh;
+  overflow-y: auto;
 }
 
 .brand {
@@ -93,6 +99,74 @@
   font-size: 13px;
 }
 
+/* Account onderaan de zijbalk (gebruikersstijl). */
+.sidebar-account {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-account-hoofd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sidebar-avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sidebar-account-tekst {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-account-naam {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-account-rol {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.sidebar-account-actie {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  text-decoration: none;
+}
+
+.sidebar-account-actie:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
 .content {
   padding: 28px 24px;
   max-width: 960px;
@@ -113,11 +187,30 @@
   .sidebar {
     flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
     border-right: none;
     border-bottom: 1px solid var(--border);
+    /* Bovenaan geen volledige schermhoogte; wel sticky als topbalk. */
+    height: auto;
+    overflow: visible;
+    z-index: 20;
   }
 
   .sidebar nav {
     flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-account {
+    margin-top: 0;
+    margin-left: auto;
+    border-top: 0;
+    padding-top: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .sidebar-account-tekst {
+    display: none;
   }
 }

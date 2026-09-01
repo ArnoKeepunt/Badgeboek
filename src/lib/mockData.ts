@@ -1,25 +1,13 @@
-import { leerdoelen } from "./curriculum";
+import { leerdoelenVoorStroom } from "./curriculum";
+import { stroomVan } from "./leerlingen";
 import type { PeriodeId } from "./periode";
-import type { DoelKleuren, Rating, Student } from "./types";
+import { seedLeerlingen, seedMentoren } from "./seedGebruikers";
+import type { DoelKleuren, Mentor, Rating, Student } from "./types";
 import { doelSleutel } from "./types";
 
-/** Seed-data — vervang later door een echte databron. Wordt gebruikt tot je iets aanpast. */
-export const students: Student[] = [
-  { id: "s1", firstName: "Emma", lastName: "Janssens", vestiging: "Gent", leerjaar: 2, klasgroep: "A" },
-  { id: "s2", firstName: "Lucas", lastName: "Peeters", vestiging: "Gent", leerjaar: 2, klasgroep: "A" },
-  { id: "s3", firstName: "Noor", lastName: "De Vries", vestiging: "Brugge", leerjaar: 1, klasgroep: "B" },
-  { id: "s4", firstName: "Milan", lastName: "Maes", vestiging: "Brugge", leerjaar: 1, klasgroep: "B" },
-  { id: "s5", firstName: "Amir", lastName: "Haddad", vestiging: "Gent", leerjaar: 1, klasgroep: "A" },
-  { id: "s6", firstName: "Lena", lastName: "Willems", vestiging: "Gent", leerjaar: 3, klasgroep: "A" },
-  { id: "s7", firstName: "Ravi", lastName: "Patel", vestiging: "Gent", leerjaar: 4, klasgroep: "A" },
-  { id: "s8", firstName: "Fien", lastName: "Claes", vestiging: "Gent", leerjaar: 4, klasgroep: "B" },
-  { id: "s9", firstName: "Jonas", lastName: "Hermans", vestiging: "Brugge", leerjaar: 3, klasgroep: "B" },
-  { id: "s10", firstName: "Yasmine", lastName: "Bakker", vestiging: "Brugge", leerjaar: 5, klasgroep: "A" },
-  { id: "s11", firstName: "Tuur", lastName: "Vermeulen", vestiging: "Gent", leerjaar: 6, klasgroep: "A" },
-  { id: "s12", firstName: "Sara", lastName: "Aydin", vestiging: "Gent", leerjaar: 6, klasgroep: "B" },
-  { id: "s13", firstName: "Wout", lastName: "Declercq", vestiging: "Brugge", leerjaar: 2, klasgroep: "B" },
-  { id: "s14", firstName: "Nina", lastName: "Coppens", vestiging: "Brugge", leerjaar: 5, klasgroep: "B" },
-];
+/** Seed-data uit de fictieve-gebruikerslijst. Vervangbaar via CSV-import op /gegevens. */
+export const students: Student[] = seedLeerlingen;
+export const mentoren: Mentor[] = seedMentoren;
 
 /** Deterministische "hash" van een string → niet-negatief getal. */
 const hash = (s: string): number =>
@@ -42,23 +30,27 @@ function seedKleur(bron: string): Rating {
 
 /**
  * Per schooljaar: de kans dat een cel al ingevuld is, en welke periodes al data hebben.
- * Zo ontstaat het verschil tussen vaste content (2024-2025, afgesloten, alle rapporten +
- * algemeen, zo goed als vol), nog aanpasbare content (2025-2026, open, rapport 1-3 +
- * algemeen) en content waar nog aan begonnen moet worden (2026-2027, lopend schooljaar,
- * enkel rapport 1, grotendeels leeg).
+ * Enkel de eerste leerlingen krijgen seed-kleuren — anders wordt localStorage te groot.
  */
 const SEED_CONFIG: Record<string, { dichtheid: number; periodes: PeriodeId[] }> = {
-  "2024-2025": { dichtheid: 0.92, periodes: ["algemeen", "p1", "p2", "p3", "p4"] },
-  "2025-2026": { dichtheid: 0.78, periodes: ["algemeen", "p1", "p2", "p3"] },
-  "2026-2027": { dichtheid: 0.14, periodes: ["p1"] },
+  "2024-2025": { dichtheid: 0.85, periodes: ["algemeen", "p1", "p2"] },
+  "2025-2026": { dichtheid: 0.6, periodes: ["algemeen", "p1"] },
+  "2026-2027": { dichtheid: 0.12, periodes: ["p1"] },
 };
+
+const GESEEDE_LEERLINGEN = students.slice(0, 16);
+
+/** De badges van elke geseede leerling, volgens zijn/haar eigen stroom (1A, 1B, 2A, 3A). */
+const DOELEN_PER_LEERLING = new Map(
+  GESEEDE_LEERLINGEN.map((s) => [s.id, leerdoelenVoorStroom(stroomVan(s))]),
+);
 
 export const doelKleuren: DoelKleuren = (() => {
   const map: DoelKleuren = {};
   for (const [schooljaar, { dichtheid, periodes }] of Object.entries(SEED_CONFIG)) {
     for (const periode of periodes) {
-      for (const student of students) {
-        for (const doel of leerdoelen) {
+      for (const student of GESEEDE_LEERLINGEN) {
+        for (const doel of DOELEN_PER_LEERLING.get(student.id) ?? []) {
           const bron = `${schooljaar}:${periode}:${student.id}:${doel.id}`;
           if ((hash(`${bron}#fill`) % 100) / 100 < dichtheid) {
             map[doelSleutel(schooljaar, periode, student.id, doel.id)] = seedKleur(bron);

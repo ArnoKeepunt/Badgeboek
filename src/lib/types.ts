@@ -10,10 +10,22 @@ export type Rating = 'red' | 'yellow' | 'green' | 'blue'
  */
 export type DoelCategorie = "standaard" | "basisgeletterdheid" | "uitbreiding" | "freinet";
 
+/** Graad + stroom, zoals de badgeboeken en de eindtermenbestanden. */
+export type Stroom = "1A" | "1B" | "2A" | "3A";
+
+export const STROMEN: Stroom[] = ["1A", "1B", "2A", "3A"];
+
+export const STROOM_LABEL: Record<Stroom, string> = {
+  "1A": "1e graad A",
+  "1B": "1e graad B",
+  "2A": "2e graad A",
+  "3A": "3e graad",
+};
+
 export interface Cursus {
   id: string;
+  stroom: Stroom;
   naam: string;
-  graad: number;
 }
 
 /** Bundeling van leerdoelen binnen een cursus (soms 'cluster' genoemd). */
@@ -23,14 +35,28 @@ export interface Rubric {
   naam: string;
 }
 
+/** Criteria per kleur bij een leerdoel (uit de badgeboek-rubrics). */
+export interface Kleurcriteria {
+  blauw: string;
+  groen: string;
+  geel: string;
+  rood: string;
+}
+
 export interface Leerdoel {
   id: string;
   rubricId: string;
   omschrijving: string;
   categorie: DoelCategorie;
+  /** Optioneel: de rubric-omschrijving per kleur. */
+  kleuren?: Kleurcriteria;
 }
 
+/** De rollen die de app (voorlopig) kent. */
+export type Basisrol = "leerling" | "mentor";
+
 export interface Student {
+  /** Stabiele sleutel — bedoeld als de Smartschool/OneRoster-gebruikersnaam of sourcedId. */
   id: string;
   firstName: string;
   lastName: string;
@@ -39,6 +65,24 @@ export interface Student {
   leerjaar: number;
   /** Klasgroep binnen het leerjaar, bv. "A" of "B". */
   klasgroep: string;
+  email?: string;
+  /** Fictief wachtwoord (enkel voor de demo-login; nooit een echt geheim). */
+  wachtwoord?: string;
+}
+
+export interface Mentor {
+  id: string;
+  voornaam: string;
+  naam: string;
+  vestiging: string;
+  email?: string;
+  wachtwoord?: string;
+}
+
+/** Wie er momenteel is aangemeld. Enkel voor deze browsertab (sessionStorage). */
+export interface Sessie {
+  rol: Basisrol;
+  id: string;
 }
 
 /** Zelfgemaakte leerlingengroep: een naam + een verzameling leerlingen. */
@@ -46,6 +90,8 @@ export interface Groep {
   id: string;
   naam: string;
   leerlingIds: string[];
+  /** Koppeling: de mentor die deze groep aanmaakte / opvolgt. */
+  mentorId?: string;
 }
 
 /**
@@ -62,3 +108,22 @@ export const doelSleutel = (
   studentId: string,
   leerdoelId: string,
 ): string => `${schooljaar}:${periode}:${studentId}:${leerdoelId}`;
+
+/** Notitie bij een badge voor één leerling in één schooljaar. */
+export interface Notitie {
+  /** Zichtbaar voor de leerling. */
+  zichtbaar: string;
+  /** Enkel voor mentoren/beheerders. */
+  verborgen: string;
+}
+
+/** Sleutel `${schooljaar}:${studentId}:${leerdoelId}` → Notitie. */
+export type Notities = Record<string, Notitie>;
+
+export const notitieSleutel = (
+  schooljaar: string,
+  studentId: string,
+  leerdoelId: string,
+): string => `${schooljaar}:${studentId}:${leerdoelId}`;
+
+export const LEGE_NOTITIE: Notitie = { zichtbaar: "", verborgen: "" };

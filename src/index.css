@@ -152,6 +152,64 @@ th {
   margin-right: 2px;
 }
 
+.periode-balk-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Voortgangskaarten op het overzicht */
+.voortgang-kaarten {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.voortgang-kaart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voortgang-kaart-kop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.voortgang-kaart-titel {
+  font-weight: 700;
+}
+
+.voortgang-kaart-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.voortgang-kaart-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.voortgang-strook {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.voortgang-strook > span {
+  display: block;
+  height: 100%;
+}
+
 .grid-col-periode {
   min-width: 74px;
   text-align: center;
@@ -234,6 +292,16 @@ th {
   color: var(--text-muted);
 }
 
+.doel-stroom {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .doel-omschrijving {
   flex: 1 1 300px;
 }
@@ -269,6 +337,53 @@ th {
   font-size: 11px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.doel-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doel-editor-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.doel-editor-veld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.doel-editor-veld > span {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.doel-editor-veld select,
+.doel-editor-veld textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+}
+
+.doel-editor-acties {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 2px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -315,23 +430,26 @@ th {
 .grid thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 6;
   background: var(--surface);
   border-bottom: 2px solid var(--border);
   text-align: center;
   white-space: nowrap;
 }
 
-/* Eerste kolom blijft in beeld bij horizontaal schuiven. */
+/* Eerste kolom blijft in beeld bij horizontaal schuiven. Dekkende achtergrond + rechterrand
+   zodat de badgetekst leesbaar blijft en de cellen er netjes onder wegschuiven. */
 .grid-col-doel {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 5;
   min-width: 220px;
   max-width: 340px;
   text-align: left;
   text-transform: none;
   letter-spacing: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
 }
 
 @media (min-width: 720px) {
@@ -341,7 +459,7 @@ th {
 }
 
 .grid thead .grid-col-doel {
-  z-index: 3;
+  z-index: 7;
 }
 
 .grid-col-kleur {
@@ -356,6 +474,11 @@ th {
   letter-spacing: 0;
 }
 
+.grid-col-leerling a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .grid-col-leerling-sub {
   display: block;
   font-weight: 400;
@@ -368,6 +491,169 @@ th {
   line-height: 1.4;
   color: var(--text);
   padding-left: 28px;
+}
+
+/* De inhoud van de badge-cel flext; de <td> zelf blijft een gewone tabelcel, anders
+   werkt de sticky eerste kolom (en haar dekkende achtergrond) niet betrouwbaar. */
+.grid-doel-rij {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* Terwijl een bulk-/notitiemenu open staat, moet die vaste eerste kolom boven de
+   andere vaste cellen (koprij, andere rijen) komen — anders verdwijnt het menu erachter. */
+.grid .grid-col-doel:has(.bulk-menu),
+.grid .grid-col-doel:has(.notitie-panel) {
+  z-index: 45;
+}
+
+.grid-doel-tekst {
+  flex: 1;
+}
+
+.detail-terug {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.detail-terug a {
+  font-weight: 600;
+}
+
+/* Klikbare leerlingenrijen */
+.leerling-rij {
+  cursor: pointer;
+}
+
+.leerling-rij:hover td {
+  background: var(--accent-soft);
+}
+
+.leerling-naam {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.leerling-rij:hover .leerling-naam {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Bulk-kleur voor een hele rij */
+.bulk-knop {
+  position: relative;
+  flex: none;
+}
+
+.bulk-knop-trigger {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.grid tbody tr:hover .bulk-knop-trigger,
+.bulk-knop-trigger:focus-visible,
+.bulk-knop-trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.bulk-knop-trigger:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.bulk-menu {
+  right: 0;
+  left: auto;
+  transform: none;
+  min-width: 210px;
+}
+
+.bulk-menu-kop {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Notitie bij een badge */
+.notitie {
+  position: relative;
+  flex: none;
+}
+
+.notitie-knop {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.notitie-knop.heeft-notitie {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.notitie-knop:hover {
+  color: var(--text);
+}
+
+.notitie-panel {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 360px;
+  max-width: 78vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notitie-veld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.notitie-veld > span {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.notitie-veld textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .grid tbody tr:hover td,
@@ -429,6 +715,25 @@ th {
   font-size: 11px;
 }
 
+/* Eén stroom = één tabel; bij meerdere stromen komen ze onder elkaar met een titel. */
+.stroom-matrix + .stroom-matrix {
+  margin-top: 32px;
+}
+
+.stroom-matrix-titel {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.stroom-matrix-titel span {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .grid-tel-cel {
   text-align: center;
   color: var(--text-muted);
@@ -439,6 +744,12 @@ th {
 .grid-cel {
   padding: 4px 8px;
   text-align: center;
+}
+
+/* Leerlingdetail: rustige tabel zonder rij-hover. */
+.grid--rustig tbody tr:hover td,
+.grid--rustig tbody tr:hover .grid-col-doel {
+  background: var(--surface);
 }
 
 .grid tfoot th,
@@ -578,6 +889,435 @@ th {
 }
 
 /* ---------------------------------------------------------------------------
+   Gegevens (CSV im/export)
+   --------------------------------------------------------------------------- */
+
+.gegevens-kaarten {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.gegevens-kaart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 16px;
+  flex: 1 1 260px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gegevens-kaart-naam {
+  font-weight: 700;
+}
+
+.gegevens-kaart p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.gegevens-kaart code {
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.gegevens-melding {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.gegevens-melding.is-ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.gegevens-melding.is-fout {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.gegevens-melding ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------------------------------------------------------------------------
+   Aanmelden + leerlingweergave
+   --------------------------------------------------------------------------- */
+
+.aanmeld-lijst {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.aanmeld-rij {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+}
+
+.aanmeld-rij:last-child {
+  border-bottom: 0;
+}
+
+.aanmeld-rij:hover {
+  background: #fafafc;
+}
+
+.aanmeld-rij.is-gekozen {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.aanmeld-sub {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.aanmeld-bevestig {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.aanmeld-bevestig input {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 240px;
+}
+
+.mijn-rubric {
+  padding: 10px 4px 4px 28px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ===========================================================================
+   Leerlingweergave — eigen, eenvoudige layout (geen zijbalk, geen tabellen)
+   =========================================================================== */
+
+.ll-shell {
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+.ll-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 60px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.ll-brand {
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ll-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ll-afmelden {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ll-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+.ring-getal {
+  font-weight: 800;
+  fill: var(--text);
+  font-size: 20px;
+}
+
+.ring-groot .ring-getal {
+  font-size: 34px;
+}
+
+.ring-totaal {
+  fill: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.55em;
+}
+
+/* --- Home ------------------------------------------------------------------ */
+
+.ll-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px 26px;
+}
+
+.ll-hero-tekst {
+  flex: 1 1 260px;
+}
+
+.ll-hero-tekst h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+}
+
+.ll-hero-tekst p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.ll-hero-cijfer {
+  margin-top: 10px !important;
+  font-size: 17px !important;
+  color: var(--text) !important;
+}
+
+.ll-hero-klaar {
+  color: #166534;
+  font-weight: 600;
+}
+
+.ll-kop {
+  margin: 32px 0 12px;
+  font-size: 18px;
+}
+
+.ll-cursussen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.ll-cursus-kaart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ll-cursus-kaart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ll-cursus-boven {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ll-cursus-naam {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.ll-cursus-stand {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ll-strook {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.ll-strook > span {
+  display: block;
+  height: 100%;
+}
+
+.ll-strook-leeg {
+  background: var(--border);
+}
+
+/* --- Cursusdetail -------------------------------------------------------- */
+
+.ll-terug {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.ll-cursus-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 22px 24px;
+}
+
+.ll-cursus-hero h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.ll-cursus-hero p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.ll-rubriek {
+  margin-top: 26px;
+}
+
+.ll-rubriek h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.ll-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ll-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px 16px;
+}
+
+.ll-badge-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ll-badge-tekst {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.ll-badge-notitie {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.ll-status {
+  flex: none;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ll-status.st-blauw {
+  background: #eff6ff;
+  color: #1e40af;
+}
+.ll-status.st-groen {
+  background: #f0fdf4;
+  color: #166534;
+}
+.ll-status.st-geel {
+  background: #fffbeb;
+  color: #92400e;
+}
+.ll-status.st-rood {
+  background: #fef2f2;
+  color: #991b1b;
+}
+.ll-status.st-leeg {
+  background: var(--bg);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ll-leeg {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
    Foutpagina (404 + crash)
    --------------------------------------------------------------------------- */
 
@@ -651,9 +1391,11 @@ th {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
-.groep-editor-rij input {
+.groep-editor-rij input,
+.groep-editor-rij select {
   font: inherit;
   font-size: 13px;
   padding: 7px 10px;
@@ -670,6 +1412,10 @@ th {
 
 .groep-editor-rij input[type="search"] {
   flex: 1 1 180px;
+}
+
+.groep-editor-rij select {
+  flex: 1 1 160px;
 }
 
 .groep-editor-meta {
@@ -722,34 +1468,134 @@ th {
 }
 
 .groep-kaarten {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
 }
 
 .groep-kaart {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  padding: 14px 16px;
-  min-width: 220px;
-  flex: 1 1 240px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .groep-kaart-naam {
   font-weight: 700;
+  font-size: 15px;
 }
 
 .groep-kaart-meta {
   font-size: 12px;
   color: var(--text-muted);
-  margin: 2px 0 10px;
+  margin: -6px 0 0;
 }
 
 .groep-kaart-acties {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* Avatars */
+.groep-avatars {
+  display: flex;
+}
+
+.groep-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 2px solid var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: -8px;
+}
+
+.groep-avatar:first-child {
+  margin-left: 0;
+}
+
+.groep-avatar-rest {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+/* Samenstelling per stroom */
+.groep-samenstelling {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.groep-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.groep-chip strong {
+  color: var(--text);
+}
+
+/* Standaardgroepen: mini-kaarten met verhoudingsbalk */
+.groep-soort-kop {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+}
+
+.groep-mini-kaarten {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.groep-mini-kaart {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px 14px;
+  font: inherit;
+  text-align: left;
+}
+
+.groep-mini-kaart:hover {
+  border-color: var(--accent);
+}
+
+.groep-mini-naam {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.groep-mini-aantal {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.groep-mini-aantal span {
+  font-size: 12px;
 }
 
 .groep-lijst {
