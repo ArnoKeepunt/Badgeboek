@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { usePopover } from "../lib/popover";
 import type { Rating } from "../lib/types";
 import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL } from "../lib/ratings";
 
 /**
  * Eén cel in de doelenmatrix, in de stijl van een Notion "status"-eigenschap:
  * de cel toont de huidige kleur; klikken opent een klein menu om te kiezen of te wissen.
+ * Het menu hangt aan document.body (portal) zodat het buiten het rooster kan vallen.
  */
 export function RatingCell({
   value,
@@ -20,13 +23,12 @@ export function RatingCell({
   readonly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pos = usePopover(open, trigger, () => setOpen(false), {
+    breedte: 176,
+    hoogte: 244,
+    uitlijn: "midden",
+  });
 
   const kies = (next: Rating | null) => {
     onChange(next);
@@ -48,6 +50,7 @@ export function RatingCell({
   return (
     <div className="rating-cell">
       <button
+        ref={trigger}
         type="button"
         className={`rating-cell-btn rating-${value ?? "empty"}`}
         aria-haspopup="menu"
@@ -58,39 +61,46 @@ export function RatingCell({
         {value ? RATING_LABEL[value] : "–"}
       </button>
 
-      {open && (
-        <>
-          <button
-            type="button"
-            className="rating-cell-backdrop"
-            aria-label="Sluiten"
-            onClick={() => setOpen(false)}
-          />
-          <div className="rating-cell-menu" role="menu">
-            {RATINGS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                role="menuitem"
-                className={`rating-cell-option rating-${r}${value === r ? " is-current" : ""}`}
-                onClick={() => kies(r)}
-              >
-                <span className="rating-dot" />
-                {RATING_LABEL[r]}
-              </button>
-            ))}
+      {open &&
+        pos &&
+        createPortal(
+          <>
             <button
               type="button"
-              role="menuitem"
-              className={`rating-cell-option rating-empty${value === null ? " is-current" : ""}`}
-              onClick={() => kies(null)}
+              className="rating-cell-backdrop"
+              aria-label="Sluiten"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              className="rating-cell-menu zwevend-menu"
+              role="menu"
+              style={{ top: pos.top, left: pos.left }}
             >
-              <span className="rating-dot" />
-              {RATING_EMPTY_LABEL}
-            </button>
-          </div>
-        </>
-      )}
+              {RATINGS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  role="menuitem"
+                  className={`rating-cell-option rating-${r}${value === r ? " is-current" : ""}`}
+                  onClick={() => kies(r)}
+                >
+                  <span className="rating-dot" />
+                  {RATING_LABEL[r]}
+                </button>
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                className={`rating-cell-option rating-empty${value === null ? " is-current" : ""}`}
+                onClick={() => kies(null)}
+              >
+                <span className="rating-dot" />
+                {RATING_EMPTY_LABEL}
+              </button>
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }

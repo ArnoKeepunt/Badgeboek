@@ -72,10 +72,24 @@ export const unieke = <T extends string | number>(waarden: T[]): T[] =>
 
 const FILTER_KEY = "keerpunt-badgeboek:leerling-filter";
 
+/** Graad en leerjaar consistent houden: bij een tegenstrijdige combinatie wint het leerjaar. */
+export function verzoenGraadLeerjaar(f: LeerlingFilter): LeerlingFilter {
+  if (f.leerjaar) {
+    const g = String(graadVan(Number(f.leerjaar)));
+    return f.graad === g ? f : { ...f, graad: g };
+  }
+  return f;
+}
+
 function loadFilter(): LeerlingFilter {
   try {
     const raw = localStorage.getItem(FILTER_KEY);
-    if (raw) return { ...LEEG_FILTER, ...(JSON.parse(raw) as Partial<LeerlingFilter>) };
+    if (raw) {
+      return verzoenGraadLeerjaar({
+        ...LEEG_FILTER,
+        ...(JSON.parse(raw) as Partial<LeerlingFilter>),
+      });
+    }
   } catch {
     // geen opgeslagen filter
   }

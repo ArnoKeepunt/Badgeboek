@@ -8,7 +8,14 @@ import type { Groep, Student } from "./types";
  *   vestiging of klasgroep). Deze kan je niet bewerken, wel gebruiken als filter.
  */
 
-export type GroepSoort = "eigen" | "graad" | "leerjaar" | "vestiging" | "klasgroep";
+export type GroepSoort =
+  | "eigen"
+  | "graad"
+  | "leerjaar"
+  | "vestiging"
+  | "klasgroep"
+  | "graad-vestiging"
+  | "leerjaar-vestiging";
 
 export interface GroepDef {
   /** Stabiele id, bv. "eigen:g123", "graad:2", "vestiging:Gent". */
@@ -24,10 +31,19 @@ export const SOORT_LABEL: Record<GroepSoort, string> = {
   leerjaar: "Per leerjaar",
   vestiging: "Per vestiging",
   klasgroep: "Per klasgroep",
+  "graad-vestiging": "Graad per vestiging",
+  "leerjaar-vestiging": "Leerjaar per vestiging",
 };
 
 /** Volgorde waarin de systeemcategorieën getoond worden. */
-export const SYSTEEM_SOORTEN: GroepSoort[] = ["graad", "leerjaar", "vestiging", "klasgroep"];
+export const SYSTEEM_SOORTEN: GroepSoort[] = [
+  "graad",
+  "leerjaar",
+  "vestiging",
+  "klasgroep",
+  "graad-vestiging",
+  "leerjaar-vestiging",
+];
 
 export function systeemGroepen(students: Student[]): GroepDef[] {
   const defs: GroepDef[] = [];
@@ -63,6 +79,37 @@ export function systeemGroepen(students: Student[]): GroepDef[] {
       soort: "klasgroep",
       leerlingIds: students.filter((s) => s.klasgroep === k).map((s) => s.id),
     });
+  }
+
+  const vestigingen = unieke(students.map((s) => s.vestiging)).sort((a, b) => a.localeCompare(b));
+  const graden = unieke(students.map((s) => graadVan(s.leerjaar))).sort((a, b) => a - b);
+  const leerjaren = unieke(students.map((s) => s.leerjaar)).sort((a, b) => a - b);
+
+  for (const v of vestigingen) {
+    for (const g of graden) {
+      const ids = students
+        .filter((s) => s.vestiging === v && graadVan(s.leerjaar) === g)
+        .map((s) => s.id);
+      if (ids.length === 0) continue;
+      defs.push({
+        id: `graad-vestiging:${g}:${v}`,
+        naam: `${GRAAD_LABEL[g] ?? `${g}e graad`} · ${v}`,
+        soort: "graad-vestiging",
+        leerlingIds: ids,
+      });
+    }
+  }
+  for (const v of vestigingen) {
+    for (const j of leerjaren) {
+      const ids = students.filter((s) => s.vestiging === v && s.leerjaar === j).map((s) => s.id);
+      if (ids.length === 0) continue;
+      defs.push({
+        id: `leerjaar-vestiging:${j}:${v}`,
+        naam: `${j}e jaar · ${v}`,
+        soort: "leerjaar-vestiging",
+        leerlingIds: ids,
+      });
+    }
   }
   return defs;
 }

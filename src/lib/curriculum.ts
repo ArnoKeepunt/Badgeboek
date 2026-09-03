@@ -35,6 +35,14 @@ export const cursussenVoorStroom = (stroom: Stroom): Cursus[] =>
 export const rubricsVoorCursus = (cursusId: string): Rubric[] =>
   rubrics.filter((r) => r.cursusId === cursusId);
 
+/** De cursus waartoe een leerdoel (badge) behoort. */
+export function cursusVanLeerdoel(leerdoelId: string): Cursus | undefined {
+  const l = leerdoelen.find((x) => x.id === leerdoelId);
+  if (!l) return undefined;
+  const r = rubrics.find((x) => x.id === l.rubricId);
+  return r ? cursussen.find((c) => c.id === r.cursusId) : undefined;
+}
+
 export const leerdoelenVoorRubric = (rubricId: string): Leerdoel[] =>
   leerdoelen.filter((l) => l.rubricId === rubricId);
 
@@ -48,3 +56,26 @@ export const leerdoelenVoorStroom = (stroom: Stroom): Leerdoel[] => {
   const rubricIds = new Set(rubrics.filter((r) => cursusIds.has(r.cursusId)).map((r) => r.id));
   return leerdoelen.filter((l) => rubricIds.has(l.rubricId));
 };
+
+export interface Subgroep {
+  /** `null` = losse leerdoelen zonder subgroep. */
+  naam: string | null;
+  leerdoelen: Leerdoel[];
+}
+
+/**
+ * De leerdoelen van een rubric, gegroepeerd per `subgroep` (op volgorde). Rubrics zonder
+ * subgroepen geven één groep terug met `naam: null`.
+ */
+export function subgroepenVoorRubric(rubricId: string): Subgroep[] {
+  const lds = leerdoelenVoorRubric(rubricId);
+  if (!lds.some((l) => l.subgroep)) return [{ naam: null, leerdoelen: lds }];
+  const uit: Subgroep[] = [];
+  for (const l of lds) {
+    const naam = l.subgroep ?? null;
+    const laatste = uit[uit.length - 1];
+    if (laatste && laatste.naam === naam) laatste.leerdoelen.push(l);
+    else uit.push({ naam, leerdoelen: [l] });
+  }
+  return uit;
+}

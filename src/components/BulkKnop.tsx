@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { usePopover } from "../lib/popover";
 import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL } from "../lib/ratings";
 import type { Rating } from "../lib/types";
 
@@ -13,13 +15,12 @@ export function BulkKnop({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open]);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pos = usePopover(open, trigger, () => setOpen(false), {
+    breedte: 214,
+    hoogte: 236,
+    uitlijn: "rechts",
+  });
 
   if (disabled || aantal === 0) return null;
 
@@ -31,48 +32,57 @@ export function BulkKnop({
   return (
     <span className="bulk-knop">
       <button
+        ref={trigger}
         type="button"
         className="bulk-knop-trigger"
         aria-expanded={open}
+        aria-haspopup="menu"
         title={`Zet een kleur voor alle ${aantal} zichtbare leerlingen`}
         onClick={() => setOpen((o) => !o)}
       >
         alle ▾
       </button>
-      {open && (
-        <>
-          <button
-            type="button"
-            className="rating-cell-backdrop"
-            aria-label="Sluiten"
-            onClick={() => setOpen(false)}
-          />
-          <div className="rating-cell-menu bulk-menu" role="menu">
-            <div className="bulk-menu-kop">Alle {aantal} zichtbare leerlingen</div>
-            {RATINGS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                role="menuitem"
-                className={`rating-cell-option rating-${r}`}
-                onClick={() => kies(r)}
-              >
-                <span className="rating-dot" />
-                {RATING_LABEL[r]}
-              </button>
-            ))}
+      {open &&
+        pos &&
+        createPortal(
+          <>
             <button
               type="button"
-              role="menuitem"
-              className="rating-cell-option rating-empty"
-              onClick={() => kies(null)}
+              className="rating-cell-backdrop"
+              aria-label="Sluiten"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              className="rating-cell-menu zwevend-menu bulk-menu"
+              role="menu"
+              style={{ top: pos.top, left: pos.left }}
             >
-              <span className="rating-dot" />
-              {RATING_EMPTY_LABEL}
-            </button>
-          </div>
-        </>
-      )}
+              <div className="bulk-menu-kop">Alle {aantal} zichtbare leerlingen</div>
+              {RATINGS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  role="menuitem"
+                  className={`rating-cell-option rating-${r}`}
+                  onClick={() => kies(r)}
+                >
+                  <span className="rating-dot" />
+                  {RATING_LABEL[r]}
+                </button>
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                className="rating-cell-option rating-empty"
+                onClick={() => kies(null)}
+              >
+                <span className="rating-dot" />
+                {RATING_EMPTY_LABEL}
+              </button>
+            </div>
+          </>,
+          document.body,
+        )}
     </span>
   );
 }

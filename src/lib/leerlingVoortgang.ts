@@ -1,35 +1,27 @@
 import { ALGEMEEN } from "./periode";
-import { SCHOOLJAREN } from "./schooljaar";
+import { HUIDIG_SCHOOLJAAR } from "./schooljaar";
 import { getDoelKleur, getNotitie } from "./store";
 import type { DoelKleuren, Notities, Rating } from "./types";
 
 /**
- * De "graadskleur" van een badge voor een leerling: de **meest recente** algemene kleur.
- * Een leerling zit meerdere jaren in een graad; we nemen het laatste schooljaar waarin de
- * mentor een algemene kleur zette. Dat weerspiegelt waar de leerling nú staat (de evolutie
- * zit al in dat oordeel) — niet de beste kleur ooit, en geen gemiddelde.
+ * De kleur van een badge zoals de leerling ze ziet: de **algemene kleur van het lopende
+ * schooljaar**. Dat is precies wat de mentor in het badgeboek heeft staan — haalt de mentor
+ * de kleur weg, dan ziet de leerling ze ook niet meer. (Eerdere schooljaren blijven in de
+ * leerlingdetailpagina zichtbaar, niet in dit overzicht.)
  */
 export function graadKleur(
   kleuren: DoelKleuren,
   studentId: string,
   leerdoelId: string,
 ): Rating | null {
-  for (let i = SCHOOLJAREN.length - 1; i >= 0; i -= 1) {
-    const k = getDoelKleur(kleuren, SCHOOLJAREN[i], ALGEMEEN, studentId, leerdoelId);
-    if (k) return k;
-  }
-  return null;
+  return getDoelKleur(kleuren, HUIDIG_SCHOOLJAAR, ALGEMEEN, studentId, leerdoelId);
 }
 
-/** De meest recente zichtbare notitie bij een badge (voor de leerlingweergave). */
+/** De zichtbare notitie bij een badge in het lopende schooljaar (voor de leerlingweergave). */
 export function graadNotitie(
   notities: Notities,
   studentId: string,
   leerdoelId: string,
 ): string {
-  for (let i = SCHOOLJAREN.length - 1; i >= 0; i -= 1) {
-    const n = getNotitie(notities, SCHOOLJAREN[i], studentId, leerdoelId);
-    if (n.zichtbaar) return n.zichtbaar;
-  }
-  return "";
+  return getNotitie(notities, HUIDIG_SCHOOLJAAR, studentId, leerdoelId).zichtbaar;
 }

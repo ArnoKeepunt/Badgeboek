@@ -15,7 +15,8 @@ type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | nul
 
 /**
  * Gegevens: alles in en uit de app via CSV. Geen backend — de export is meteen de
- * "download op elk moment"-back-up van de evaluaties.
+ * "download op elk moment"-back-up van de evaluaties. Alleen voor de beheerder
+ * (`<AlleenBeheerder>` in de router).
  */
 export function Gegevens() {
   const { students, mentoren, kleuren, doelWijzigingen, doelenImport } = useStore();
@@ -84,13 +85,6 @@ export function Gegevens() {
 
   return (
     <section>
-      <h1>Gegevens</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        In- en uitvoer via CSV (met <code>;</code> als scheidingsteken; <code>,</code> wordt ook
-        gelezen). De leerling-<strong>id</strong> is de vaste sleutel: bij een naams- of
-        klaswissel of jaarovergang blijven de evaluaties gekoppeld.
-      </p>
-
       {melding && (
         <div className={`gegevens-melding ${melding.soort === "ok" ? "is-ok" : "is-fout"}`}>
           <strong>{melding.tekst}</strong>

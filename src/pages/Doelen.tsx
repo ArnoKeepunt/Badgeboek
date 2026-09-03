@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { DoelEditor } from "../components/DoelEditor";
+import { useEffectieveRol } from "../lib/sessie";
 import {
   type DoelSoort,
   type Stroom,
@@ -22,10 +23,12 @@ type StroomKeuze = Stroom | "alle";
 /**
  * Doelen: de minimumdoelen / eindtermen (los van de badges). Bovenaan kies je de graad/stroom
  * (zoals de periodes bij de badges); daaronder zoek en filter je per soort. Gegroepeerd per
- * sleutelcompetentie. Elk doel is bewerkbaar.
+ * sleutelcompetentie. De beheerder kan elk doel bewerken; een mentor kan enkel bekijken
+ * (en de uitleg openklappen).
  */
 export function Doelen() {
   const { doelWijzigingen, doelenImport } = useStore();
+  const magBewerken = useEffectieveRol() === "beheerder";
   const minimumdoelen = useMemo(
     () => metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen),
     [doelenImport, doelWijzigingen],
@@ -35,6 +38,15 @@ export function Doelen() {
   const [soort, setSoort] = useState<DoelSoort | "">("");
   const [dicht, setDicht] = useState<Set<number>>(new Set());
   const [bewerken, setBewerken] = useState<string | null>(null);
+  const [uitlegOpen, setUitlegOpen] = useState<Set<string>>(new Set());
+
+  const toggleUitleg = (code: string) =>
+    setUitlegOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
 
   const alleStromen = stroom === "alle";
 
@@ -75,12 +87,6 @@ export function Doelen() {
 
   return (
     <section>
-      <h1>Doelen</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        De minimumdoelen en eindtermen per sleutelcompetentie. Los van de badges. Kies de
-        graad/stroom, zoek en filter per soort. Elk doel kan je bewerken.
-      </p>
-
       <div className="periode-balk">
         <span className="periode-balk-label">Stroom</span>
         <button
@@ -162,36 +168,62 @@ export function Doelen() {
 
               {open && (
                 <ul className="doel-lijst">
-                  {c.doelen.map((d) => (
-                    <li key={d.code} className="doel-item">
-                      {bewerken === d.code ? (
-                        <DoelEditor doel={d} onSluit={() => setBewerken(null)} />
-                      ) : (
-                        <div className="doel-item-rij">
-                          <span
-                            className={`soort-tag rating-${SOORT_KLEUR[d.soort]}`}
-                            title={SOORT_LABEL[d.soort]}
-                          >
-                            {SOORT_LABEL[d.soort]}
-                          </span>
-                          {alleStromen && (
-                            <span className="doel-stroom" title={STROOM_LABEL[d.stroom]}>
-                              {d.stroom}
-                            </span>
-                          )}
-                          <span className="doel-nr">{d.nummer}</span>
-                          <span className="doel-omschrijving">{d.omschrijving}</span>
-                          <button
-                            type="button"
-                            className="linkknop doel-uitleg-knop"
-                            onClick={() => setBewerken(d.code)}
-                          >
-                            Bewerk
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
+                  {c.doelen.map((d) => {
+                    const heeftUitleg = Boolean(d.uitleg || d.opmerking);
+                    const toonUitleg = uitlegOpen.has(d.code);
+                    return (
+                      <li key={d.code} className="doel-item">
+                        {magBewerken && bewerken === d.code ? (
+                          <DoelEditor doel={d} onSluit={() => setBewerken(null)} />
+                        ) : (
+                          <>
+                            <div className="doel-item-rij">
+                              <span
+                                className={`soort-tag rating-${SOORT_KLEUR[d.soort]}`}
+                                title={SOORT_LABEL[d.soort]}
+                              >
+                                {SOORT_LABEL[d.soort]}
+                              </span>
+                              {alleStromen && (
+                                <span className="doel-stroom" title={STROOM_LABEL[d.stroom]}>
+                                  {d.stroom}
+                                </span>
+                              )}
+                              <span className="doel-nr">{d.nummer}</span>
+                              <span className="doel-omschrijving">{d.omschrijving}</span>
+                              {magBewerken ? (
+                                <button
+                                  type="button"
+                                  className="linkknop doel-uitleg-knop"
+                                  onClick={() => setBewerken(d.code)}
+                                >
+                                  Bewerk
+                                </button>
+                              ) : (
+                                heeftUitleg && (
+                                  <button
+                                    type="button"
+                                    className="linkknop doel-uitleg-knop"
+                                    onClick={() => toggleUitleg(d.code)}
+                                  >
+                                    {toonUitleg ? "Verberg uitleg" : "Uitleg"}
+                                  </button>
+                                )
+                              )}
+                            </div>
+                            {!magBewerken && toonUitleg && heeftUitleg && (
+                              <div className="doel-uitleg-lezen">
+                                {d.uitleg && <p>{d.uitleg}</p>}
+                                {d.opmerking && (
+                                  <p className="doel-uitleg-opmerking">Opmerking: {d.opmerking}</p>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

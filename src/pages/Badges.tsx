@@ -5,11 +5,13 @@ import { ColorBar } from "../components/ColorBar";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
 import { RatingCell } from "../components/RatingCell";
 import {
+  cursussen as alleCursussen,
   cursussenVoorStroom,
   leerdoelenVoorCursus,
   leerdoelenVoorRubric,
   leerdoelenVoorStroom,
   rubricsVoorCursus,
+  subgroepenVoorRubric,
 } from "../lib/curriculum";
 import { alleGroepDefs, groepLeden } from "../lib/groepen";
 import { telKleuren } from "../lib/kleurstats";
@@ -25,7 +27,7 @@ import {
   useStore,
 } from "../lib/store";
 import { STROMEN, STROOM_LABEL } from "../lib/types";
-import type { DoelKleuren, Stroom, Student } from "../lib/types";
+import type { DoelKleuren, Leerdoel, Stroom, Student } from "../lib/types";
 
 /**
  * Badgematrix: badges (per cursus, per rubric) als rijen, leerlingen als kolommen.
@@ -39,22 +41,36 @@ import type { DoelKleuren, Stroom, Student } from "../lib/types";
  * (In de code heten de badges nog `leerdoel` — enkel de labels zijn "badge".)
  */
 
-const FOLD_KEY = "keerpunt-badgeboek:matrix-fold";
+const FOLD_KEY = "keerpunt-badgeboek:matrix-fold:v2";
+
+/** Standaard: alle cursussen toegeklapt, zodat je niet langs alles moet scrollen. */
+const alleCursusIds = () => alleCursussen.map((c) => c.id);
 
 interface Fold {
   cursus: string[];
   rubric: string[];
+  /** Ingeklapte subgroepen, sleutel `${rubricId}|${subgroepnaam}`. */
+  subgroep: string[];
 }
 
 function loadFold(): Fold {
   try {
     const raw = localStorage.getItem(FOLD_KEY);
-    if (raw) return JSON.parse(raw) as Fold;
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<Fold>;
+      return {
+        cursus: p.cursus ?? alleCursusIds(),
+        rubric: p.rubric ?? [],
+        subgroep: p.subgroep ?? [],
+      };
+    }
   } catch {
-    // geen opgeslagen stand — begin volledig uitgeklapt
+    // geen opgeslagen stand
   }
-  return { cursus: [], rubric: [] };
+  return { cursus: alleCursusIds(), rubric: [], subgroep: [] };
 }
+
+const subgroepSleutel = (rubricId: string, naam: string) => `${rubricId}|${naam}`;
 
 const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
 const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id]);
@@ -65,6 +81,7 @@ interface StroomMatrixProps {
   fold: Fold;
   toggleCursus: (id: string) => void;
   toggleRubric: (id: string) => void;
+  toggleSubgroep: (key: string) => void;
   kleuren: DoelKleuren;
   schooljaar: string;
   periode: PeriodeId;
@@ -79,6 +96,7 @@ function StroomMatrix({
   fold,
   toggleCursus,
   toggleRubric,
+  toggleSubgroep,
   kleuren,
   schooljaar,
   periode,
@@ -90,6 +108,49 @@ function StroomMatrix({
 
   const telVoor = (doelen: { id: string }[], studentId: string) =>
     telKleuren(doelen.map((d) => getDoelKleur(kleuren, schooljaar, periode, studentId, d.id)));
+
+  const telCellen = (doelen: { id: string }[]) =>
+    leerlingen.map((s) => {
+      const t = telVoor(doelen, s.id);
+      return (
+        <td key={s.id} className="grid-tel-cel">
+          {doelen.length - t.leeg}/{doelen.length}
+        </td>
+      );
+    });
+
+  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => (
+    <tr key={doel.id}>
+      <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+        <div className="grid-doel-rij">
+          <span className="grid-doel-tekst">{doel.omschrijving}</span>
+          <BulkKnop
+            aantal={leerlingen.length}
+            disabled={vergrendeld}
+            onKies={(kleur) =>
+              setDoelKleurBulk(
+                schooljaar,
+                periode,
+                leerlingen.map((s) => s.id),
+                doel.id,
+                kleur,
+              )
+            }
+          />
+        </div>
+      </td>
+      {leerlingen.map((s) => (
+        <td key={s.id} className="grid-cel">
+          <RatingCell
+            label={`${s.firstName} — ${doel.omschrijving}`}
+            readonly={vergrendeld}
+            value={getDoelKleur(kleuren, schooljaar, periode, s.id, doel.id)}
+            onChange={(next) => setDoelKleur(schooljaar, periode, s.id, doel.id, next)}
+          />
+        </td>
+      ))}
+    </tr>
+  );
 
   const kolomTotalen = leerlingen.map((s) =>
     telKleuren(stroomLeerdoelen.map((d) => getDoelKleur(kleuren, schooljaar, periode, s.id, d.id))),
@@ -133,7 +194,11 @@ function StroomMatrix({
             <tr>
               <th className="grid-col-doel">Badge</th>
               {leerlingen.map((s) => (
-                <th key={s.id} className="grid-col-leerling">
+                <th
+                  key={s.id}
+                  className="grid-col-leerling"
+                  title={`${s.firstName} ${s.lastName}`}
+                >
                   <Link to={`/students/${s.id}`}>{s.firstName}</Link>
                   <span className="grid-col-leerling-sub">
                     {s.lastName} · {s.leerjaar}e · {s.klasgroep}
@@ -146,6 +211,10 @@ function StroomMatrix({
           {cursussen.map((cursus) => {
             const cursusDicht = fold.cursus.includes(cursus.id);
             const cursusDoelen = leerdoelenVoorCursus(cursus.id);
+            const cursusRubrics = rubricsVoorCursus(cursus.id);
+            // Eén rubriek met dezelfde naam als de cursus = een overbodig tussenniveau:
+            // toon de badges dan meteen onder de cursus.
+            const enkeleRubriek = cursusRubrics.length === 1;
             return (
               <tbody key={cursus.id}>
                 <tr className="grid-cursus">
@@ -171,68 +240,61 @@ function StroomMatrix({
                 </tr>
 
                 {!cursusDicht &&
-                  rubricsVoorCursus(cursus.id).map((rubric) => {
-                    const rubricDicht = fold.rubric.includes(rubric.id);
+                  cursusRubrics.map((rubric) => {
+                    const rubricDicht = !enkeleRubriek && fold.rubric.includes(rubric.id);
                     const doelen = leerdoelenVoorRubric(rubric.id);
+                    const subgroepen = subgroepenVoorRubric(rubric.id);
                     return (
                       <Fragment key={rubric.id}>
-                        <tr className="grid-group">
-                          <th className="grid-col-doel">
-                            <button
-                              type="button"
-                              className="grid-toggle"
-                              onClick={() => toggleRubric(rubric.id)}
-                            >
-                              <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
-                              {rubric.naam}
-                              <span className="grid-count">{doelen.length}</span>
-                            </button>
-                          </th>
-                          {leerlingen.map((s) => {
-                            const t = telVoor(doelen, s.id);
-                            return (
-                              <td key={s.id} className="grid-tel-cel">
-                                {doelen.length - t.leeg}/{doelen.length}
-                              </td>
-                            );
-                          })}
-                        </tr>
+                        {!enkeleRubriek && (
+                          <tr className="grid-group">
+                            <th className="grid-col-doel">
+                              <button
+                                type="button"
+                                className="grid-toggle"
+                                onClick={() => toggleRubric(rubric.id)}
+                              >
+                                <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
+                                {rubric.naam}
+                                <span className="grid-count">{doelen.length}</span>
+                              </button>
+                            </th>
+                            {telCellen(doelen)}
+                          </tr>
+                        )}
 
                         {!rubricDicht &&
-                          doelen.map((doel) => (
-                            <tr key={doel.id}>
-                              <td className="grid-col-doel grid-doel">
-                                <div className="grid-doel-rij">
-                                  <span className="grid-doel-tekst">{doel.omschrijving}</span>
-                                  <BulkKnop
-                                    aantal={leerlingen.length}
-                                    disabled={vergrendeld}
-                                    onKies={(kleur) =>
-                                      setDoelKleurBulk(
-                                        schooljaar,
-                                        periode,
-                                        leerlingen.map((s) => s.id),
-                                        doel.id,
-                                        kleur,
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </td>
-                              {leerlingen.map((s) => (
-                                <td key={s.id} className="grid-cel">
-                                  <RatingCell
-                                    label={`${s.firstName} — ${doel.omschrijving}`}
-                                    readonly={vergrendeld}
-                                    value={getDoelKleur(kleuren, schooljaar, periode, s.id, doel.id)}
-                                    onChange={(next) =>
-                                      setDoelKleur(schooljaar, periode, s.id, doel.id, next)
-                                    }
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
+                          subgroepen.map((groep) => {
+                            if (!groep.naam) {
+                              const losNiveau = enkeleRubriek ? 1 : 2;
+                              return (
+                                <Fragment key={`${rubric.id}|los`}>
+                                  {groep.leerdoelen.map((d) => doelRij(d, losNiveau))}
+                                </Fragment>
+                              );
+                            }
+                            const sgKey = subgroepSleutel(rubric.id, groep.naam);
+                            const sgDicht = fold.subgroep.includes(sgKey);
+                            return (
+                              <Fragment key={sgKey}>
+                                <tr className="grid-group grid-subgroep">
+                                  <th className="grid-col-doel">
+                                    <button
+                                      type="button"
+                                      className="grid-toggle"
+                                      onClick={() => toggleSubgroep(sgKey)}
+                                    >
+                                      <span className="grid-caret">{sgDicht ? "▶" : "▼"}</span>
+                                      {groep.naam}
+                                      <span className="grid-count">{groep.leerdoelen.length}</span>
+                                    </button>
+                                  </th>
+                                  {telCellen(groep.leerdoelen)}
+                                </tr>
+                                {!sgDicht && groep.leerdoelen.map((d) => doelRij(d, 3))}
+                              </Fragment>
+                            );
+                          })}
                       </Fragment>
                     );
                   })}
@@ -267,21 +329,26 @@ export function Badges() {
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
 
   const groepDefs = useMemo(() => alleGroepDefs(students, groepen), [students, groepen]);
+
+  // De stroomchips bepalen al de graad/klasgroep-as, dus die velden in de filterbalk laten
+  // we weg en negeren we hier — geen dubbel systeem.
+  const stroomLeerlingen = useMemo(
+    () => students.filter((s) => matrixStromen.includes(stroomVan(s))),
+    [students, matrixStromen],
+  );
   const zichtbaar = useMemo(() => {
     const leden = groepLeden(filter.groepId, students, groepen);
-    return filterLeerlingen(students, filter, leden).filter((s) =>
-      matrixStromen.includes(stroomVan(s)),
-    );
-  }, [students, groepen, filter, matrixStromen]);
+    const zonderStroomvelden = { ...filter, graad: "", klasgroep: "" };
+    return filterLeerlingen(stroomLeerlingen, zonderStroomvelden, leden);
+  }, [students, groepen, filter, stroomLeerlingen]);
 
   const leerlingenPerStroom = useMemo(
-    () => matrixStromen.map((s) => ({ stroom: s, leerlingen: zichtbaar.filter((l) => stroomVan(l) === s) })),
+    () =>
+      matrixStromen.map((s) => ({
+        stroom: s,
+        leerlingen: zichtbaar.filter((l) => stroomVan(l) === s),
+      })),
     [matrixStromen, zichtbaar],
-  );
-
-  const totaalBadges = useMemo(
-    () => matrixStromen.reduce((n, s) => n + leerdoelenVoorStroom(s).length, 0),
-    [matrixStromen],
   );
 
   useEffect(() => {
@@ -302,24 +369,26 @@ export function Badges() {
       ...f,
       rubric: f.rubric.includes(id) ? zonder(f.rubric, id) : met(f.rubric, id),
     }));
+  const toggleSubgroep = (key: string) =>
+    setFold((f) => ({
+      ...f,
+      subgroep: f.subgroep.includes(key) ? zonder(f.subgroep, key) : met(f.subgroep, key),
+    }));
 
   const allesDicht = () => {
     const cursusIds = matrixStromen.flatMap((s) => cursussenVoorStroom(s).map((c) => c.id));
     const rubricIds = cursusIds.flatMap((id) => rubricsVoorCursus(id).map((r) => r.id));
-    setFold({ cursus: cursusIds, rubric: rubricIds });
+    const subgroepKeys = rubricIds.flatMap((rid) =>
+      subgroepenVoorRubric(rid)
+        .filter((g) => g.naam)
+        .map((g) => `${rid}|${g.naam}`),
+    );
+    setFold({ cursus: cursusIds, rubric: rubricIds, subgroep: subgroepKeys });
   };
-  const allesOpen = () => setFold({ cursus: [], rubric: [] });
+  const allesOpen = () => setFold({ cursus: [], rubric: [], subgroep: [] });
 
   return (
     <section>
-      <h1>Badges</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        {totaalBadges} badges · {matrixStromen.map((s) => STROOM_LABEL[s]).join(" + ")}. Kies
-        stroom en periode, klik een cel aan om de kleur te kiezen of te wissen. Klap cursussen of
-        rubrics op en filter de leerlingen om te tonen wat je nodig hebt. Alles wordt lokaal
-        bewaard.
-      </p>
-
       <div className="periode-balk">
         <span className="periode-balk-label">Stroom</span>
         {STROMEN.map((s) => {
@@ -367,11 +436,12 @@ export function Badges() {
       )}
 
       <LeerlingFilterBar
-        alle={students}
+        alle={stroomLeerlingen}
         zichtbaar={zichtbaar.length}
         groepen={groepDefs}
         filter={filter}
         onChange={setFilter}
+        verbergVelden={["graad", "klasgroep"]}
       />
 
       <div className="matrix-acties">
@@ -397,6 +467,7 @@ export function Badges() {
             fold={fold}
             toggleCursus={toggleCursus}
             toggleRubric={toggleRubric}
+            toggleSubgroep={toggleSubgroep}
             kleuren={kleuren}
             schooljaar={schooljaar}
             periode={periode}

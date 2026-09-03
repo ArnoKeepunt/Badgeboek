@@ -179,12 +179,52 @@ th {
 .voortgang-kaart-kop {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
 .voortgang-kaart-titel {
   font-weight: 700;
+  margin-right: auto;
+}
+
+.voortgang-kaart-x {
+  align-self: center;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.voortgang-kaart:hover .voortgang-kaart-x,
+.voortgang-kaart-x:focus-visible {
+  opacity: 1;
+}
+
+.voortgang-kaart-x:hover {
+  color: var(--text);
+}
+
+.overzicht-toevoeg {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.overzicht-toevoeg:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .voortgang-kaart-pct {
@@ -208,6 +248,42 @@ th {
 .voortgang-strook > span {
   display: block;
   height: 100%;
+}
+
+.groep-openen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voortgang-kaart > .groep-openen {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.voortgang-kaart-ikn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.voortgang-kaart-ikn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.voortgang-kaart-ikn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .grid-col-periode {
@@ -333,6 +409,31 @@ th {
   color: #92400e;
 }
 
+/* Alleen-lezen uitleg (mentor). */
+.doel-uitleg-lezen {
+  margin: 6px 0 2px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.doel-uitleg-lezen p {
+  margin: 0 0 8px;
+}
+
+.doel-uitleg-lezen p:last-child {
+  margin-bottom: 0;
+}
+
+.doel-uitleg-opmerking {
+  color: #92400e;
+}
+
 .doel-code {
   font-size: 11px;
   color: var(--text-muted);
@@ -390,11 +491,23 @@ th {
    Doelenmatrix — rustig raster met in-/uitklapbare cursussen en rubrics
    --------------------------------------------------------------------------- */
 
-/* Horizontaal schuiven binnen dit kader; geen vaste hoogte, geen verticale scroll. */
+/* Het raster is zijn eigen schuifgebied: het schuift pas als het niet meer op het scherm past.
+   Zolang het past, schuift er niets. De koprij (leerlingnamen) en de eerste kolom (badge)
+   blijven staan bij het schuiven. Het gebied blijft onder de bovenbalk hangen, zodat je niet
+   "voorbij" de koprij scrollt. */
+/* Het kader is precies zo breed als de tabel (smal bij weinig leerlingen — geen groot leeg wit
+   vlak ernaast; breder dan het scherm bij veel leerlingen — dan schuift het). De koprij en de
+   eerste kolom blijven staan bij het schuiven; het gebied hangt onder de bovenbalk. De
+   scrollbalk zit zo ook mee aan de rechterrand van het kader. */
 .grid-wrap {
+  position: sticky;
+  top: 56px;
+  z-index: 1;
+  width: max-content;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
+  max-height: calc(100vh - 68px);
+  max-height: calc(100svh - 68px);
+  overflow: auto;
   overscroll-behavior-x: contain;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -404,14 +517,31 @@ th {
 .grid {
   border-collapse: separate;
   border-spacing: 0;
+  /* Enkel zo breed als nodig: bij weinig leerlingen blijft de tabel compact. */
   width: auto;
-  min-width: 100%;
   font-size: 13px;
 }
 
-/* Leerlingkolommen krijgen een vaste minimumbreedte zodat de tabel echt
-   breed wordt (en dus scrollt) bij veel leerlingen. */
-.grid-col-leerling,
+/* Elke leerlingkolom is exact even breed, zodat alle kleurvakjes gelijk zijn. De koprij
+   (naam) bepaalt de breedte en wordt afgekapt met "…" als de naam te lang is (volledige
+   naam in de tooltip). Bij veel leerlingen wordt de tabel breder dan het kader en schuift ze. */
+.grid thead th.grid-col-leerling {
+  width: 116px;
+  min-width: 116px;
+  max-width: 116px;
+  overflow: hidden;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.grid-col-leerling a,
+.grid-col-leerling .grid-col-leerling-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .grid-cel,
 .grid-tel-cel,
 .grid-foot-cel {
@@ -493,6 +623,18 @@ th {
   padding-left: 28px;
 }
 
+/* Trapsgewijze inspringing: de badge-items staan telkens één stap dieper dan hun kop
+   (cursus → rubric → subgroep). */
+.grid-doel.grid-doel-n1 {
+  padding-left: 22px;
+}
+.grid-doel.grid-doel-n2 {
+  padding-left: 40px;
+}
+.grid-doel.grid-doel-n3 {
+  padding-left: 58px;
+}
+
 /* De inhoud van de badge-cel flext; de <td> zelf blijft een gewone tabelcel, anders
    werkt de sticky eerste kolom (en haar dekkende achtergrond) niet betrouwbaar. */
 .grid-doel-rij {
@@ -501,12 +643,8 @@ th {
   gap: 8px;
 }
 
-/* Terwijl een bulk-/notitiemenu open staat, moet die vaste eerste kolom boven de
-   andere vaste cellen (koprij, andere rijen) komen — anders verdwijnt het menu erachter. */
-.grid .grid-col-doel:has(.bulk-menu),
-.grid .grid-col-doel:has(.notitie-panel) {
-  z-index: 45;
-}
+/* De zwevende menu's (kleurkeuze, "alle", notitie) hangen aan document.body via een portal,
+   zodat ze buiten het rooster vallen — geen clipping, geen inner-scroll. */
 
 .grid-doel-tekst {
   flex: 1;
@@ -576,10 +714,8 @@ th {
 }
 
 .bulk-menu {
-  right: 0;
-  left: auto;
-  transform: none;
-  min-width: 210px;
+  width: 214px;
+  min-width: 0;
 }
 
 .bulk-menu-kop {
@@ -702,7 +838,19 @@ th {
 
 .grid-group .grid-toggle {
   font-weight: 600;
-  padding-left: 14px;
+  padding-left: 18px;
+}
+
+/* Subgroep-rij (derde inklapniveau, bv. Getallenleer onder een rubric). */
+.grid-subgroep th,
+.grid-subgroep td {
+  background: var(--surface);
+}
+
+.grid-subgroep .grid-toggle {
+  font-weight: 500;
+  padding-left: 36px;
+  color: var(--text-muted);
 }
 
 .grid-count {
@@ -868,6 +1016,13 @@ th {
   flex-wrap: wrap;
 }
 
+.pagina-kop-acties {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .knop-primair {
   border: 1px solid var(--accent);
   background: var(--accent);
@@ -882,6 +1037,25 @@ th {
 .knop-primair:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Rustiger variant: wel duidelijk een knop, maar zonder de volle accentkleur. */
+.knop-secundair {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.knop-secundair:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .linkknop-gevaar {
@@ -1054,10 +1228,19 @@ th {
 }
 
 .ll-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-weight: 800;
   font-size: 17px;
   color: var(--text);
   text-decoration: none;
+}
+
+.ll-brand-icoon {
+  width: 23px;
+  height: 23px;
+  flex: none;
 }
 
 .ll-account {
@@ -1076,6 +1259,147 @@ th {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* --- Meldingencentrum (leerling) --- */
+.ll-klok {
+  position: relative;
+  display: flex;
+}
+
+.ll-klok-knop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.ll-klok-icoon {
+  width: 19px;
+  height: 19px;
+}
+
+.ll-klok-knop:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ll-klok-knop.is-actief {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ll-klok-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.ll-klok-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.ll-klok-paneel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.16);
+}
+
+.ll-klok-kop {
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ll-klok-leeg {
+  margin: 0;
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ll-klok-lijst {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.ll-klok-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 10px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ll-klok-item:hover {
+  background: var(--accent-soft);
+}
+
+.ll-klok-item.is-nieuw {
+  background: var(--accent-soft);
+}
+
+.ll-klok-item.is-nieuw .ll-klok-item-tekst::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.ll-klok-item-tekst {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.ll-klok-item-tijd {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .ll-content {
@@ -1375,27 +1699,20 @@ th {
    Groepen
    --------------------------------------------------------------------------- */
 
-.groep-editor {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 16px;
-  margin: 16px 0 24px;
-}
-
 .groep-editor h2 {
-  margin-top: 0;
+  margin: 0 28px 4px 0;
 }
 
 .groep-editor-rij {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 8px;
 }
 
-.groep-editor-rij input,
-.groep-editor-rij select {
+.groep-editor input:not([type="checkbox"]),
+.groep-editor select {
   font: inherit;
   font-size: 13px;
   padding: 7px 10px;
@@ -1405,31 +1722,96 @@ th {
   color: var(--text);
 }
 
-.groep-editor-naam {
-  flex: 1 1 220px;
-  font-weight: 600;
-}
-
 .groep-editor-rij input[type="search"] {
   flex: 1 1 180px;
 }
 
 .groep-editor-rij select {
-  flex: 1 1 160px;
+  flex: 1 1 150px;
 }
 
-.groep-editor-meta {
+.groep-editor-naam {
+  display: block;
+  width: 100%;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.groep-editor-breed {
+  display: block;
+  width: 100%;
+}
+
+/* Kleine sectiekop binnen het formulier. */
+.groep-editor-sectie {
+  margin: 16px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Prominente knop om alle (gefilterde) leerlingen in één keer toe te voegen. */
+.groep-editor-voegtoe {
+  display: block;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.groep-editor-voegtoe:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.groep-editor-voegtoe:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.groep-editor-samenvatting {
+  margin: 14px 0 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.groep-editor-samenvatting-kop {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin: 12px 0 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.groep-editor-aantal {
   font-size: 13px;
   color: var(--text-muted);
 }
 
+.groep-editor-aantal strong {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+  margin-right: 4px;
+}
+
+.groep-editor-melding {
+  margin: 7px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .groep-editor-lijst {
-  max-height: 320px;
+  max-height: min(48vh, 440px);
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1453,6 +1835,17 @@ th {
   background: #fafafc;
 }
 
+/* Duidelijk zichtbaar welke leerlingen in de groep zitten. */
+.groep-editor-item.is-gekozen {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.groep-editor-item.is-gekozen span:first-of-type {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .groep-editor-item-meta {
   margin-left: auto;
   font-size: 11px;
@@ -1463,6 +1856,7 @@ th {
 .groep-editor-acties {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 14px;
   margin-top: 14px;
 }
@@ -1474,6 +1868,7 @@ th {
 }
 
 .groep-kaart {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -1486,6 +1881,27 @@ th {
 .groep-kaart-naam {
   font-weight: 700;
   font-size: 15px;
+  padding-right: 34px;
+}
+
+/* Bewerk-potlood in de rechterbovenhoek; pas zichtbaar bij hover/focus. */
+.groep-kaart-bewerk {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.groep-kaart:hover .groep-kaart-bewerk,
+.groep-kaart:focus-within .groep-kaart-bewerk {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .groep-kaart-bewerk {
+    opacity: 1;
+  }
 }
 
 .groep-kaart-meta {
@@ -1686,6 +2102,14 @@ th {
   padding: 4px;
 }
 
+/* Zwevende menu's/panelen hangen via een portal aan document.body: vaste positie (top/left
+   komen uit een inline style), altijd bovenop en buiten elk rooster of overlay. */
+.zwevend-menu {
+  position: fixed;
+  transform: none;
+  z-index: 1000;
+}
+
 .rating-cell-option {
   display: flex;
   align-items: center;
@@ -1753,4 +2177,403 @@ th {
 .cursus-kop .colorbar {
   flex: 1 1 120px;
   max-width: 220px;
+}
+
+/* ---------------------------------------------------------------------------
+   Deelevaluaties
+   --------------------------------------------------------------------------- */
+
+.de-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.de-editor h2 {
+  margin: 0;
+  padding-right: 28px;
+}
+
+.de-veld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.de-veld > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.de-veld-tel {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.de-veld input,
+.de-veld select,
+.de-veld textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.de-veld-rij {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.de-veld-rij .de-veld {
+  flex: 1 1 200px;
+}
+
+.de-veld-rij .de-veld-datum {
+  flex: 0 1 170px;
+}
+
+.de-type-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.de-badges {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.de-badge-groep + .de-badge-groep {
+  border-top: 1px solid var(--border);
+}
+
+.de-badge-groep-kop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.de-badge-tip {
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.de-badge-lijst {
+  padding: 2px 0 6px;
+  border-top: 1px solid var(--border);
+}
+
+.de-badge-item {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 6px 12px 6px 26px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.de-badge-item:hover {
+  background: var(--accent-soft);
+}
+
+.de-badge-leeg {
+  padding: 8px 26px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.de-editor-acties {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.de-editor-verwijder {
+  margin-left: auto;
+}
+
+.de-cursus {
+  margin-top: 26px;
+}
+
+.de-cursus-kop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0 0 8px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.de-cursus-kop h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.de-cursus-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.de-kapstok {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.de-kapstok-tabel {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  min-width: 30rem;
+}
+
+.de-kapstok-tabel th,
+.de-kapstok-tabel td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.de-kapstok-tabel thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.de-kapstok-tabel .de-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.de-kapstok-tabel .de-kapstok-actie {
+  width: 44px;
+  text-align: right;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.de-leeg {
+  margin: 10px 0;
+}
+
+.de-leeg-rij {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.de-leeg-rij .lege-staat {
+  margin: 0;
+}
+
+.de-rij-kop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 76px;
+}
+
+/* Rijacties (alle ▾ + bewerken) in de rechterbovenhoek; pas zichtbaar bij hover/focus. */
+.de-rij-hoek {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.grid tbody tr:hover .de-rij-hoek,
+.de-rij-hoek:focus-within,
+.de-rij-hoek:has([aria-expanded="true"]) {
+  opacity: 1;
+}
+
+.de-rij-titel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.de-rij-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.de-rij-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.de-badge-chip {
+  font-size: 10px;
+  line-height: 1.3;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* ---------------------------------------------------------------------------
+   Vierkante icoonknop + gecentreerde overlay (modal)
+   --------------------------------------------------------------------------- */
+
+.knop-icoon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.knop-icoon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.knop-icoon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.knop-icoon-klein {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.knop-icoon-klein svg {
+  width: 14px;
+  height: 14px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(23, 25, 31, 0.44);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  padding: 22px;
+  animation: modal-in 0.14s ease-out;
+}
+
+/* Breder venster voor inhoudrijke formulieren (groep-editor). */
+.modal--groot {
+  max-width: 860px;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+  }
+}
+
+.modal-sluit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.modal-sluit:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.modal-sluit svg {
+  width: 16px;
+  height: 16px;
 }

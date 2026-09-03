@@ -26,12 +26,6 @@ export function Students() {
 
   return (
     <section>
-      <h1>Leerlingen</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        "Ingevuld" telt de badges met een algemene kleur. Kleuren per rapport vul je in via{" "}
-        <Link to="/badges">Badges</Link> of per leerling.
-      </p>
-
       <LeerlingFilterBar
         alle={students}
         zichtbaar={zichtbaar.length}

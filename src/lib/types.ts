@@ -50,6 +50,11 @@ export interface Leerdoel {
   categorie: DoelCategorie;
   /** Optioneel: de rubric-omschrijving per kleur. */
   kleuren?: Kleurcriteria;
+  /**
+   * Optioneel: een subgroep binnen de rubric (bv. "Getallenleer" onder "Inzicht en
+   * vaardigheden in wiskundige domeinen"). Leerdoelen zonder subgroep staan los onder de rubric.
+   */
+  subgroep?: string;
 }
 
 /** De rollen die de app (voorlopig) kent. */
@@ -127,3 +132,50 @@ export const notitieSleutel = (
 ): string => `${schooljaar}:${studentId}:${leerdoelId}`;
 
 export const LEGE_NOTITIE: Notitie = { zichtbaar: "", verborgen: "" };
+
+/**
+ * Een concrete deelevaluatie: een toets of opdracht die een leerkracht zelf aanmaakt,
+ * gekoppeld aan één of meer badges. Het aanduiden van een kleur hier keurt de badge
+ * NIET automatisch goed — het is een tussenstap die de mentor helpt beslissen.
+ */
+export interface Deelevaluatie {
+  id: string;
+  schooljaar: string;
+  stroom: Stroom;
+  /** Cursusnaam (uit de deelevaluatie-kapstok), bv. "Actuaronde". */
+  cursus: string;
+  /** Optionele koppeling aan een type uit de kapstok (`deelevaluatieTypes`). */
+  typeId: string | null;
+  titel: string;
+  /** "" of een datum "2026-03-12". */
+  datum: string;
+  /** Gekoppelde badges (leerdoel-id's). */
+  leerdoelIds: string[];
+  toelichting: string;
+  /** De mentor die de deelevaluatie aanmaakte. */
+  mentorId?: string;
+}
+
+/** Sleutel `${deelevaluatieId}:${studentId}` → Rating. Ontbreekt = niet gemaakt. */
+export type DeelKleuren = Record<string, Rating>;
+
+export const deelSleutel = (deelevaluatieId: string, studentId: string): string =>
+  `${deelevaluatieId}:${studentId}`;
+
+/**
+ * Een melding voor het meldingencentrum van de leerling: "nieuwe beoordeling(en) in cursus X".
+ * Enkel in de app zichtbaar (geen push naar toestel). Meerdere beoordelingen in dezelfde cursus
+ * worden samengevoegd tot één melding met een teller.
+ */
+export interface Melding {
+  id: string;
+  /** Tijdstip van de (laatste) beoordeling. */
+  ts: number;
+  studentId: string;
+  soort: "kleur" | "deelevaluatie";
+  /** Curriculum-cursus-id om naar `/vak/:id` te springen; "" als onbekend. */
+  cursusId: string;
+  cursusNaam: string;
+  /** Hoeveel beoordelingen deze melding samenvat. */
+  aantal: number;
+}

@@ -6,7 +6,7 @@ import {
   leerdoelenVoorRubric,
   rubricsVoorCursus,
 } from "../lib/curriculum";
-import { telKleuren } from "../lib/kleurstats";
+import { aantalIngevuld, telKleuren } from "../lib/kleurstats";
 import { stroomVan } from "../lib/leerlingen";
 import { graadKleur, graadNotitie } from "../lib/leerlingVoortgang";
 import { useAangemeld } from "../lib/sessie";
@@ -58,7 +58,9 @@ export function LeerlingCursus() {
 
   const doelen = leerdoelenVoorCursus(cursus.id);
   const telling = telKleuren(doelen.map((d) => graadKleur(kleuren, leerling.id, d.id)));
-  const inOrde = telling.green + telling.blue;
+  // "Gedaan" = een badge met een kleur (welke dan ook) — een overzicht van wat al aan bod
+  // kwam, niet van geslaagd/gefaald.
+  const gedaan = aantalIngevuld(telling);
 
   return (
     <div className="ll-cursus">
@@ -72,17 +74,17 @@ export function LeerlingCursus() {
           <p>
             {doelen.length === 0
               ? "Voor deze cursus staan er nog geen badges klaar."
-              : `${inOrde} van ${doelen.length} in orde`}
+              : `${gedaan} van ${doelen.length} gedaan`}
           </p>
         </div>
-        <Voortgangsring behaald={inOrde} totaal={doelen.length} groot />
+        <Voortgangsring behaald={gedaan} totaal={doelen.length} groot />
       </header>
 
-      {rubricsVoorCursus(cursus.id).map((rubric) => {
+      {rubricsVoorCursus(cursus.id).map((rubric, _i, alle) => {
         const rd = leerdoelenVoorRubric(rubric.id);
         return (
           <section key={rubric.id} className="ll-rubriek">
-            <h2>{rubric.naam}</h2>
+            {alle.length > 1 && <h2>{rubric.naam}</h2>}
             <div className="ll-badges">
               {rd.map((doel) => {
                 const notitie = graadNotitie(notities, leerling.id, doel.id);

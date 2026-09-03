@@ -1,15 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SOORT_LABEL, alleGroepDefs } from "../lib/groepen";
 import { GRAAD_LABEL, graadVan, unieke } from "../lib/leerlingen";
-import { maakGroep, useStore, wijzigGroep } from "../lib/store";
+import { maakGroep, useStore, verwijderGroep, wijzigGroep } from "../lib/store";
 import type { Groep } from "../lib/types";
 
-const SNEL_SOORTEN = ["eigen", "graad", "leerjaar", "vestiging", "klasgroep"] as const;
+const SNEL_SOORTEN = [
+  "eigen",
+  "graad",
+  "leerjaar",
+  "vestiging",
+  "klasgroep",
+  "graad-vestiging",
+  "leerjaar-vestiging",
+] as const;
 
 /**
  * Formulier om een groep te maken of te bewerken: een naam + een zelfgekozen verzameling
- * leerlingen. Je kan filteren op vestiging en jaar, en in één keer een bestaande groep
- * (bv. "3e jaar") toevoegen.
+ * leerlingen. Twee manieren om leerlingen erbij te halen: een bestaande groep in één keer,
+ * of filteren (vestiging/graad/jaar mag je combineren, bv. "2e graad + Oudenaarde") en dan
+ * alle gefilterde leerlingen toevoegen.
  */
 export function GroepEditor({
   groep,
@@ -30,6 +39,14 @@ export function GroepEditor({
   const [gekozen, setGekozen] = useState<Set<string>>(
     () => new Set(groep?.leerlingIds ?? []),
   );
+  const [melding, setMelding] = useState("");
+
+  // De bevestiging na een batch verdwijnt vanzelf.
+  useEffect(() => {
+    if (!melding) return;
+    const t = setTimeout(() => setMelding(""), 4000);
+    return () => clearTimeout(t);
+  }, [melding]);
 
   const vestigingen = useMemo(() => unieke(students.map((s) => s.vestiging)), [students]);
   const graden = useMemo(
@@ -37,6 +54,25 @@ export function GroepEditor({
     [students],
   );
   const jaren = useMemo(() => unieke(students.map((s) => s.leerjaar)), [students]);
+
+  // Graad en leerjaar mogen niet tegenstrijdig zijn, maar alle keuzes blijven bruikbaar.
+  const kiesGraad = (waarde: string) => {
+    setGraad(waarde);
+    if (waarde && leerjaar && String(graadVan(Number(leerjaar))) !== waarde) setLeerjaar("");
+  };
+  const kiesLeerjaar = (waarde: string) => {
+    setLeerjaar(waarde);
+    if (waarde) setGraad(String(graadVan(Number(waarde))));
+  };
+
+  const filterActief = Boolean(zoek.trim() || vestiging || graad || leerjaar);
+  const wisFilter = () => {
+    setZoek("");
+    setVestiging("");
+    setGraad("");
+    setLeerjaar("");
+  };
+
   const groepDefs = useMemo(
     () => alleGroepDefs(students, groepen).filter((d) => d.leerlingIds.length > 0),
     [students, groepen],
@@ -53,17 +89,29 @@ export function GroepEditor({
     );
   }, [students, zoek, vestiging, graad, leerjaar]);
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    setMelding("");
     setGekozen((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
-  const voegToe = (ids: string[]) => setGekozen((prev) => new Set([...prev, ...ids]));
-  const kiesZichtbare = () => voegToe(zichtbaar.map((s) => s.id));
-  const wisSelectie = () => setGekozen(new Set());
+  const voegToe = (ids: string[], wat: string) => {
+    const nieuw = ids.filter((id) => !gekozen.has(id)).length;
+    setGekozen((prev) => new Set([...prev, ...ids]));
+    setMelding(
+      nieuw > 0
+        ? `${nieuw} leerling${nieuw === 1 ? "" : "en"} toegevoegd · ${wat}`
+        : `${wat}: die zaten er al in`,
+    );
+  };
+  const wisSelectie = () => {
+    setGekozen(new Set());
+    setMelding("");
+  };
 
   const opslaan = () => {
     const ids = [...gekozen];
@@ -77,41 +125,42 @@ export function GroepEditor({
     <div className="groep-editor">
       <h2>{groep ? "Groep bewerken" : "Nieuwe groep"}</h2>
 
-      <div className="groep-editor-rij">
-        <input
-          className="groep-editor-naam"
-          placeholder="Groepsnaam"
-          value={naam}
-          onChange={(e) => setNaam(e.target.value)}
-        />
-      </div>
+      <input
+        className="groep-editor-naam"
+        placeholder="Groepsnaam"
+        value={naam}
+        onChange={(e) => setNaam(e.target.value)}
+      />
 
-      <div className="groep-editor-rij">
-        <select
-          value=""
-          onChange={(e) => {
-            const def = groepDefs.find((d) => d.id === e.target.value);
-            if (def) voegToe(def.leerlingIds);
-            e.target.value = "";
-          }}
-        >
-          <option value="">+ Bestaande groep toevoegen…</option>
-          {SNEL_SOORTEN.map((soort) => {
-            const rijen = groepDefs.filter((d) => d.soort === soort);
-            if (rijen.length === 0) return null;
-            return (
-              <optgroup key={soort} label={SOORT_LABEL[soort]}>
-                {rijen.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.naam} ({d.leerlingIds.length})
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-        </select>
-      </div>
+      <div className="groep-editor-sectie">In één keer een bestaande groep toevoegen</div>
+      <select
+        className="groep-editor-breed"
+        value=""
+        onChange={(e) => {
+          const def = groepDefs.find((d) => d.id === e.target.value);
+          if (def) voegToe(def.leerlingIds, def.naam);
+          e.target.value = "";
+        }}
+      >
+        <option value="">Kies een bestaande groep…</option>
+        {SNEL_SOORTEN.map((soort) => {
+          const rijen = groepDefs.filter((d) => d.soort === soort);
+          if (rijen.length === 0) return null;
+          return (
+            <optgroup key={soort} label={SOORT_LABEL[soort]}>
+              {rijen.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.naam} ({d.leerlingIds.length})
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
+      </select>
 
+      <div className="groep-editor-sectie">
+        Of filteren en toevoegen — je mag combineren (bv. 2e graad + Oudenaarde)
+      </div>
       <div className="groep-editor-rij">
         <input
           type="search"
@@ -127,7 +176,7 @@ export function GroepEditor({
             </option>
           ))}
         </select>
-        <select value={graad} onChange={(e) => setGraad(e.target.value)}>
+        <select value={graad} onChange={(e) => kiesGraad(e.target.value)}>
           <option value="">Alle graden</option>
           {graden.map((g) => (
             <option key={g} value={String(g)}>
@@ -135,43 +184,68 @@ export function GroepEditor({
             </option>
           ))}
         </select>
-        <select value={leerjaar} onChange={(e) => setLeerjaar(e.target.value)}>
-          <option value="">Alle jaren</option>
+        <select value={leerjaar} onChange={(e) => kiesLeerjaar(e.target.value)}>
+          <option value="">{graad ? "Alle jaren van deze graad" : "Alle jaren"}</option>
           {jaren.map((j) => (
             <option key={j} value={String(j)}>
               {j}e jaar
             </option>
           ))}
         </select>
+        {filterActief && (
+          <button type="button" className="linkknop" onClick={wisFilter}>
+            Filter wissen
+          </button>
+        )}
       </div>
 
-      <div className="groep-editor-meta">
-        <span>{gekozen.size} leerling(en) gekozen</span>
-        <button type="button" className="linkknop" onClick={kiesZichtbare}>
-          Alle zichtbare toevoegen ({zichtbaar.length})
-        </button>
-        <button type="button" className="linkknop" onClick={wisSelectie}>
-          Selectie wissen
-        </button>
+      <button
+        type="button"
+        className="groep-editor-voegtoe"
+        onClick={() =>
+          voegToe(
+            zichtbaar.map((s) => s.id),
+            filterActief ? "van deze filter" : "alle leerlingen",
+          )
+        }
+        disabled={zichtbaar.length === 0}
+      >
+        + Alle {zichtbaar.length} {filterActief ? "gefilterde leerlingen" : "leerlingen"} toevoegen
+      </button>
+
+      <div className="groep-editor-samenvatting">
+        <div className="groep-editor-samenvatting-kop">
+          <span className="groep-editor-aantal">
+            <strong>{gekozen.size}</strong> leerling{gekozen.size === 1 ? "" : "en"} in de groep
+          </span>
+          {gekozen.size > 0 && (
+            <button type="button" className="linkknop" onClick={wisSelectie}>
+              Alles wissen
+            </button>
+          )}
+        </div>
+        {melding && <p className="groep-editor-melding">✓ {melding}</p>}
       </div>
 
       <div className="groep-editor-lijst">
-        {zichtbaar.map((s) => (
-          <label key={s.id} className="groep-editor-item">
-            <input
-              type="checkbox"
-              checked={gekozen.has(s.id)}
-              onChange={() => toggle(s.id)}
-            />
-            <span>
-              {s.firstName} {s.lastName}
-            </span>
-            <span className="groep-editor-item-meta">
-              {GRAAD_LABEL[graadVan(s.leerjaar)]} · {s.leerjaar}e · groep {s.klasgroep} ·{" "}
-              {s.vestiging}
-            </span>
-          </label>
-        ))}
+        {zichtbaar.map((s) => {
+          const isGekozen = gekozen.has(s.id);
+          return (
+            <label
+              key={s.id}
+              className={`groep-editor-item${isGekozen ? " is-gekozen" : ""}`}
+            >
+              <input type="checkbox" checked={isGekozen} onChange={() => toggle(s.id)} />
+              <span>
+                {s.firstName} {s.lastName}
+              </span>
+              <span className="groep-editor-item-meta">
+                {GRAAD_LABEL[graadVan(s.leerjaar)]} · {s.leerjaar}e · groep {s.klasgroep} ·{" "}
+                {s.vestiging}
+              </span>
+            </label>
+          );
+        })}
         {zichtbaar.length === 0 && (
           <p className="groep-editor-item-meta" style={{ padding: 12 }}>
             Geen leerlingen voor deze filter.
@@ -186,11 +260,25 @@ export function GroepEditor({
           onClick={opslaan}
           disabled={gekozen.size === 0}
         >
-          Opslaan
+          {groep ? "Opslaan" : "Groep aanmaken"} ({gekozen.size})
         </button>
         <button type="button" className="linkknop" onClick={onSluit}>
           Annuleren
         </button>
+        {groep && (
+          <button
+            type="button"
+            className="linkknop linkknop-gevaar de-editor-verwijder"
+            onClick={() => {
+              if (confirm(`Groep "${groep.naam}" verwijderen?`)) {
+                verwijderGroep(groep.id);
+                onSluit();
+              }
+            }}
+          >
+            Groep verwijderen
+          </button>
+        )}
       </div>
     </div>
   );

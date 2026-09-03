@@ -1,4 +1,4 @@
-/** Ronde voortgangsindicator: hoeveel van de badges zijn in orde (groen/blauw). */
+/** Ronde voortgangsindicator: hoeveel van de badges al een kleur hebben (al aan bod kwamen). */
 export function Voortgangsring({
   behaald,
   totaal,
@@ -22,7 +22,7 @@ export function Voortgangsring({
       height={maat}
       viewBox={`0 0 ${maat} ${maat}`}
       role="img"
-      aria-label={`${behaald} van ${totaal} in orde`}
+      aria-label={`${behaald} van ${totaal} gedaan`}
     >
       <circle cx={mid} cy={mid} r={r} fill="none" stroke="var(--border)" strokeWidth={dikte} />
       <circle

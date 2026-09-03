@@ -1,14 +1,29 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GroepEditor } from "../components/GroepEditor";
+import { GroepOpenen } from "../components/GroepOpenen";
+import { Modal } from "../components/Modal";
 import { SOORT_LABEL, SYSTEEM_SOORTEN, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import { useAangemeld } from "../lib/sessie";
-import { useStore, verwijderGroep } from "../lib/store";
+import { setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
 
 const init = (s: Student) =>
   `${s.firstName[0] ?? ""}${s.lastName[0] ?? ""}`.toUpperCase();
+
+function PotloodIcoon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
  * Groepenpagina: zelfgemaakte groepen beheren + alle standaardgroepen. Elke groep toont
@@ -41,33 +56,43 @@ export function Groepen() {
     navigate("/badges");
   };
 
+  // Groep als filter zetten (+ juiste stromen) en naar de gekozen pagina springen.
+  const openGroep = (groepDefId: string, leerlingIds: string[], pad: string) => {
+    setFilter({ ...LEEG_FILTER, groepId: groepDefId });
+    const stromen = [...new Set(leden(leerlingIds).map((s) => stroomVan(s)))];
+    if (stromen.length > 0) setMatrixStromen(stromen);
+    navigate(pad);
+  };
+
   return (
     <section>
-      <div className="pagina-kop">
-        <h1>Groepen</h1>
-        {!editor && (
-          <button type="button" className="knop-primair" onClick={() => setEditor({})}>
-            + Groep aanmaken
-          </button>
-        )}
-      </div>
-
       {editor && (
-        <GroepEditor groep={teBewerken} mentorId={mentorId} onSluit={() => setEditor(null)} />
+        <Modal
+          label={teBewerken ? "Groep bewerken" : "Nieuwe groep"}
+          groot
+          onClose={() => setEditor(null)}
+        >
+          <GroepEditor groep={teBewerken} mentorId={mentorId} onSluit={() => setEditor(null)} />
+        </Modal>
       )}
 
       <div className="pagina-kop">
         <h2>Eigen groepen</h2>
-        {mentorId && groepen.some((g) => g.mentorId === mentorId) && (
-          <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            <input
-              type="checkbox"
-              checked={alleenVanMij}
-              onChange={(e) => setAlleenVanMij(e.target.checked)}
-            />{" "}
-            Alleen mijn groepen
-          </label>
-        )}
+        <div className="pagina-kop-acties">
+          {mentorId && groepen.some((g) => g.mentorId === mentorId) && (
+            <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              <input
+                type="checkbox"
+                checked={alleenVanMij}
+                onChange={(e) => setAlleenVanMij(e.target.checked)}
+              />{" "}
+              Alleen mijn groepen
+            </label>
+          )}
+          <button type="button" className="knop-secundair" onClick={() => setEditor({})}>
+            + Groep aanmaken
+          </button>
+        </div>
       </div>
 
       {zichtbareGroepen.length === 0 ? (
@@ -80,6 +105,15 @@ export function Groepen() {
             const ll = leden(g.leerlingIds);
             return (
               <div key={g.id} className="groep-kaart">
+                <button
+                  type="button"
+                  className="knop-icoon knop-icoon-klein groep-kaart-bewerk"
+                  title="Groep bewerken"
+                  aria-label={`"${g.naam}" bewerken`}
+                  onClick={() => setEditor({ id: g.id })}
+                >
+                  <PotloodIcoon />
+                </button>
                 <div className="groep-kaart-naam">{g.naam}</div>
                 <div className="groep-kaart-meta">
                   {g.leerlingIds.length} leerlingen
@@ -92,29 +126,10 @@ export function Groepen() {
                 <Samenstelling leden={ll} />
 
                 <div className="groep-kaart-acties">
-                  <button
-                    type="button"
-                    className="linkknop"
-                    onClick={() => toonInMatrix(`eigen:${g.id}`)}
-                  >
-                    Toon in matrix
-                  </button>
-                  <button
-                    type="button"
-                    className="linkknop"
-                    onClick={() => setEditor({ id: g.id })}
-                  >
-                    Bewerken
-                  </button>
-                  <button
-                    type="button"
-                    className="linkknop linkknop-gevaar"
-                    onClick={() => {
-                      if (confirm(`Groep "${g.naam}" verwijderen?`)) verwijderGroep(g.id);
-                    }}
-                  >
-                    Verwijderen
-                  </button>
+                  <GroepOpenen
+                    naam={g.naam}
+                    onOpen={(pad) => openGroep(`eigen:${g.id}`, g.leerlingIds, pad)}
+                  />
                 </div>
               </div>
             );

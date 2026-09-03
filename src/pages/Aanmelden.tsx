@@ -58,8 +58,6 @@ export function Aanmelden() {
 
   return (
     <section style={{ maxWidth: 520 }}>
-      <h1>Aanmelden</h1>
-
       {aangemeld ? (
         <p className="jaar-melding jaar-melding-slot">
           Je bent aangemeld als{" "}

@@ -285,6 +285,38 @@ def parse(path):
     return res
 
 
+DOMEIN_ITEM = re.compile(r"^\d+\.\d+\b")
+
+
+def groepeer_domeinen(cursussen):
+    """In een rubriek met items als '1.2 …', '2.3 …' (Levende Wiskunde › Inzicht …) hoort een
+    reeks genummerde items bij het domein (Getallenleer, Meetkunde, …) dat er net boven staat.
+    De domeinnaam wordt de `subgroep` (een uitklapbaar submenu) en verdwijnt als aparte badge.
+    Een domeinnaam zonder genummerde items eronder (Statistiek, Verzamelingenleer, Logica)
+    blijft een gewone badge, los onder de rubriek."""
+    for c in cursussen:
+        for r in c["rubrieken"]:
+            lds = r["leerdoelen"]
+            if not any(DOMEIN_ITEM.match(x["tekst"]) for x in lds):
+                continue
+            nieuw = []
+            subgroep = None
+            for idx, x in enumerate(lds):
+                if DOMEIN_ITEM.match(x["tekst"]):
+                    if subgroep:
+                        x["subgroep"] = subgroep
+                    nieuw.append(x)
+                    continue
+                volgende = lds[idx + 1]["tekst"] if idx + 1 < len(lds) else ""
+                if DOMEIN_ITEM.match(volgende):
+                    subgroep = x["tekst"]  # enkel de submenunaam, geen eigen badge
+                else:
+                    subgroep = None
+                    nieuw.append(x)
+            r["leerdoelen"] = nieuw
+    return cursussen
+
+
 def esc(s):
     return (s or "").replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").replace("\r", " ").strip()
 
@@ -317,6 +349,8 @@ def generate(stroom, cursussen):
                         'kleuren: { blauw: "%s", groen: "%s", geel: "%s", rood: "%s" }'
                         % (esc(k["blauw"]), esc(k["groen"]), esc(k["geel"]), esc(k["rood"]))
                     )
+                if ld.get("subgroep"):
+                    parts.append(f'subgroep: "{esc(ld["subgroep"])}"')
                 ll.append("  { " + ", ".join(parts) + " },")
     out += cl + ["];", "", f"export const rubrics{stroom}: Rubric[] = ["] + rl
     out += ["];", "", f"export const leerdoelen{stroom}: Leerdoel[] = ["] + ll + ["];", ""]
@@ -326,6 +360,6 @@ def generate(stroom, cursussen):
 
 if __name__ == "__main__":
     for stroom, fn in FILES.items():
-        cursussen = parse(REF / fn)
+        cursussen = groepeer_domeinen(parse(REF / fn))
         nc, nr, nl = generate(stroom, cursussen)
         print(f"curriculum{stroom}.ts: {nc} cursussen / {nr} rubrieken / {nl} badges")

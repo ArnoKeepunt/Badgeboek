@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { usePopover } from "../lib/popover";
 import { getNotitie, useStore, zetNotitie } from "../lib/store";
 
 /**
  * Notitie bij een badge voor één leerling: een tekst die de leerling ziet en een interne
- * notitie die enkel mentoren/beheerders zien. Opent als klein paneel bij de badge.
+ * notitie die enkel mentoren/beheerders zien. Opent als klein paneel (portal) bij de badge.
  */
 export function NotitieVeld({
   schooljaar,
@@ -20,17 +22,13 @@ export function NotitieVeld({
   const n = getNotitie(notities, schooljaar, studentId, leerdoelId);
   const heeft = Boolean(n.zichtbaar || n.verborgen);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open]);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pos = usePopover(open, trigger, () => setOpen(false), { breedte: 360, hoogte: 260 });
 
   return (
     <span className="notitie">
       <button
+        ref={trigger}
         type="button"
         className={`notitie-knop${heeft ? " heeft-notitie" : ""}`}
         aria-expanded={open}
@@ -40,43 +38,46 @@ export function NotitieVeld({
         {heeft ? "💬" : "+ notitie"}
       </button>
 
-      {open && (
-        <>
-          <button
-            type="button"
-            className="rating-cell-backdrop"
-            aria-label="Sluiten"
-            onClick={() => setOpen(false)}
-          />
-          <div className="notitie-panel">
-            <label className="notitie-veld">
-              <span>Zichtbaar voor de leerling</span>
-              <textarea
-                rows={2}
-                readOnly={readonly}
-                defaultValue={n.zichtbaar}
-                onBlur={(e) =>
-                  zetNotitie(schooljaar, studentId, leerdoelId, { zichtbaar: e.target.value })
-                }
-              />
-            </label>
-            <label className="notitie-veld">
-              <span>Interne notitie · niet zichtbaar voor de leerling</span>
-              <textarea
-                rows={2}
-                readOnly={readonly}
-                defaultValue={n.verborgen}
-                onBlur={(e) =>
-                  zetNotitie(schooljaar, studentId, leerdoelId, { verborgen: e.target.value })
-                }
-              />
-            </label>
-            <button type="button" className="linkknop" onClick={() => setOpen(false)}>
-              Sluiten
-            </button>
-          </div>
-        </>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              className="rating-cell-backdrop"
+              aria-label="Sluiten"
+              onClick={() => setOpen(false)}
+            />
+            <div className="notitie-panel zwevend-menu" style={{ top: pos.top, left: pos.left }}>
+              <label className="notitie-veld">
+                <span>Zichtbaar voor de leerling</span>
+                <textarea
+                  rows={2}
+                  readOnly={readonly}
+                  defaultValue={n.zichtbaar}
+                  onBlur={(e) =>
+                    zetNotitie(schooljaar, studentId, leerdoelId, { zichtbaar: e.target.value })
+                  }
+                />
+              </label>
+              <label className="notitie-veld">
+                <span>Interne notitie · niet zichtbaar voor de leerling</span>
+                <textarea
+                  rows={2}
+                  readOnly={readonly}
+                  defaultValue={n.verborgen}
+                  onBlur={(e) =>
+                    zetNotitie(schooljaar, studentId, leerdoelId, { verborgen: e.target.value })
+                  }
+                />
+              </label>
+              <button type="button" className="linkknop" onClick={() => setOpen(false)}>
+                Sluiten
+              </button>
+            </div>
+          </>,
+          document.body,
+        )}
     </span>
   );
 }

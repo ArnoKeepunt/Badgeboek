@@ -8,11 +8,13 @@ import {
   leerdoelenVoorCursus,
   leerdoelenVoorRubric,
   rubricsVoorCursus,
+  subgroepenVoorRubric,
 } from "../lib/curriculum";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
 import { PERIODES } from "../lib/periode";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { getDoelKleur, setDoelKleur, useStore } from "../lib/store";
+import type { Leerdoel } from "../lib/types";
 
 /**
  * Leerlingdetail: dezelfde badges als in de badgematrix (`Badges.tsx`), maar met de vijf
@@ -26,20 +28,25 @@ const FOLD_KEY = "keerpunt-badgeboek:student-fold";
 interface Fold {
   cursus: string[];
   rubric: string[];
+  subgroep: string[];
 }
 
 function loadFold(): Fold {
   try {
     const raw = localStorage.getItem(FOLD_KEY);
-    if (raw) return JSON.parse(raw) as Fold;
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<Fold>;
+      return { cursus: p.cursus ?? [], rubric: p.rubric ?? [], subgroep: p.subgroep ?? [] };
+    }
   } catch {
     // geen opgeslagen stand — begin volledig uitgeklapt
   }
-  return { cursus: [], rubric: [] };
+  return { cursus: [], rubric: [], subgroep: [] };
 }
 
 const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
 const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id]);
+const subgroepSleutel = (rubricId: string, naam: string) => `${rubricId}|${naam}`;
 
 export function StudentDetail() {
   const { studentId } = useParams();
@@ -86,16 +93,62 @@ export function StudentDetail() {
       ...f,
       rubric: f.rubric.includes(id) ? zonder(f.rubric, id) : met(f.rubric, id),
     }));
+  const toggleSubgroep = (key: string) =>
+    setFold((f) => ({
+      ...f,
+      subgroep: f.subgroep.includes(key) ? zonder(f.subgroep, key) : met(f.subgroep, key),
+    }));
 
   const allesDicht = () => {
     const cursusIds = cursussen.map((c) => c.id);
     const rubricIds = cursusIds.flatMap((id) => rubricsVoorCursus(id).map((r) => r.id));
-    setFold({ cursus: cursusIds, rubric: rubricIds });
+    const subgroepKeys = rubricIds.flatMap((rid) =>
+      subgroepenVoorRubric(rid)
+        .filter((g) => g.naam)
+        .map((g) => `${rid}|${g.naam}`),
+    );
+    setFold({ cursus: cursusIds, rubric: rubricIds, subgroep: subgroepKeys });
   };
-  const allesOpen = () => setFold({ cursus: [], rubric: [] });
+  const allesOpen = () => setFold({ cursus: [], rubric: [], subgroep: [] });
 
   const telVoor = (doelen: { id: string }[], periodeId: string) =>
     telKleuren(doelen.map((d) => getDoelKleur(kleuren, schooljaar, periodeId, student.id, d.id)));
+
+  const telCellen = (doelen: { id: string }[]) =>
+    PERIODES.map((p) => {
+      const t = telVoor(doelen, p.id);
+      return (
+        <td key={p.id} className="grid-tel-cel">
+          {doelen.length - t.leeg}/{doelen.length}
+        </td>
+      );
+    });
+
+  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => (
+    <tr key={doel.id}>
+      <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+        <div className="grid-doel-rij">
+          <span className="grid-doel-tekst">{doel.omschrijving}</span>
+          <NotitieVeld
+            schooljaar={schooljaar}
+            studentId={student.id}
+            leerdoelId={doel.id}
+            readonly={vergrendeld}
+          />
+        </div>
+      </td>
+      {PERIODES.map((p) => (
+        <td key={p.id} className="grid-cel">
+          <RatingCell
+            label={`${doel.omschrijving} — ${p.label}`}
+            readonly={vergrendeld}
+            value={getDoelKleur(kleuren, schooljaar, p.id, student.id, doel.id)}
+            onChange={(next) => setDoelKleur(schooljaar, p.id, student.id, doel.id, next)}
+          />
+        </td>
+      ))}
+    </tr>
+  );
 
   return (
     <section>
@@ -105,12 +158,9 @@ export function StudentDetail() {
         </button>
         <Link to="/students">Alle leerlingen</Link>
       </div>
-      <h1>
-        {student.firstName} {student.lastName}
-      </h1>
-      <p style={{ color: "var(--text-muted)" }}>
+      <p style={{ color: "var(--text-muted)", marginTop: 8 }}>
         {student.vestiging} · {GRAAD_LABEL[graadVan(student.leerjaar)]} · {student.leerjaar}e jaar
-        · groep {student.klasgroep}
+        · groep {student.klasgroep} · badgeboek {stroom}
       </p>
 
       {vergrendeld && (
@@ -123,11 +173,6 @@ export function StudentDetail() {
           Je bekijkt schooljaar <strong>{schooljaar}</strong> (niet het lopende schooljaar).
         </p>
       )}
-
-      <p style={{ color: "var(--text-muted)" }}>
-        Badgeboek {stroom}. Elke badge krijgt een kleur per rapport (R1–R4) en een algemene
-        kleur — net dezelfde gegevens als in de <Link to="/badges">badgematrix</Link>.
-      </p>
 
       <div className="matrix-acties">
         <button type="button" className="linkknop" onClick={allesOpen}>
@@ -154,6 +199,9 @@ export function StudentDetail() {
           {cursussen.map((cursus) => {
             const cursusDicht = fold.cursus.includes(cursus.id);
             const cursusDoelen = leerdoelenVoorCursus(cursus.id);
+            const cursusRubrics = rubricsVoorCursus(cursus.id);
+            // Eén rubriek = overbodig tussenniveau: badges meteen onder de cursus.
+            const enkeleRubriek = cursusRubrics.length === 1;
             return (
               <tbody key={cursus.id}>
                 <tr className="grid-cursus">
@@ -179,67 +227,61 @@ export function StudentDetail() {
                 </tr>
 
                 {!cursusDicht &&
-                  rubricsVoorCursus(cursus.id).map((rubric) => {
-                    const rubricDicht = fold.rubric.includes(rubric.id);
+                  cursusRubrics.map((rubric) => {
+                    const rubricDicht = !enkeleRubriek && fold.rubric.includes(rubric.id);
                     const doelen = leerdoelenVoorRubric(rubric.id);
+                    const subgroepen = subgroepenVoorRubric(rubric.id);
                     return (
                       <Fragment key={rubric.id}>
-                        <tr className="grid-group">
-                          <th className="grid-col-doel">
-                            <button
-                              type="button"
-                              className="grid-toggle"
-                              onClick={() => toggleRubric(rubric.id)}
-                            >
-                              <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
-                              {rubric.naam}
-                              <span className="grid-count">{doelen.length}</span>
-                            </button>
-                          </th>
-                          {PERIODES.map((p) => {
-                            const t = telVoor(doelen, p.id);
-                            return (
-                              <td key={p.id} className="grid-tel-cel">
-                                {doelen.length - t.leeg}/{doelen.length}
-                              </td>
-                            );
-                          })}
-                        </tr>
+                        {!enkeleRubriek && (
+                          <tr className="grid-group">
+                            <th className="grid-col-doel">
+                              <button
+                                type="button"
+                                className="grid-toggle"
+                                onClick={() => toggleRubric(rubric.id)}
+                              >
+                                <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
+                                {rubric.naam}
+                                <span className="grid-count">{doelen.length}</span>
+                              </button>
+                            </th>
+                            {telCellen(doelen)}
+                          </tr>
+                        )}
 
                         {!rubricDicht &&
-                          doelen.map((doel) => (
-                            <tr key={doel.id}>
-                              <td className="grid-col-doel grid-doel">
-                                <div className="grid-doel-rij">
-                                  <span className="grid-doel-tekst">{doel.omschrijving}</span>
-                                  <NotitieVeld
-                                    schooljaar={schooljaar}
-                                    studentId={student.id}
-                                    leerdoelId={doel.id}
-                                    readonly={vergrendeld}
-                                  />
-                                </div>
-                              </td>
-                              {PERIODES.map((p) => (
-                                <td key={p.id} className="grid-cel">
-                                  <RatingCell
-                                    label={`${doel.omschrijving} — ${p.label}`}
-                                    readonly={vergrendeld}
-                                    value={getDoelKleur(
-                                      kleuren,
-                                      schooljaar,
-                                      p.id,
-                                      student.id,
-                                      doel.id,
-                                    )}
-                                    onChange={(next) =>
-                                      setDoelKleur(schooljaar, p.id, student.id, doel.id, next)
-                                    }
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
+                          subgroepen.map((groep) => {
+                            if (!groep.naam) {
+                              const losNiveau = enkeleRubriek ? 1 : 2;
+                              return (
+                                <Fragment key={`${rubric.id}|los`}>
+                                  {groep.leerdoelen.map((d) => doelRij(d, losNiveau))}
+                                </Fragment>
+                              );
+                            }
+                            const sgKey = subgroepSleutel(rubric.id, groep.naam);
+                            const sgDicht = fold.subgroep.includes(sgKey);
+                            return (
+                              <Fragment key={sgKey}>
+                                <tr className="grid-group grid-subgroep">
+                                  <th className="grid-col-doel">
+                                    <button
+                                      type="button"
+                                      className="grid-toggle"
+                                      onClick={() => toggleSubgroep(sgKey)}
+                                    >
+                                      <span className="grid-caret">{sgDicht ? "▶" : "▼"}</span>
+                                      {groep.naam}
+                                      <span className="grid-count">{groep.leerdoelen.length}</span>
+                                    </button>
+                                  </th>
+                                  {telCellen(groep.leerdoelen)}
+                                </tr>
+                                {!sgDicht && groep.leerdoelen.map((d) => doelRij(d, 3))}
+                              </Fragment>
+                            );
+                          })}
                       </Fragment>
                     );
                   })}

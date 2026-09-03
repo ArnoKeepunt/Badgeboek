@@ -1,19 +1,68 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { type Aangemeld, naamVan, useAangemeld } from "../lib/sessie";
-import { meldAf } from "../lib/store";
+import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
+import { meldAf, useStore } from "../lib/store";
+import type { Student } from "../lib/types";
+import { Icoon, type IcoonNaam } from "./Icoon";
 import { SchooljaarKiezer } from "./SchooljaarKiezer";
 import "./Layout.css";
 
-const mentorNav = [
-  { to: "/", label: "Overzicht", end: true },
-  { to: "/badges", label: "Badges", end: false },
-  { to: "/doelen", label: "Doelen", end: false },
-  { to: "/groepen", label: "Groepen", end: false },
-  { to: "/students", label: "Leerlingen", end: false },
-  { to: "/gegevens", label: "Gegevens", end: false },
+const PAGINA_TITELS: Record<string, string> = {
+  "/badges": "Badges",
+  "/deelevaluaties": "Deelevaluaties",
+  "/rubrics": "Rubrics",
+  "/doelen": "Doelen",
+  "/groepen": "Groepen",
+  "/students": "Leerlingen",
+  "/gegevens": "Gegevens",
+  "/aanmelden": "Aanmelden",
+};
+
+/** De titel voor de bovenbalk, afgeleid van het huidige pad. */
+function paginaTitel(pathname: string, students: Student[]): string {
+  if (pathname === "/") return "Overzicht";
+  if (pathname.startsWith("/students/")) {
+    const id = decodeURIComponent(pathname.slice("/students/".length));
+    const s = students.find((x) => x.id === id);
+    return s ? `${s.firstName} ${s.lastName}` : "Leerling";
+  }
+  return PAGINA_TITELS[pathname] ?? "Badgeboek";
+}
+
+type NavItem = { to: string; label: string; end: boolean; icoon: IcoonNaam };
+type NavGroep = { items: NavItem[] };
+
+// De zijbalk is geordend in blokjes, gescheiden door een lijntje: het overzicht apart, dan
+// de evaluatie-onderdelen, het klasbeheer en de naslag. Beheerder krijgt er "Gegevens" bij.
+const mentorNav: NavGroep[] = [
+  { items: [{ to: "/", label: "Overzicht", end: true, icoon: "overzicht" }] },
+  {
+    items: [
+      { to: "/badges", label: "Badges", end: false, icoon: "badges" },
+      { to: "/deelevaluaties", label: "Deelevaluaties", end: false, icoon: "deelevaluaties" },
+      { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
+    ],
+  },
+  {
+    items: [
+      { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" },
+      { to: "/students", label: "Leerlingen", end: false, icoon: "leerlingen" },
+    ],
+  },
+  {
+    items: [{ to: "/doelen", label: "Doelen", end: false, icoon: "doelen" }],
+  },
 ];
 
-const leerlingNav = [{ to: "/", label: "Mijn badges", end: true }];
+const beheerderNav: NavGroep[] = [
+  ...mentorNav,
+  {
+    items: [{ to: "/gegevens", label: "Gegevens", end: false, icoon: "gegevens" }],
+  },
+];
+
+const leerlingNav: NavGroep[] = [
+  { items: [{ to: "/", label: "Mijn badges", end: true, icoon: "badges" }] },
+];
 
 function initialen(naam: string): string {
   return naam
@@ -54,19 +103,27 @@ function SidebarAccount({ aangemeld }: { aangemeld: Aangemeld }) {
 export function Layout() {
   const { pathname } = useLocation();
   const aangemeld = useAangemeld();
-  const isLeerling = aangemeld?.rol === "leerling";
-  const nav = isLeerling ? leerlingNav : mentorNav;
+  const rol = useEffectieveRol();
+  const { students } = useStore();
+  const isLeerling = rol === "leerling";
+  const nav = isLeerling ? leerlingNav : rol === "mentor" ? mentorNav : beheerderNav;
   const breed = !isLeerling && pathname.startsWith("/badges");
+  const titel = paginaTitel(pathname, students);
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">Badgeboek</div>
         <nav>
-          {nav.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className="nav-link">
-              {item.label}
-            </NavLink>
+          {nav.map((groep, i) => (
+            <div key={groep.items[0]?.to ?? i} className="nav-groep">
+              {groep.items.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end} className="nav-link">
+                  <Icoon naam={item.icoon} className="nav-icoon" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <SidebarAccount aangemeld={aangemeld} />
@@ -74,7 +131,7 @@ export function Layout() {
 
       <div className="main">
         <header className="topbar">
-          <span className="topbar-title">Badgeboek — dagelijks werk</span>
+          <span className="topbar-title">{titel}</span>
           {!isLeerling && <SchooljaarKiezer />}
         </header>
         <main className={`content${breed ? " content--breed" : ""}`}>

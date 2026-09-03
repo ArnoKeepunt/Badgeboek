@@ -1,11 +1,13 @@
 import { type ReactNode, lazy, Suspense } from "react";
 import { createHashRouter } from "react-router-dom";
+import { AlleenBeheerder } from "./components/AlleenBeheerder";
 import { Shell } from "./components/Shell";
 import { Aanmelden } from "./pages/Aanmelden";
 import { Foutpagina } from "./pages/Foutpagina";
 import { Groepen } from "./pages/Groepen";
 import { Home } from "./pages/Home";
 import { LeerlingCursus } from "./pages/LeerlingCursus";
+import { Rubrics } from "./pages/Rubrics";
 import { Students } from "./pages/Students";
 import { StudentDetail } from "./pages/StudentDetail";
 import { NotFound } from "./pages/NotFound";
@@ -13,6 +15,10 @@ import { NotFound } from "./pages/NotFound";
 // Badges, Doelen en Gegevens laden forse curriculum-/eindtermendata — apart inladen.
 // oxlint-disable-next-line react/only-export-components
 const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.Badges })));
+// oxlint-disable-next-line react/only-export-components
+const Deelevaluaties = lazy(() =>
+  import("./pages/Deelevaluaties").then((m) => ({ default: m.Deelevaluaties })),
+);
 // oxlint-disable-next-line react/only-export-components
 const Doelen = lazy(() => import("./pages/Doelen").then((m) => ({ default: m.Doelen })));
 // oxlint-disable-next-line react/only-export-components
@@ -37,9 +43,16 @@ export const router = createHashRouter([
       { path: "aanmelden", element: <Aanmelden /> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
+      { path: "deelevaluaties", element: traag(<Deelevaluaties />) },
+      { path: "rubrics", element: <Rubrics /> },
       { path: "doelen", element: traag(<Doelen />) },
       { path: "groepen", element: <Groepen /> },
-      { path: "gegevens", element: traag(<Gegevens />) },
+      {
+        path: "gegevens",
+        element: (
+          <AlleenBeheerder>{traag(<Gegevens />)}</AlleenBeheerder>
+        ),
+      },
       { path: "students", element: <Students /> },
       { path: "students/:studentId", element: <StudentDetail /> },
       { path: "*", element: <NotFound /> },
