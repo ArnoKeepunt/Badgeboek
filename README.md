@@ -13,7 +13,9 @@ Dit is een **prototype / testversie**, geen productie-app:
 
 - **Geen echte login** — `/aanmelden` is een demo; standaard ben je "beheerder" met volledige toegang.
 - **Alle data leeft in de browser** (`localStorage`). Niets wordt gedeeld tussen toestellen of
-  gebruikers en er is geen back-up. Cache wissen = data weg.
+  gebruikers en er is geen back-up. Cache wissen = data weg. De opslag zit wel achter een
+  seam (`src/lib/data/`) zodat dit later Firebase/Supabase kan worden zonder de pagina's te
+  raken — zie `src/lib/data/README.md` en `docs/roadmap-voor-echte-data.md`.
 - De leerlingen/mentoren zijn **fictief** (`docs/reference/fictieve_gebruikers_150ll_20mentoren.csv`).
 - **Geen ingebouwde AI**, geen server, geen externe calls.
 
@@ -67,7 +69,8 @@ src/
     LeerlingHome/Cursus # aparte, kindvriendelijke leerlingweergave
     Gegevens.tsx        # CSV import/export
   lib/
-    store.ts            # useSyncExternalStore + localStorage
+    store.ts            # useSyncExternalStore — in-memory reactieve store + domeinregels
+    data/               # persistentielaag (seam): localStorage nu, Firebase/Supabase later
     curriculum*.ts      # badgeboek 1A/1B/2A/3A (auto-gegenereerd uit de Word-docs)
     minimumdoelen*.ts   # eindtermen per stroom (auto-gegenereerd uit de xlsx)
     seedGebruikers.ts   # fictieve leerlingen/mentoren

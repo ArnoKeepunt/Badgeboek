@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { cursusVanLeerdoel } from "./curriculum";
+import { cursusVanLeerdoel, cursusVanNode } from "./curriculum";
+import { type PersistedStore, type RauweStore, maakPersistentie, sessieOpslag } from "./data";
 import {
   deelKleuren as seedDeelKleuren,
   seedDeelevaluaties,
@@ -9,11 +10,11 @@ import {
   students as seedStudents,
 } from "./mockData";
 import type { Minimumdoel } from "./minimumdoelen";
-import { ALGEMEEN, type PeriodeId } from "./periode";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "./schooljaar";
 import type {
   Basisrol,
   DeelKleuren,
+  DeelNotities,
   Deelevaluatie,
   DoelKleuren,
   Groep,
@@ -22,6 +23,7 @@ import type {
   Notitie,
   Notities,
   Rating,
+  Rubriek,
   Sessie,
   Stroom,
   Student,
@@ -35,120 +37,90 @@ import {
 } from "./types";
 
 /**
- * Kleine browser-store zodat mentoren kleuren per leerdoel kunnen invullen en die
- * bewaard blijven. Enkel voor het prototype — later vervangen door een echte API/store.
- * Alles zit in localStorage onder één sleutel; elke mutatie vervangt `state` door een
- * nieuw object zodat useSyncExternalStore de abonnees opnieuw rendert.
+ * In-memory reactieve store: elke mutatie vervangt `state` door een nieuw object zodat
+ * `useSyncExternalStore` de abonnees opnieuw rendert. Hier zitten de domeinregels (seed
+ * eronder mergen, meldingen, `gewist`, afgesloten-schooljaar-guards).
+ *
+ * Waar de data *fysiek* leeft weet deze module niet: dat gaat via een `BadgeboekPersistentie`
+ * (`src/lib/data/`). Nu localStorage, later Firebase/Supabase — zonder wijziging aan de pagina's.
  */
 
-const STORAGE_KEY = "keerpunt-badgeboek:v7";
-const SESSIE_KEY = "keerpunt-badgeboek:sessie";
+const opslag = maakPersistentie();
 
-interface State {
-  students: Student[];
-  mentoren: Mentor[];
+/**
+ * De volledige store = alles wat bewaard wordt (`PersistedStore`, veldbeschrijvingen staan in
+ * `src/lib/data/persistentie.ts`) + de per-tab `sessie` die buiten de gedeelde opslag leeft.
+ */
+interface State extends PersistedStore {
   /** Wie er is aangemeld (per browsertab). */
   sessie: Sessie | null;
-  /** Sleutel `${schooljaar}:${studentId}:${leerdoelId}` → kleur. Ontbrekend = niet aangeboden. */
-  kleuren: DoelKleuren;
-  /** Notities per badge/leerling/schooljaar (zichtbaar + verborgen). */
-  notities: Notities;
-  /** Zelfgemaakte leerlingengroepen. */
-  groepen: Groep[];
-  /** Het schooljaar dat momenteel bekeken/bewerkt wordt. */
-  schooljaar: string;
-  /** De rapportperiode die in de badgematrix bekeken/bewerkt wordt (gedeeld met het overzicht). */
-  periode: PeriodeId;
-  /** De graad/stromen die in de badgematrix getoond worden (minstens één). */
-  matrixStromen: Stroom[];
-  /**
-   * Bewerkingen aan minimumdoelen, per code. De basislijst blijft een statische import;
-   * deze patches worden er bij het lezen bovenop gelegd.
-   */
-  doelWijzigingen: Record<string, Partial<Minimumdoel>>;
-  /** Ingeladen doelenlijst via CSV. `null` = de standaardlijst gebruiken. */
-  doelenImport: Minimumdoel[] | null;
-  /** Door leerkrachten aangemaakte deelevaluaties (toetsen/opdrachten). */
-  deelevaluaties: Deelevaluatie[];
-  /** Sleutel `${deelevaluatieId}:${studentId}` → kleur. Ontbrekend = niet gemaakt. */
-  deelKleuren: DeelKleuren;
-  /** Meldingen voor het leerling-meldingencentrum (nieuwste eerst, gemaximeerd). */
-  meldingen: Melding[];
-  /** Per leerling: tijdstip waarop het meldingencentrum voor het laatst bekeken werd. */
-  meldingGezien: Record<string, number>;
-  /**
-   * Kleursleutels (kleuren én deelKleuren) die de gebruiker bewust heeft leeggemaakt. Bij het
-   * herladen leggen we de seed-data er niet meer onder voor deze sleutels, zodat een gewiste
-   * kleur ook weg blijft.
-   */
-  gewist: string[];
 }
 
 const MAX_MELDINGEN = 120;
 const MAX_GEWIST = 1000;
 
-const seed = (): State => ({
+/** De seed-/demodata. Dit is de `PersistedStore`, dus zonder `sessie`. */
+const seed = (): PersistedStore => ({
   students: seedStudents,
   mentoren: seedMentoren,
-  sessie: null,
   kleuren: seedKleuren,
   notities: {},
   groepen: [],
   schooljaar: HUIDIG_SCHOOLJAAR,
-  periode: ALGEMEEN,
   matrixStromen: ["1A"],
+  matrixCursus: "",
   doelWijzigingen: {},
   doelenImport: null,
+  rubriekWijzigingen: {},
   deelevaluaties: seedDeelevaluaties,
   deelKleuren: seedDeelKleuren,
+  deelNotities: {},
   meldingen: seedMeldingen,
   meldingGezien: {},
   gewist: [],
 });
 
-function laadSessie(): Sessie | null {
-  try {
-    const raw = sessionStorage.getItem(SESSIE_KEY);
-    return raw ? (JSON.parse(raw) as Sessie) : null;
-  } catch {
-    return null;
+/**
+ * De ruwe (mogelijk onvolledige/oude) opslag samenvoegen met de seed-data + migraties.
+ * Levert de `PersistedStore` (zonder `sessie`, die komt er los bij).
+ */
+function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
+  const standaard = seed();
+  if (!bewaard) return standaard;
+
+  const basis: PersistedStore = { ...standaard, ...bewaard };
+  // De seed-evaluaties en -notities blijven onder de bewaarde waarden liggen: zo verschijnt
+  // nieuwe demo-data (bv. voor 1B/2A/3A-leerlingen) zonder dat een eigen kleur of notitie
+  // sneuvelt — een handmatige waarde wint altijd van de seed.
+  basis.kleuren = { ...standaard.kleuren, ...(bewaard.kleuren ?? {}) };
+  basis.notities = { ...standaard.notities, ...(bewaard.notities ?? {}) };
+  basis.deelKleuren = { ...standaard.deelKleuren, ...(bewaard.deelKleuren ?? {}) };
+  basis.deelNotities = { ...standaard.deelNotities, ...(bewaard.deelNotities ?? {}) };
+  // Bewust gewiste kleuren blijven weg, ook al zit er seed-data onder.
+  basis.gewist = Array.isArray(bewaard.gewist) ? bewaard.gewist : [];
+  for (const k of basis.gewist) {
+    delete basis.kleuren[k];
+    delete basis.deelKleuren[k];
   }
+  // De voorbeeld-deelevaluaties/-meldingen blijven staan tot er echte data is.
+  if (!Array.isArray(bewaard.deelevaluaties)) basis.deelevaluaties = standaard.deelevaluaties;
+  if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
+  if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
+  // Migratie: vroeger één stroom (`matrixStroom`), nu een lijst (`matrixStromen`).
+  if (!Array.isArray(bewaard.matrixStromen)) {
+    basis.matrixStromen = bewaard.matrixStroom ? [bewaard.matrixStroom] : standaard.matrixStromen;
+  }
+  return basis;
 }
 
 function load(): State {
-  const standaard = seed();
-  let basis = standaard;
+  let bewaard: RauweStore | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const bewaard = JSON.parse(raw) as Partial<State> & { matrixStroom?: Stroom };
-      basis = { ...standaard, ...bewaard };
-      // De seed-evaluaties en -notities blijven onder de bewaarde waarden liggen: zo verschijnt
-      // nieuwe demo-data (bv. voor 1B/2A/3A-leerlingen) zonder dat een eigen kleur of notitie
-      // sneuvelt — een handmatige waarde wint altijd van de seed.
-      basis.kleuren = { ...standaard.kleuren, ...(bewaard.kleuren ?? {}) };
-      basis.notities = { ...standaard.notities, ...(bewaard.notities ?? {}) };
-      basis.deelKleuren = { ...standaard.deelKleuren, ...(bewaard.deelKleuren ?? {}) };
-      // Bewust gewiste kleuren blijven weg, ook al zit er seed-data onder.
-      basis.gewist = Array.isArray(bewaard.gewist) ? bewaard.gewist : [];
-      for (const k of basis.gewist) {
-        delete basis.kleuren[k];
-        delete basis.deelKleuren[k];
-      }
-      // De voorbeeld-deelevaluaties/-meldingen blijven staan tot er echte data is.
-      if (!Array.isArray(bewaard.deelevaluaties)) basis.deelevaluaties = standaard.deelevaluaties;
-      if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
-      if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
-      // Migratie: vroeger één stroom (`matrixStroom`), nu een lijst (`matrixStromen`).
-      if (!Array.isArray(bewaard.matrixStromen)) {
-        basis.matrixStromen = bewaard.matrixStroom ? [bewaard.matrixStroom] : standaard.matrixStromen;
-      }
-    }
+    bewaard = opslag.laadDirect();
   } catch {
-    // Privémodus, uitgeschakelde opslag of corrupte JSON — terugvallen op seed.
+    // opslag onbereikbaar — terugvallen op de seed
   }
-  // De sessie leeft per browsertab, los van de rest.
-  return { ...basis, sessie: laadSessie() };
+  return { ...verwerkRauw(bewaard), sessie: sessieOpslag.laad() };
 }
 
 let state: State = load();
@@ -156,16 +128,22 @@ const listeners = new Set<() => void>();
 
 function commit(next: State) {
   state = next;
-  try {
-    const { sessie, ...rest } = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
-    if (sessie) sessionStorage.setItem(SESSIE_KEY, JSON.stringify(sessie));
-    else sessionStorage.removeItem(SESSIE_KEY);
-  } catch {
-    // Opslagfouten negeren; state leeft nog in het geheugen voor deze sessie.
-  }
+  const { sessie, ...rest } = state;
+  void opslag.bewaar(rest);
+  sessieOpslag.bewaar(sessie);
   listeners.forEach((notify) => notify());
 }
+
+// Data die elders wijzigt (andere browsertab nu, straks een realtime backend) overnemen —
+// zonder terug te schrijven, anders krijg je een lus.
+opslag.abonneer?.((rauw) => {
+  try {
+    state = { ...verwerkRauw(rauw), sessie: state.sessie };
+    listeners.forEach((notify) => notify());
+  } catch {
+    // onbruikbare payload van elders — huidige state behouden
+  }
+});
 
 function subscribe(notify: () => void) {
   listeners.add(notify);
@@ -182,8 +160,8 @@ function pasGewistAan(gewist: string[], sleutel: string, kleur: Rating | null): 
 
 // --- Meldingen (leerling-meldingencentrum) ------------------------------
 
-const cursusInfoVoorLeerdoel = (leerdoelId: string) => {
-  const c = cursusVanLeerdoel(leerdoelId);
+const cursusInfoVoorNode = (nodeId: string) => {
+  const c = cursusVanNode(nodeId);
   return { cursusId: c?.id ?? "", cursusNaam: c?.naam ?? "je badges" };
 };
 
@@ -239,17 +217,20 @@ export function useStore(): State {
   return useSyncExternalStore(subscribe, () => state);
 }
 
-/** Zet (of wis, met `null`) de kleur van een leerdoel voor één leerling, schooljaar en periode. */
+/**
+ * Zet (of wis, met `null`) de kleur van een node voor één leerling in een schooljaar. Een node
+ * is een losse badge (leerdoel-id) of een hoger niveau: een cursus-id, rubric-id of
+ * subgroep-sleutel `${rubricId}|${naam}` (de manuele graadsbadge/subgraadbadge).
+ */
 export function setDoelKleur(
   schooljaar: string,
-  periode: string,
   studentId: string,
-  leerdoelId: string,
+  nodeId: string,
   kleur: Rating | null,
 ) {
   // Een afgesloten schooljaar staat vast: negeer wijzigingen.
   if (isAfgesloten(schooljaar)) return;
-  const sleutel = doelSleutel(schooljaar, periode, studentId, leerdoelId);
+  const sleutel = doelSleutel(schooljaar, studentId, nodeId);
   const verandert = kleur !== null && state.kleuren[sleutel] !== kleur;
   const kleuren = { ...state.kleuren };
   if (kleur) kleuren[sleutel] = kleur;
@@ -259,39 +240,37 @@ export function setDoelKleur(
       ? metMelding(state.meldingen, {
           studentId,
           soort: "kleur",
-          ...cursusInfoVoorLeerdoel(leerdoelId),
+          ...cursusInfoVoorNode(nodeId),
         })
       : state.meldingen;
   commit({ ...state, kleuren, meldingen, gewist: pasGewistAan(state.gewist, sleutel, kleur) });
 }
 
-/** Lees de kleur van een leerdoel voor één leerling, schooljaar en periode (`null` = niet aangeboden). */
+/** Lees de kleur van een node voor één leerling in een schooljaar (`null` = niet aangeboden). */
 export function getDoelKleur(
   kleuren: DoelKleuren,
   schooljaar: string,
-  periode: string,
   studentId: string,
-  leerdoelId: string,
+  nodeId: string,
 ): Rating | null {
-  return kleuren[doelSleutel(schooljaar, periode, studentId, leerdoelId)] ?? null;
+  return kleuren[doelSleutel(schooljaar, studentId, nodeId)] ?? null;
 }
 
-/** Zet dezelfde kleur voor meerdere leerlingen tegelijk (één opslagbeurt). */
+/** Zet dezelfde kleur voor meerdere leerlingen tegelijk op één node (één opslagbeurt). */
 export function setDoelKleurBulk(
   schooljaar: string,
-  periode: string,
   studentIds: string[],
-  leerdoelId: string,
+  nodeId: string,
   kleur: Rating | null,
 ) {
   if (isAfgesloten(schooljaar)) return;
   const kleuren = { ...state.kleuren };
   const logt = kleur !== null && schooljaar === HUIDIG_SCHOOLJAAR;
-  const cursusInfo = logt ? cursusInfoVoorLeerdoel(leerdoelId) : null;
+  const cursusInfo = logt ? cursusInfoVoorNode(nodeId) : null;
   let meldingen = state.meldingen;
   let gewist = state.gewist;
   for (const studentId of studentIds) {
-    const sleutel = doelSleutel(schooljaar, periode, studentId, leerdoelId);
+    const sleutel = doelSleutel(schooljaar, studentId, nodeId);
     const verandert = kleur !== null && kleuren[sleutel] !== kleur;
     if (kleur) kleuren[sleutel] = kleur;
     else delete kleuren[sleutel];
@@ -309,20 +288,20 @@ export function getNotitie(
   notities: Notities,
   schooljaar: string,
   studentId: string,
-  leerdoelId: string,
+  nodeId: string,
 ): Notitie {
-  return notities[notitieSleutel(schooljaar, studentId, leerdoelId)] ?? LEGE_NOTITIE;
+  return notities[notitieSleutel(schooljaar, studentId, nodeId)] ?? LEGE_NOTITIE;
 }
 
 /** Werk een notitie bij; verdwijnt als beide velden leeg zijn. */
 export function zetNotitie(
   schooljaar: string,
   studentId: string,
-  leerdoelId: string,
+  nodeId: string,
   patch: Partial<Notitie>,
 ) {
   if (isAfgesloten(schooljaar)) return;
-  const sleutel = notitieSleutel(schooljaar, studentId, leerdoelId);
+  const sleutel = notitieSleutel(schooljaar, studentId, nodeId);
   const huidig = state.notities[sleutel] ?? LEGE_NOTITIE;
   const nieuw: Notitie = {
     zichtbaar: (patch.zichtbaar ?? huidig.zichtbaar).trim(),
@@ -339,18 +318,13 @@ export function setSchooljaar(schooljaar: string) {
   commit({ ...state, schooljaar });
 }
 
-/** Wissel de rapportperiode (gedeeld tussen overzicht en badgematrix). */
-export function setPeriode(periode: PeriodeId) {
-  commit({ ...state, periode });
-}
-
-/** Zet de getoonde stromen van de badgematrix (in vaste volgorde, minstens één). */
+/** Zet de getoonde stromen van de matrix-pagina's (in vaste volgorde, minstens één). */
 export function setMatrixStromen(stromen: Stroom[]) {
   const uniek = STROMEN.filter((s) => stromen.includes(s));
   commit({ ...state, matrixStromen: uniek.length > 0 ? uniek : ["1A"] });
 }
 
-/** Zet één stroom aan of uit in de badgematrix (de laatste actieve stroom blijft staan). */
+/** Zet één stroom aan of uit (de laatste actieve stroom blijft staan). */
 export function toggleMatrixStroom(stroom: Stroom) {
   const actief = state.matrixStromen.includes(stroom);
   if (actief && state.matrixStromen.length === 1) return;
@@ -359,6 +333,14 @@ export function toggleMatrixStroom(stroom: Stroom) {
       ? state.matrixStromen.filter((s) => s !== stroom)
       : [...state.matrixStromen, stroom],
   );
+}
+
+/**
+ * Cursusfilter voor de matrix-pagina's (Badges / Deelevaluaties / Rubrics), op cursusnaam.
+ * `""` = alle cursussen. Gedeeld zodat de keuze meegaat als je van pagina wisselt.
+ */
+export function setMatrixCursus(cursus: string) {
+  commit({ ...state, matrixCursus: cursus });
 }
 
 // --- Aanmelden ------------------------------------------------------------
@@ -441,6 +423,27 @@ export function zetDoelenImport(doelen: Minimumdoel[] | null) {
   commit({ ...state, doelenImport: doelen, doelWijzigingen: {} });
 }
 
+// --- Rubrieken -----------------------------------------------------------
+
+/** Bewaar een bewerking aan één uitgeschreven rubric (op basis van zijn id). */
+export function wijzigRubriek(id: string, patch: Partial<Omit<Rubriek, "id" | "cursus" | "stroom">>) {
+  commit({
+    ...state,
+    rubriekWijzigingen: {
+      ...state.rubriekWijzigingen,
+      [id]: { ...state.rubriekWijzigingen[id], ...patch },
+    },
+  });
+}
+
+/** Verwijder alle bewerkingen aan één rubric (terug naar de brontekst). */
+export function herstelRubriek(id: string) {
+  if (!state.rubriekWijzigingen[id]) return;
+  const rest = { ...state.rubriekWijzigingen };
+  delete rest[id];
+  commit({ ...state, rubriekWijzigingen: rest });
+}
+
 // --- Deelevaluaties -------------------------------------------------------
 
 /** Maak een deelevaluatie aan en geef de id terug. */
@@ -460,16 +463,21 @@ export function wijzigDeelevaluatie(id: string, patch: Partial<Omit<Deelevaluati
   });
 }
 
-/** Verwijder een deelevaluatie én de bijhorende kleuren. */
+/** Verwijder een deelevaluatie én de bijhorende kleuren en notities. */
 export function verwijderDeelevaluatie(id: string) {
   const deelKleuren = { ...state.deelKleuren };
+  const deelNotities = { ...state.deelNotities };
   for (const sleutel of Object.keys(deelKleuren)) {
     if (sleutel.startsWith(`${id}:`)) delete deelKleuren[sleutel];
+  }
+  for (const sleutel of Object.keys(deelNotities)) {
+    if (sleutel.startsWith(`${id}:`)) delete deelNotities[sleutel];
   }
   commit({
     ...state,
     deelevaluaties: state.deelevaluaties.filter((d) => d.id !== id),
     deelKleuren,
+    deelNotities,
   });
 }
 
@@ -479,6 +487,34 @@ export function getDeelKleur(
   studentId: string,
 ): Rating | null {
   return deelKleuren[deelSleutel(deelevaluatieId, studentId)] ?? null;
+}
+
+/** De notitie bij één deelevaluatiecel (leeg als er geen is). */
+export function getDeelNotitie(
+  deelNotities: DeelNotities,
+  deelevaluatieId: string,
+  studentId: string,
+): Notitie {
+  return deelNotities[deelSleutel(deelevaluatieId, studentId)] ?? LEGE_NOTITIE;
+}
+
+/** Werk de notitie bij één deelevaluatiecel bij; verdwijnt als beide velden leeg zijn. */
+export function zetDeelNotitie(
+  deelevaluatieId: string,
+  studentId: string,
+  patch: Partial<Notitie>,
+) {
+  if (deelevaluatieVergrendeld(deelevaluatieId)) return;
+  const sleutel = deelSleutel(deelevaluatieId, studentId);
+  const huidig = state.deelNotities[sleutel] ?? LEGE_NOTITIE;
+  const nieuw: Notitie = {
+    zichtbaar: (patch.zichtbaar ?? huidig.zichtbaar).trim(),
+    verborgen: (patch.verborgen ?? huidig.verborgen).trim(),
+  };
+  const deelNotities = { ...state.deelNotities };
+  if (nieuw.zichtbaar || nieuw.verborgen) deelNotities[sleutel] = nieuw;
+  else delete deelNotities[sleutel];
+  commit({ ...state, deelNotities });
 }
 
 const deelevaluatie = (id: string) => state.deelevaluaties.find((d) => d.id === id);
@@ -542,7 +578,7 @@ export function setDeelKleurBulk(
   commit({ ...state, deelKleuren, meldingen, gewist });
 }
 
-/** Wis alle lokale aanpassingen en ga terug naar de seed-data. */
+/** Wis alle lokale aanpassingen en ga terug naar de seed-data (meldt ook af). */
 export function resetStore() {
-  commit(seed());
+  commit({ ...seed(), sessie: null });
 }

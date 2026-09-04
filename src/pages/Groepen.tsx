@@ -6,7 +6,7 @@ import { Modal } from "../components/Modal";
 import { SOORT_LABEL, SYSTEEM_SOORTEN, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import { useAangemeld } from "../lib/sessie";
-import { setMatrixStromen, useStore } from "../lib/store";
+import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
 
 const init = (s: Student) =>
@@ -53,6 +53,7 @@ export function Groepen() {
 
   const toonInMatrix = (groepDefId: string) => {
     setFilter({ ...LEEG_FILTER, groepId: groepDefId });
+    setMatrixCursus("");
     navigate("/badges");
   };
 
@@ -61,6 +62,7 @@ export function Groepen() {
     setFilter({ ...LEEG_FILTER, groepId: groepDefId });
     const stromen = [...new Set(leden(leerlingIds).map((s) => stroomVan(s)))];
     if (stromen.length > 0) setMatrixStromen(stromen);
+    setMatrixCursus("");
     navigate(pad);
   };
 

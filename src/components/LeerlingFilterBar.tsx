@@ -14,6 +14,9 @@ import type { Student } from "../lib/types";
  *
  * `verbergVelden` laat toe graad en/of klasgroep te verbergen op pagina's waar de stroomkeuze
  * die as al bepaalt (badgematrix, deelevaluaties) — zo is er geen dubbel systeem.
+ *
+ * Optioneel: een cursusfilter (`cursusOpties` + `cursus` + `onCursusChange`) — voor de
+ * matrix-pagina's, die staat dan tussen de andere filters i.p.v. bij de stroomchips.
  */
 export function LeerlingFilterBar({
   alle,
@@ -22,6 +25,9 @@ export function LeerlingFilterBar({
   filter,
   onChange,
   verbergVelden = [],
+  cursusOpties,
+  cursus = "",
+  onCursusChange,
 }: {
   alle: Student[];
   zichtbaar: number;
@@ -29,8 +35,13 @@ export function LeerlingFilterBar({
   filter: LeerlingFilter;
   onChange: (next: LeerlingFilter) => void;
   verbergVelden?: ("graad" | "klasgroep")[];
+  cursusOpties?: string[];
+  cursus?: string;
+  onCursusChange?: (cursus: string) => void;
 }) {
   const toon = (veld: "graad" | "klasgroep") => !verbergVelden.includes(veld);
+  const toonCursus = Boolean(cursusOpties && onCursusChange);
+  const gekozenCursus = cursusOpties?.includes(cursus) ? cursus : "";
   const vestigingen = unieke(alle.map((s) => s.vestiging));
   const graden = unieke(alle.map((s) => graadVan(s.leerjaar)));
   const jaren = unieke(alle.map((s) => s.leerjaar));
@@ -61,7 +72,13 @@ export function LeerlingFilterBar({
   const heeftActieveFilter =
     Boolean(filter.zoek || filter.vestiging || filter.leerjaar || filter.groepId) ||
     (toon("graad") && Boolean(filter.graad)) ||
-    (toon("klasgroep") && Boolean(filter.klasgroep));
+    (toon("klasgroep") && Boolean(filter.klasgroep)) ||
+    (toonCursus && Boolean(gekozenCursus));
+
+  const wisAlles = () => {
+    onChange(LEEG_FILTER);
+    onCursusChange?.("");
+  };
 
   return (
     <div className="filterbar">
@@ -85,6 +102,22 @@ export function LeerlingFilterBar({
           );
         })}
       </select>
+
+      {toonCursus && (
+        <select
+          className="filterbar-cursus"
+          value={gekozenCursus}
+          aria-label="Filter op cursus"
+          onChange={(e) => onCursusChange?.(e.target.value)}
+        >
+          <option value="">Alle cursussen</option>
+          {cursusOpties?.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      )}
 
       <input
         type="search"
@@ -141,7 +174,7 @@ export function LeerlingFilterBar({
       </span>
 
       {heeftActieveFilter && (
-        <button type="button" className="linkknop" onClick={() => onChange(LEEG_FILTER)}>
+        <button type="button" className="linkknop" onClick={wisAlles}>
           Wis filter
         </button>
       )}

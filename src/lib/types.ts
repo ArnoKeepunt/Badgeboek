@@ -57,6 +57,25 @@ export interface Leerdoel {
   subgroep?: string;
 }
 
+/**
+ * Een uitgeschreven rubric (los van de badgematrix): per cursus en stroom, met de doelcodes
+ * die eronder vallen, de omschrijving per kleur en een tekst over de leerlijn. Bron:
+ * docs/reference/rubrics_overzicht.xlsx → `src/lib/rubriekenData.ts` (auto-gegenereerd).
+ * Nog niet alle cursussen zijn uitgeschreven.
+ */
+export interface Rubriek {
+  id: string;
+  cursus: string;
+  stroom: Stroom;
+  naam: string;
+  /** Doelcodes uit de minimumdoelen die deze rubric afdekt (bv. "16.01", "BG04.02"). */
+  doelen: string[];
+  /** De omschrijving per kleur (blauw / groen / geel / rood). */
+  criteria: Kleurcriteria;
+  /** Waar de leerling vandaan komt en waar het naartoe gaat (leerlijn). */
+  leerlijn: string;
+}
+
 /** De rollen die de app (voorlopig) kent. */
 export type Basisrol = "leerling" | "mentor";
 
@@ -100,19 +119,19 @@ export interface Groep {
 }
 
 /**
- * Kleur per (schooljaar, periode, leerling, leerdoel). Bewaard als één map met sleutel
- * `${schooljaar}:${periode}:${studentId}:${leerdoelId}`, waarbij `periode` "algemeen" of
- * een rapportperiode ("p1"…"p4") is. Een ontbrekende sleutel betekent "nog niet
- * aangeboden / geëvalueerd".
+ * Kleur per (schooljaar, leerling, node). Bewaard als één map met sleutel
+ * `${schooljaar}:${studentId}:${nodeId}`. Een `nodeId` is een leerdoel-id (een losse badge),
+ * of een cursus-/rubric-id of subgroep-sleutel `${rubricId}|${naam}` (de manueel gezette
+ * graadsbadge/subgraadbadge op dat niveau). Een ontbrekende sleutel = "nog niet aangeboden
+ * / geëvalueerd".
  */
 export type DoelKleuren = Record<string, Rating>;
 
 export const doelSleutel = (
   schooljaar: string,
-  periode: string,
   studentId: string,
-  leerdoelId: string,
-): string => `${schooljaar}:${periode}:${studentId}:${leerdoelId}`;
+  nodeId: string,
+): string => `${schooljaar}:${studentId}:${nodeId}`;
 
 /** Notitie bij een badge voor één leerling in één schooljaar. */
 export interface Notitie {
@@ -122,14 +141,14 @@ export interface Notitie {
   verborgen: string;
 }
 
-/** Sleutel `${schooljaar}:${studentId}:${leerdoelId}` → Notitie. */
+/** Sleutel `${schooljaar}:${studentId}:${nodeId}` → Notitie (nodeId = badge/cursus/rubric/…). */
 export type Notities = Record<string, Notitie>;
 
 export const notitieSleutel = (
   schooljaar: string,
   studentId: string,
-  leerdoelId: string,
-): string => `${schooljaar}:${studentId}:${leerdoelId}`;
+  nodeId: string,
+): string => `${schooljaar}:${studentId}:${nodeId}`;
 
 export const LEGE_NOTITIE: Notitie = { zichtbaar: "", verborgen: "" };
 
@@ -158,6 +177,9 @@ export interface Deelevaluatie {
 
 /** Sleutel `${deelevaluatieId}:${studentId}` → Rating. Ontbreekt = niet gemaakt. */
 export type DeelKleuren = Record<string, Rating>;
+
+/** Sleutel `${deelevaluatieId}:${studentId}` → Notitie bij die deelevaluatiecel. */
+export type DeelNotities = Record<string, Notitie>;
 
 export const deelSleutel = (deelevaluatieId: string, studentId: string): string =>
   `${deelevaluatieId}:${studentId}`;

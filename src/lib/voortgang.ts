@@ -11,19 +11,18 @@ export interface Voortgang {
 }
 
 /**
- * Hoeveel badge-cellen zijn al ingevuld voor een set leerlingen, in een schooljaar en periode.
+ * Hoeveel losse badges hebben al een kleur voor een set leerlingen, in een schooljaar.
  * Elke leerling telt mee met de badges van zijn/haar eigen stroom.
  */
 export function voortgangVoor(
   leerlingen: Student[],
   kleuren: DoelKleuren,
   schooljaar: string,
-  periode: string,
 ): Voortgang {
   const waarden: (Rating | null)[] = [];
   for (const s of leerlingen) {
     for (const d of leerdoelenVoorStroom(stroomVan(s))) {
-      waarden.push(getDoelKleur(kleuren, schooljaar, periode, s.id, d.id));
+      waarden.push(getDoelKleur(kleuren, schooljaar, s.id, d.id));
     }
   }
   const telling = telKleuren(waarden);

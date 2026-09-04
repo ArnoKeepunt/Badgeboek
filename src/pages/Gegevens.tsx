@@ -103,7 +103,7 @@ export function Gegevens() {
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Evaluaties (back-up)</div>
-          <p>Elke ingevulde kleur, per leerling / schooljaar / periode / badge.</p>
+          <p>Elke ingevulde kleur, per leerling / schooljaar / badge (ook de graadsbadges).</p>
           <button
             type="button"
             className="knop-primair"

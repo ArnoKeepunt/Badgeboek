@@ -2,7 +2,6 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
-import { telKleuren } from "../lib/kleurstats";
 import {
   cursussenVoorStroom,
   leerdoelenVoorCursus,
@@ -11,16 +10,15 @@ import {
   subgroepenVoorRubric,
 } from "../lib/curriculum";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
-import { PERIODES } from "../lib/periode";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
-import { getDoelKleur, setDoelKleur, useStore } from "../lib/store";
+import { getDoelKleur, getNotitie, setDoelKleur, useStore, zetNotitie } from "../lib/store";
 import type { Leerdoel } from "../lib/types";
 
 /**
- * Leerlingdetail: dezelfde badges als in de badgematrix (`Badges.tsx`), maar met de vijf
- * periodes als kolommen voor één leerling. Cursussen en rubrics zijn in- en uitklapbaar op
- * exact dezelfde manier als in de matrix; de koprij en de eerste kolom (badgetekst) blijven
- * leesbaar staan bij het scrollen.
+ * Leerlingdetail: dezelfde badges als in de badgematrix (`Badges.tsx`), maar voor één leerling
+ * met één kleurkolom en een notitieveld per badge. Cursussen, rubrics en subgroepen krijgen —
+ * net als in de matrix — een eigen kleur (graadsbadge) en zijn in- en uitklapbaar. De koprij
+ * en de eerste kolom blijven leesbaar staan bij het scrollen.
  */
 
 const FOLD_KEY = "keerpunt-badgeboek:student-fold";
@@ -50,7 +48,7 @@ const subgroepSleutel = (rubricId: string, naam: string) => `${rubricId}|${naam}
 
 export function StudentDetail() {
   const { studentId } = useParams();
-  const { students, kleuren, schooljaar } = useStore();
+  const { students, kleuren, notities, schooljaar } = useStore();
   const [fold, setFold] = useState<Fold>(loadFold);
   const student = students.find((s) => s.id === studentId);
   const vergrendeld = isAfgesloten(schooljaar);
@@ -111,42 +109,45 @@ export function StudentDetail() {
   };
   const allesOpen = () => setFold({ cursus: [], rubric: [], subgroep: [] });
 
-  const telVoor = (doelen: { id: string }[], periodeId: string) =>
-    telKleuren(doelen.map((d) => getDoelKleur(kleuren, schooljaar, periodeId, student.id, d.id)));
-
-  const telCellen = (doelen: { id: string }[]) =>
-    PERIODES.map((p) => {
-      const t = telVoor(doelen, p.id);
-      return (
-        <td key={p.id} className="grid-tel-cel">
-          {doelen.length - t.leeg}/{doelen.length}
-        </td>
-      );
-    });
-
-  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => (
-    <tr key={doel.id}>
-      <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
-        <div className="grid-doel-rij">
-          <span className="grid-doel-tekst">{doel.omschrijving}</span>
+  /** De ene kleurcel voor één node (badge, cursus, rubric of subgroep). */
+  const kleurCel = (nodeId: string, naam: string) => {
+    const kleur = getDoelKleur(kleuren, schooljaar, student.id, nodeId);
+    return (
+      <td className="grid-cel">
+        <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
+          <RatingCell
+            label={naam}
+            readonly={vergrendeld}
+            value={kleur}
+            onChange={(next) => setDoelKleur(schooljaar, student.id, nodeId, next)}
+          />
           <NotitieVeld
-            schooljaar={schooljaar}
-            studentId={student.id}
-            leerdoelId={doel.id}
+            notitie={getNotitie(notities, schooljaar, student.id, nodeId)}
+            onSave={(patch) => zetNotitie(schooljaar, student.id, nodeId, patch)}
             readonly={vergrendeld}
           />
         </div>
       </td>
-      {PERIODES.map((p) => (
-        <td key={p.id} className="grid-cel">
-          <RatingCell
-            label={`${doel.omschrijving} — ${p.label}`}
-            readonly={vergrendeld}
-            value={getDoelKleur(kleuren, schooljaar, p.id, student.id, doel.id)}
-            onChange={(next) => setDoelKleur(schooljaar, p.id, student.id, doel.id, next)}
-          />
-        </td>
-      ))}
+    );
+  };
+
+  /** De eerste kolom van een cursus-/rubric-/subgroep-rij. */
+  const nodeKop = (naam: string, aantal: number, dicht: boolean, onToggle: () => void) => (
+    <th className="grid-col-doel">
+      <button type="button" className="grid-toggle" onClick={onToggle}>
+        <span className="grid-caret">{dicht ? "▶" : "▼"}</span>
+        {naam}
+        <span className="grid-count">{aantal}</span>
+      </button>
+    </th>
+  );
+
+  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => (
+    <tr key={doel.id}>
+      <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+        <span className="grid-doel-tekst">{doel.omschrijving}</span>
+      </td>
+      {kleurCel(doel.id, doel.omschrijving)}
     </tr>
   );
 
@@ -188,11 +189,7 @@ export function StudentDetail() {
           <thead>
             <tr>
               <th className="grid-col-doel">Badge</th>
-              {PERIODES.map((p) => (
-                <th key={p.id} className="grid-col-periode" title={p.label}>
-                  {p.kort}
-                </th>
-              ))}
+              <th className="grid-col-kleur">Kleur</th>
             </tr>
           </thead>
 
@@ -205,25 +202,10 @@ export function StudentDetail() {
             return (
               <tbody key={cursus.id}>
                 <tr className="grid-cursus">
-                  <th className="grid-col-doel">
-                    <button
-                      type="button"
-                      className="grid-toggle"
-                      onClick={() => toggleCursus(cursus.id)}
-                    >
-                      <span className="grid-caret">{cursusDicht ? "▶" : "▼"}</span>
-                      {cursus.naam}
-                      <span className="grid-count">{cursusDoelen.length}</span>
-                    </button>
-                  </th>
-                  {PERIODES.map((p) => {
-                    const t = telVoor(cursusDoelen, p.id);
-                    return (
-                      <td key={p.id} className="grid-tel-cel">
-                        {cursusDoelen.length - t.leeg}/{cursusDoelen.length}
-                      </td>
-                    );
-                  })}
+                  {nodeKop(cursus.naam, cursusDoelen.length, cursusDicht, () =>
+                    toggleCursus(cursus.id),
+                  )}
+                  {kleurCel(cursus.id, cursus.naam)}
                 </tr>
 
                 {!cursusDicht &&
@@ -235,18 +217,10 @@ export function StudentDetail() {
                       <Fragment key={rubric.id}>
                         {!enkeleRubriek && (
                           <tr className="grid-group">
-                            <th className="grid-col-doel">
-                              <button
-                                type="button"
-                                className="grid-toggle"
-                                onClick={() => toggleRubric(rubric.id)}
-                              >
-                                <span className="grid-caret">{rubricDicht ? "▶" : "▼"}</span>
-                                {rubric.naam}
-                                <span className="grid-count">{doelen.length}</span>
-                              </button>
-                            </th>
-                            {telCellen(doelen)}
+                            {nodeKop(rubric.naam, doelen.length, rubricDicht, () =>
+                              toggleRubric(rubric.id),
+                            )}
+                            {kleurCel(rubric.id, rubric.naam)}
                           </tr>
                         )}
 
@@ -265,18 +239,10 @@ export function StudentDetail() {
                             return (
                               <Fragment key={sgKey}>
                                 <tr className="grid-group grid-subgroep">
-                                  <th className="grid-col-doel">
-                                    <button
-                                      type="button"
-                                      className="grid-toggle"
-                                      onClick={() => toggleSubgroep(sgKey)}
-                                    >
-                                      <span className="grid-caret">{sgDicht ? "▶" : "▼"}</span>
-                                      {groep.naam}
-                                      <span className="grid-count">{groep.leerdoelen.length}</span>
-                                    </button>
-                                  </th>
-                                  {telCellen(groep.leerdoelen)}
+                                  {nodeKop(groep.naam, groep.leerdoelen.length, sgDicht, () =>
+                                    toggleSubgroep(sgKey),
+                                  )}
+                                  {kleurCel(sgKey, groep.naam)}
                                 </tr>
                                 {!sgDicht && groep.leerdoelen.map((d) => doelRij(d, 3))}
                               </Fragment>

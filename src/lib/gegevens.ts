@@ -2,7 +2,6 @@ import { cursussen, leerdoelen, rubrics } from "./curriculum";
 import { kopIndex, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
-import { periodeLabel } from "./periode";
 import { RATING_LABEL } from "./ratings";
 import type { DoelKleuren, Mentor, Rating, Stroom, Student } from "./types";
 
@@ -178,19 +177,24 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
 
 const EVAL_KOP = [
   "schooljaar",
-  "periode",
+  "niveau",
   "leerling_id",
   "voornaam",
   "achternaam",
   "stroom",
   "cursus",
   "rubric",
+  "subgroep",
   "badge",
   "kleur",
   "behaald",
 ];
 
-/** Elke ingevulde evaluatie als één rij — de "download op elk moment"-back-up. */
+/**
+ * Elke ingevulde kleur als één rij — de "download op elk moment"-back-up. Een kleur kan op een
+ * losse badge staan of op een hoger niveau (cursus/rubric/subgroep = graadsbadge); de kolom
+ * `niveau` zegt welke.
+ */
 export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): string {
   const studById = new Map(studenten.map((s) => [s.id, s]));
   const doelById = new Map(leerdoelen.map((d) => [d.id, d]));
@@ -199,21 +203,65 @@ export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): st
 
   const rijen: (string | number)[][] = [EVAL_KOP];
   for (const [sleutel, kleur] of Object.entries(kleuren)) {
-    const [schooljaar, periode, studentId, leerdoelId] = sleutel.split(":");
+    // Sleutel = `${schooljaar}:${studentId}:${nodeId}`; nodeId kan zelf een `:` bevatten? Nee,
+    // maar een subgroep-sleutel bevat een `|`. Slice op de eerste twee dubbelpunten.
+    const i1 = sleutel.indexOf(":");
+    const i2 = sleutel.indexOf(":", i1 + 1);
+    const schooljaar = sleutel.slice(0, i1);
+    const studentId = sleutel.slice(i1 + 1, i2);
+    const nodeId = sleutel.slice(i2 + 1);
     const s = studById.get(studentId);
-    const d = doelById.get(leerdoelId);
-    const rubriek = d ? rubById.get(d.rubricId) : undefined;
-    const cursus = rubriek ? curById.get(rubriek.cursusId) : undefined;
+
+    let niveau = "badge";
+    let stroom = "";
+    let cursusNaam = "";
+    let rubricNaam = "";
+    let subgroepNaam = "";
+    let badgeNaam = "";
+
+    if (nodeId.includes("|")) {
+      niveau = "subgroep";
+      const rubricId = nodeId.slice(0, nodeId.indexOf("|"));
+      subgroepNaam = nodeId.slice(nodeId.indexOf("|") + 1);
+      const rub = rubById.get(rubricId);
+      rubricNaam = rub?.naam ?? "";
+      const cur = rub ? curById.get(rub.cursusId) : undefined;
+      cursusNaam = cur?.naam ?? "";
+      stroom = cur?.stroom ?? "";
+    } else if (curById.has(nodeId)) {
+      niveau = "cursus";
+      const cur = curById.get(nodeId);
+      cursusNaam = cur?.naam ?? "";
+      stroom = cur?.stroom ?? "";
+    } else if (rubById.has(nodeId)) {
+      niveau = "rubric";
+      const rub = rubById.get(nodeId);
+      rubricNaam = rub?.naam ?? "";
+      const cur = rub ? curById.get(rub.cursusId) : undefined;
+      cursusNaam = cur?.naam ?? "";
+      stroom = cur?.stroom ?? "";
+    } else {
+      const d = doelById.get(nodeId);
+      badgeNaam = d?.omschrijving ?? nodeId;
+      subgroepNaam = d?.subgroep ?? "";
+      const rub = d ? rubById.get(d.rubricId) : undefined;
+      rubricNaam = rub?.naam ?? "";
+      const cur = rub ? curById.get(rub.cursusId) : undefined;
+      cursusNaam = cur?.naam ?? "";
+      stroom = cur?.stroom ?? "";
+    }
+
     rijen.push([
       schooljaar,
-      periodeLabel(periode),
+      niveau,
       studentId,
       s?.firstName ?? "",
       s?.lastName ?? "",
-      cursus?.stroom ?? "",
-      cursus?.naam ?? "",
-      rubriek?.naam ?? "",
-      d?.omschrijving ?? leerdoelId,
+      stroom,
+      cursusNaam,
+      rubricNaam,
+      subgroepNaam,
+      badgeNaam,
       RATING_LABEL[kleur as Rating],
       kleur === "green" || kleur === "blue" ? "ja" : "nee",
     ]);

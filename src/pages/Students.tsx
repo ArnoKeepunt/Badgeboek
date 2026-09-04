@@ -10,7 +10,6 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
-import { ALGEMEEN } from "../lib/periode";
 import { getDoelKleur, useStore } from "../lib/store";
 
 export function Students() {
@@ -60,7 +59,7 @@ export function Students() {
               {zichtbaar.map((s) => {
                 const doelen = leerdoelenVoorStroom(stroomVan(s));
                 const ingevuld = doelen.filter(
-                  (d) => getDoelKleur(kleuren, schooljaar, ALGEMEEN, s.id, d.id) !== null,
+                  (d) => getDoelKleur(kleuren, schooljaar, s.id, d.id) !== null,
                 ).length;
                 return (
                   <tr

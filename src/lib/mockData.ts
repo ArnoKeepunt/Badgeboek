@@ -1,6 +1,10 @@
-import { cursussenVoorStroom, leerdoelenVoorCursus, leerdoelenVoorStroom } from "./curriculum";
+import {
+  cursussenVoorStroom,
+  leerdoelenVoorCursus,
+  leerdoelenVoorStroom,
+  rubricsVoorCursus,
+} from "./curriculum";
 import { stroomVan } from "./leerlingen";
-import type { PeriodeId } from "./periode";
 import { seedLeerlingen, seedMentoren } from "./seedGebruikers";
 import type {
   DeelKleuren,
@@ -39,15 +43,17 @@ function seedKleur(bron: string): Rating {
 }
 
 /**
- * Per schooljaar: de kans dat een cel al ingevuld is, en welke periodes al data hebben.
- * Enkel de eerste leerlingen krijgen seed-kleuren — anders wordt localStorage te groot.
+ * Per schooljaar: de kans dat een badge al een kleur heeft. Enkel de eerste leerlingen krijgen
+ * seed-kleuren — anders wordt localStorage te groot.
  */
-const SEED_CONFIG: Record<string, { dichtheid: number; periodes: PeriodeId[] }> = {
-  "2024-2025": { dichtheid: 0.85, periodes: ["algemeen", "p1", "p2"] },
-  "2025-2026": { dichtheid: 0.6, periodes: ["algemeen", "p1"] },
-  // Het lopende schooljaar: genoeg algemene kleuren zodat de leerlingweergave gevuld is.
-  "2026-2027": { dichtheid: 0.5, periodes: ["algemeen", "p1"] },
+const SEED_CONFIG: Record<string, number> = {
+  "2024-2025": 0.85,
+  "2025-2026": 0.6,
+  "2026-2027": 0.5,
 };
+
+/** Kans dat een cursus- of rubric-graadsbadge al gezet is (lager dan de losse badges). */
+const PARENT_DICHTHEID = 0.3;
 
 const GESEEDE_LEERLINGEN = students.slice(0, 16);
 
@@ -58,13 +64,26 @@ const DOELEN_PER_LEERLING = new Map(
 
 export const doelKleuren: DoelKleuren = (() => {
   const map: DoelKleuren = {};
-  for (const [schooljaar, { dichtheid, periodes }] of Object.entries(SEED_CONFIG)) {
-    for (const periode of periodes) {
-      for (const student of GESEEDE_LEERLINGEN) {
-        for (const doel of DOELEN_PER_LEERLING.get(student.id) ?? []) {
-          const bron = `${schooljaar}:${periode}:${student.id}:${doel.id}`;
-          if ((hash(`${bron}#fill`) % 100) / 100 < dichtheid) {
-            map[doelSleutel(schooljaar, periode, student.id, doel.id)] = seedKleur(bron);
+  const misschien = (bron: string, dichtheid: number) =>
+    (hash(`${bron}#fill`) % 100) / 100 < dichtheid;
+
+  for (const [schooljaar, dichtheid] of Object.entries(SEED_CONFIG)) {
+    for (const student of GESEEDE_LEERLINGEN) {
+      // Losse badges (leerdoelen).
+      for (const doel of DOELEN_PER_LEERLING.get(student.id) ?? []) {
+        const bron = `${schooljaar}:${student.id}:${doel.id}`;
+        if (misschien(bron, dichtheid)) map[doelSleutel(schooljaar, student.id, doel.id)] = seedKleur(bron);
+      }
+      // Graadsbadges op cursus- en rubric-niveau.
+      for (const cursus of cursussenVoorStroom(stroomVan(student))) {
+        const cBron = `${schooljaar}:${student.id}:${cursus.id}`;
+        if (misschien(cBron, PARENT_DICHTHEID)) {
+          map[doelSleutel(schooljaar, student.id, cursus.id)] = seedKleur(cBron);
+        }
+        for (const rubric of rubricsVoorCursus(cursus.id)) {
+          const rBron = `${schooljaar}:${student.id}:${rubric.id}`;
+          if (misschien(rBron, PARENT_DICHTHEID)) {
+            map[doelSleutel(schooljaar, student.id, rubric.id)] = seedKleur(rBron);
           }
         }
       }

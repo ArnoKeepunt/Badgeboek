@@ -9,9 +9,8 @@ import {
   systeemGroepen,
 } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
-import { PERIODES, periodeLabel } from "../lib/periode";
 import { RATINGS } from "../lib/ratings";
-import { setMatrixStromen, setPeriode, useStore } from "../lib/store";
+import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import { type Voortgang, voortgangVoor } from "../lib/voortgang";
 
 const OVERZICHT_KEY = "keerpunt-badgeboek:overzicht-groepen";
@@ -37,7 +36,7 @@ function loadOverzicht(): string[] {
 
 /** Mentor-/beheerderoverzicht: eigen gekozen groepen + de vaste indeling per graad en jaar. */
 export function Dashboard() {
-  const { students, groepen, kleuren, schooljaar, periode } = useStore();
+  const { students, groepen, kleuren, schooljaar } = useStore();
   const navigate = useNavigate();
   const [, setFilter] = useLeerlingFilter();
   const [gekozen, setGekozen] = useState<string[]>(loadOverzicht);
@@ -63,7 +62,7 @@ export function Dashboard() {
   const metVoortgang = (defs: GroepDef[]) =>
     defs.map((def) => ({
       def,
-      v: voortgangVoor(leden(def.leerlingIds), kleuren, schooljaar, periode),
+      v: voortgangVoor(leden(def.leerlingIds), kleuren, schooljaar),
     }));
 
   const mijnRijen = useMemo(
@@ -72,17 +71,17 @@ export function Dashboard() {
         gekozen.map((id) => alleDefs.find((d) => d.id === id)).filter((d): d is GroepDef => !!d),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gekozen, alleDefs, kleuren, schooljaar, periode, students],
+    [gekozen, alleDefs, kleuren, schooljaar, students],
   );
   const graadRijen = useMemo(
     () => metVoortgang(systeem.filter((d) => d.soort === "graad")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [systeem, kleuren, schooljaar, periode, students],
+    [systeem, kleuren, schooljaar, students],
   );
   const leerjaarRijen = useMemo(
     () => metVoortgang(systeem.filter((d) => d.soort === "leerjaar")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [systeem, kleuren, schooljaar, periode, students],
+    [systeem, kleuren, schooljaar, students],
   );
 
   const toevoegbaar = alleDefs.filter((d) => !gekozen.includes(d.id));
@@ -93,6 +92,7 @@ export function Dashboard() {
     setFilter({ ...LEEG_FILTER, groepId: def.id });
     const stromen = [...new Set(leden(def.leerlingIds).map((s) => stroomVan(s)))];
     if (stromen.length > 0) setMatrixStromen(stromen);
+    setMatrixCursus(""); // hele groep tonen, niet één cursus
     navigate(pad);
   };
 
@@ -116,22 +116,8 @@ export function Dashboard() {
 
   return (
     <section>
-      <div className="periode-balk">
-        <span className="periode-balk-label">Periode</span>
-        {PERIODES.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            className={`chip${p.id === periode ? " is-active" : ""}`}
-            onClick={() => setPeriode(p.id)}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="pagina-kop" style={{ marginTop: 20 }}>
-        <h2>Mijn groepen · {periodeLabel(periode)}</h2>
+      <div className="pagina-kop">
+        <h2>Mijn groepen</h2>
         {toevoegbaar.length > 0 && (
           <select
             className="overzicht-toevoeg"

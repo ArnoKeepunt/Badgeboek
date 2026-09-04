@@ -7,7 +7,6 @@ import { Foutpagina } from "./pages/Foutpagina";
 import { Groepen } from "./pages/Groepen";
 import { Home } from "./pages/Home";
 import { LeerlingCursus } from "./pages/LeerlingCursus";
-import { Rubrics } from "./pages/Rubrics";
 import { Students } from "./pages/Students";
 import { StudentDetail } from "./pages/StudentDetail";
 import { NotFound } from "./pages/NotFound";
@@ -19,6 +18,8 @@ const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.Bad
 const Deelevaluaties = lazy(() =>
   import("./pages/Deelevaluaties").then((m) => ({ default: m.Deelevaluaties })),
 );
+// oxlint-disable-next-line react/only-export-components
+const Rubrics = lazy(() => import("./pages/Rubrics").then((m) => ({ default: m.Rubrics })));
 // oxlint-disable-next-line react/only-export-components
 const Doelen = lazy(() => import("./pages/Doelen").then((m) => ({ default: m.Doelen })));
 // oxlint-disable-next-line react/only-export-components
@@ -44,7 +45,7 @@ export const router = createHashRouter([
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
       { path: "deelevaluaties", element: traag(<Deelevaluaties />) },
-      { path: "rubrics", element: <Rubrics /> },
+      { path: "rubrics", element: traag(<Rubrics />) },
       { path: "doelen", element: traag(<Doelen />) },
       { path: "groepen", element: <Groepen /> },
       {

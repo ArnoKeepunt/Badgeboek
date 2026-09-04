@@ -1,26 +1,38 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePopover } from "../lib/popover";
-import { getNotitie, useStore, zetNotitie } from "../lib/store";
+import type { Notitie } from "../lib/types";
+
+function BubbelIcoon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M3 3.5h10a1 1 0 0 1 1 1V10a1 1 0 0 1-1 1H7l-3 2.5V11H3a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
- * Notitie bij een badge voor één leerling: een tekst die de leerling ziet en een interne
- * notitie die enkel mentoren/beheerders zien. Opent als klein paneel (portal) bij de badge.
+ * Notitie bij één cel (badge, graadsbadge of deelevaluatie) voor één leerling: een tekst die
+ * de leerling ziet en een interne notitie enkel voor mentoren/beheerders. Een klein vierkant
+ * knopje naast de kleurcel dat een paneeltje opent (portal). De data (`notitie`) en het
+ * wegschrijven (`onSave`) komen van de bovenliggende component — `NotitieVeld` weet niet waar
+ * het bewaard wordt en abonneert niet zelf op de store (perf in een matrix met veel cellen).
  */
 export function NotitieVeld({
-  schooljaar,
-  studentId,
-  leerdoelId,
+  notitie,
+  onSave,
   readonly = false,
 }: {
-  schooljaar: string;
-  studentId: string;
-  leerdoelId: string;
+  notitie: Notitie;
+  onSave: (patch: Partial<Notitie>) => void;
   readonly?: boolean;
 }) {
-  const { notities } = useStore();
-  const n = getNotitie(notities, schooljaar, studentId, leerdoelId);
-  const heeft = Boolean(n.zichtbaar || n.verborgen);
+  const heeft = Boolean(notitie.zichtbaar || notitie.verborgen);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const pos = usePopover(open, trigger, () => setOpen(false), { breedte: 360, hoogte: 260 });
@@ -30,12 +42,13 @@ export function NotitieVeld({
       <button
         ref={trigger}
         type="button"
-        className={`notitie-knop${heeft ? " heeft-notitie" : ""}`}
+        className={`notitie-mini${heeft ? " heeft-notitie" : ""}`}
         aria-expanded={open}
         title={heeft ? "Notitie bekijken/bewerken" : "Notitie toevoegen"}
+        aria-label={heeft ? "Notitie bekijken/bewerken" : "Notitie toevoegen"}
         onClick={() => setOpen((o) => !o)}
       >
-        {heeft ? "💬" : "+ notitie"}
+        <BubbelIcoon />
       </button>
 
       {open &&
@@ -54,10 +67,8 @@ export function NotitieVeld({
                 <textarea
                   rows={2}
                   readOnly={readonly}
-                  defaultValue={n.zichtbaar}
-                  onBlur={(e) =>
-                    zetNotitie(schooljaar, studentId, leerdoelId, { zichtbaar: e.target.value })
-                  }
+                  defaultValue={notitie.zichtbaar}
+                  onBlur={(e) => onSave({ zichtbaar: e.target.value })}
                 />
               </label>
               <label className="notitie-veld">
@@ -65,10 +76,8 @@ export function NotitieVeld({
                 <textarea
                   rows={2}
                   readOnly={readonly}
-                  defaultValue={n.verborgen}
-                  onBlur={(e) =>
-                    zetNotitie(schooljaar, studentId, leerdoelId, { verborgen: e.target.value })
-                  }
+                  defaultValue={notitie.verborgen}
+                  onBlur={(e) => onSave({ verborgen: e.target.value })}
                 />
               </label>
               <button type="button" className="linkknop" onClick={() => setOpen(false)}>

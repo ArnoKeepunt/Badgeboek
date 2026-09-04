@@ -43,6 +43,21 @@ export function cursusVanLeerdoel(leerdoelId: string): Cursus | undefined {
   return r ? cursussen.find((c) => c.id === r.cursusId) : undefined;
 }
 
+/**
+ * De cursus waartoe een node behoort. Een node-id is een cursus-id, een rubric-id, een
+ * subgroep-sleutel `${rubricId}|${naam}` of een leerdoel-id. De id's zijn structureel
+ * ondubbelzinnig (`1A-c1` / `1A-c1-r1` / `1A-c1-r1-d1`), dus de volgorde van de lookups kan
+ * niet mismatchen.
+ */
+export function cursusVanNode(nodeId: string): Cursus | undefined {
+  const basis = nodeId.includes("|") ? nodeId.slice(0, nodeId.indexOf("|")) : nodeId;
+  const cursus = cursussen.find((c) => c.id === basis);
+  if (cursus) return cursus;
+  const rubric = rubrics.find((r) => r.id === basis);
+  if (rubric) return cursussen.find((c) => c.id === rubric.cursusId);
+  return cursusVanLeerdoel(basis);
+}
+
 export const leerdoelenVoorRubric = (rubricId: string): Leerdoel[] =>
   leerdoelen.filter((l) => l.rubricId === rubricId);
 

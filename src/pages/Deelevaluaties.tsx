@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BulkKnop } from "../components/BulkKnop";
 import { DeelevaluatieEditor } from "../components/DeelevaluatieEditor";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
 import { Modal } from "../components/Modal";
+import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
+import { StroomBalk } from "../components/StroomBalk";
 import { leerdoelenVoorStroom } from "../lib/curriculum";
 import {
   cursusNamenVoorStroom,
@@ -16,9 +18,17 @@ import { alleGroepDefs, groepLeden } from "../lib/groepen";
 import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
-import { getDeelKleur, setDeelKleur, setDeelKleurBulk, useStore } from "../lib/store";
-import { STROMEN, STROOM_LABEL } from "../lib/types";
-import type { Deelevaluatie, Stroom } from "../lib/types";
+import {
+  getDeelKleur,
+  getDeelNotitie,
+  setDeelKleur,
+  setDeelKleurBulk,
+  setMatrixCursus,
+  useStore,
+  zetDeelNotitie,
+} from "../lib/store";
+import { STROOM_LABEL } from "../lib/types";
+import type { DeelKleuren, DeelNotities, Deelevaluatie, Stroom, Student } from "../lib/types";
 
 function PlusIcoon() {
   return (
@@ -48,14 +58,13 @@ function PotloodIcoon() {
 
 /**
  * Deelevaluaties: toetsen/opdrachten die een leerkracht zelf aanmaakt en aan badges koppelt.
- * Per stroom en cursus toont de kapstok wat verwacht wordt (verplicht aantal); daaronder maakt
- * de leerkracht concrete deelevaluaties aan en duidt per leerling een kleur aan. Dat keurt de
- * badge NIET automatisch goed — het is een tussenstap.
- *
- * Net als de badgematrix: de cursussen staan standaard toegeklapt (minder scrollen).
+ * Bovenaan de gedeelde stroom+cursus-balk (meerdere graden aanduidbaar, filter op cursus).
+ * Per stroom en cursus toont de kapstok wat verwacht wordt; daaronder maakt de leerkracht
+ * concrete deelevaluaties aan en duidt per leerling een kleur aan. Dat keurt de badge NIET
+ * automatisch goed — het is een tussenstap. Cursussen staan standaard toegeklapt.
  */
 
-const OPEN_KEY = "keerpunt-badgeboek:deelevaluaties-open";
+const OPEN_KEY = "keerpunt-badgeboek:deelevaluaties-open:v2";
 
 function loadOpen(): string[] {
   try {
@@ -66,78 +75,95 @@ function loadOpen(): string[] {
   }
   return [];
 }
+
+type EditorState = {
+  stroom: Stroom;
+  bestaand?: Deelevaluatie;
+  voorinvulling?: { cursus: string; typeId: string | null };
+};
+
 export function Deelevaluaties() {
-  const { students, groepen, schooljaar, deelevaluaties, deelKleuren, matrixStromen } = useStore();
+  const {
+    students,
+    groepen,
+    schooljaar,
+    deelevaluaties,
+    deelKleuren,
+    deelNotities,
+    matrixStromen,
+    matrixCursus,
+  } = useStore();
   const [filter, setFilter] = useLeerlingFilter();
   const aangemeld = useAangemeld();
   const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
 
-  const [stroom, setStroom] = useState<Stroom>(matrixStromen[0] ?? "1A");
-  const [editor, setEditor] = useState<
-    null | { bestaand?: Deelevaluatie; voorinvulling?: { cursus: string; typeId: string | null } }
-  >(null);
-  // We onthouden welke cursussen OPEN staan; standaard is dat geen enkele (alles toe).
-  const [openCursussen, setOpenCursussen] = useState<string[]>(loadOpen);
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const [openSecties, setOpenSecties] = useState<string[]>(loadOpen);
 
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
+  const meerdereStromen = matrixStromen.length > 1;
 
   const groepDefs = useMemo(() => alleGroepDefs(students, groepen), [students, groepen]);
+
   // De stroomkeuze bepaalt al de graad/klasgroep-as: die velden weglaten en negeren.
   const stroomLeerlingen = useMemo(
-    () => students.filter((s) => stroomVan(s) === stroom),
-    [students, stroom],
+    () => students.filter((s) => matrixStromen.includes(stroomVan(s))),
+    [students, matrixStromen],
   );
   const zichtbaar = useMemo(() => {
     const leden = groepLeden(filter.groepId, students, groepen);
     return filterLeerlingen(stroomLeerlingen, { ...filter, graad: "", klasgroep: "" }, leden);
   }, [students, groepen, filter, stroomLeerlingen]);
 
-  const badgeTekst = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const d of leerdoelenVoorStroom(stroom)) m.set(d.id, d.omschrijving);
-    return m;
-  }, [stroom]);
+  const cursusOpties = useMemo(() => {
+    const uit: string[] = [];
+    for (const stroom of matrixStromen) {
+      for (const c of cursusNamenVoorStroom(stroom)) if (!uit.includes(c)) uit.push(c);
+      for (const d of deelevaluatiesVoor(deelevaluaties, stroom, schooljaar)) {
+        if (!uit.includes(d.cursus)) uit.push(d.cursus);
+      }
+    }
+    return uit;
+  }, [matrixStromen, deelevaluaties, schooljaar]);
+  const cursusFilter = cursusOpties.includes(matrixCursus) ? matrixCursus : "";
 
-  const mijnDeelevaluaties = useMemo(
-    () => deelevaluatiesVoor(deelevaluaties, stroom, schooljaar),
-    [deelevaluaties, stroom, schooljaar],
+  const perStroom = useMemo(
+    () =>
+      matrixStromen.map((stroom) => {
+        const leerlingen = zichtbaar.filter((s) => stroomVan(s) === stroom);
+        const mijn = deelevaluatiesVoor(deelevaluaties, stroom, schooljaar);
+        let cursussen = cursusNamenVoorStroom(stroom);
+        for (const d of mijn) if (!cursussen.includes(d.cursus)) cursussen.push(d.cursus);
+        if (cursusFilter) cursussen = cursussen.filter((c) => c === cursusFilter);
+        const badgeTekst = new Map<string, string>();
+        for (const d of leerdoelenVoorStroom(stroom)) badgeTekst.set(d.id, d.omschrijving);
+        return { stroom, leerlingen, mijn, cursussen, badgeTekst };
+      }),
+    [matrixStromen, zichtbaar, deelevaluaties, schooljaar, cursusFilter],
   );
 
-  const cursussen = useMemo(() => {
-    const uit = cursusNamenVoorStroom(stroom);
-    for (const d of mijnDeelevaluaties) if (!uit.includes(d.cursus)) uit.push(d.cursus);
-    return uit;
-  }, [stroom, mijnDeelevaluaties]);
+  const alleSectieKeys = useMemo(
+    () => perStroom.flatMap(({ stroom, cursussen }) => cursussen.map((c) => `${stroom}|${c}`)),
+    [perStroom],
+  );
 
   useEffect(() => {
     try {
-      localStorage.setItem(OPEN_KEY, JSON.stringify(openCursussen));
+      localStorage.setItem(OPEN_KEY, JSON.stringify(openSecties));
     } catch {
       // opslag niet beschikbaar
     }
-  }, [openCursussen]);
+  }, [openSecties]);
 
-  const toggleCursus = (c: string) =>
-    setOpenCursussen((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
-  const allesOpen = () => setOpenCursussen(cursussen);
-  const allesDicht = () => setOpenCursussen([]);
+  const toggleSectie = (k: string) =>
+    setOpenSecties((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+  const allesOpen = () => setOpenSecties(alleSectieKeys);
+  const allesDicht = () => setOpenSecties([]);
 
   return (
     <section>
-      <div className="periode-balk">
-        <span className="periode-balk-label">Stroom</span>
-        {STROMEN.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`chip${s === stroom ? " is-active" : ""}`}
-            onClick={() => setStroom(s)}
-          >
-            {STROOM_LABEL[s]}
-          </button>
-        ))}
-      </div>
+      <StroomBalk hint="meerdere mogelijk" />
 
       {vergrendeld && (
         <p className="jaar-melding jaar-melding-slot">
@@ -157,15 +183,22 @@ export function Deelevaluaties() {
         filter={filter}
         onChange={setFilter}
         verbergVelden={["graad", "klasgroep"]}
+        cursusOpties={cursusOpties}
+        cursus={cursusFilter}
+        onCursusChange={setMatrixCursus}
       />
 
       <div className="matrix-acties">
-        {!vergrendeld && (
-          <button type="button" className="knop-primair" onClick={() => setEditor({})}>
+        {!vergrendeld && !meerdereStromen && (
+          <button
+            type="button"
+            className="knop-primair"
+            onClick={() => setEditor({ stroom: matrixStromen[0] })}
+          >
             + Nieuwe deelevaluatie
           </button>
         )}
-        {cursussen.length > 0 && (
+        {alleSectieKeys.length > 0 && (
           <>
             <button type="button" className="linkknop" onClick={allesOpen}>
               Alles uitklappen
@@ -183,7 +216,7 @@ export function Deelevaluaties() {
           onClose={() => setEditor(null)}
         >
           <DeelevaluatieEditor
-            stroom={stroom}
+            stroom={editor.stroom}
             schooljaar={schooljaar}
             mentorId={mentorId}
             bestaand={editor.bestaand}
@@ -193,192 +226,274 @@ export function Deelevaluaties() {
         </Modal>
       )}
 
-      {zichtbaar.length === 0 && (
+      {zichtbaar.length === 0 ? (
         <p className="lege-staat">
-          Geen leerlingen in {STROOM_LABEL[stroom]} voor deze filter. Kies een andere stroom of
-          pas de filter aan.
+          Geen leerlingen voor deze stroom en filter. Kies een andere stroom of pas de filter aan.
         </p>
+      ) : (
+        perStroom.map(({ stroom, leerlingen, mijn, cursussen, badgeTekst }) => (
+          <Fragment key={stroom}>
+            {meerdereStromen && (
+              <div className="stroom-deel-kop">
+                <h2 className="stroom-matrix-titel">
+                  {STROOM_LABEL[stroom]}
+                  <span>
+                    {leerlingen.length} {leerlingen.length === 1 ? "leerling" : "leerlingen"}
+                  </span>
+                </h2>
+                {!vergrendeld && (
+                  <button
+                    type="button"
+                    className="knop-secundair"
+                    onClick={() => setEditor({ stroom })}
+                  >
+                    + Nieuwe deelevaluatie
+                  </button>
+                )}
+              </div>
+            )}
+
+            {leerlingen.length === 0 ? (
+              <p className="lege-staat">
+                Geen leerlingen in {STROOM_LABEL[stroom]} voor deze filter.
+              </p>
+            ) : cursussen.length === 0 ? (
+              <p className="lege-staat">Geen cursussen voor deze filter.</p>
+            ) : (
+              cursussen.map((cursus) => (
+                <DeelCursusSectie
+                  key={`${stroom}|${cursus}`}
+                  stroom={stroom}
+                  cursus={cursus}
+                  leerlingen={leerlingen}
+                  rijen={mijn.filter((d) => d.cursus === cursus)}
+                  badgeTekst={badgeTekst}
+                  deelKleuren={deelKleuren}
+                  deelNotities={deelNotities}
+                  vergrendeld={vergrendeld}
+                  dicht={!openSecties.includes(`${stroom}|${cursus}`)}
+                  onToggle={() => toggleSectie(`${stroom}|${cursus}`)}
+                  onNieuw={(typeId) =>
+                    setEditor({ stroom, voorinvulling: { cursus, typeId } })
+                  }
+                  onBewerk={(d) => setEditor({ stroom, bestaand: d })}
+                />
+              ))
+            )}
+          </Fragment>
+        ))
       )}
+    </section>
+  );
+}
 
-      {zichtbaar.length > 0 &&
-        cursussen.map((cursus) => {
-          const dicht = !openCursussen.includes(cursus);
-          const types = typesVoorCursus(stroom, cursus);
-          const rijen = mijnDeelevaluaties.filter((d) => d.cursus === cursus);
-          const aantalPerType = new Map<string | null, number>();
-          for (const d of rijen)
-            aantalPerType.set(d.typeId, (aantalPerType.get(d.typeId) ?? 0) + 1);
+/** Eén cursus binnen één stroom: de kapstok-tabel + de deelevaluatie-matrix. */
+function DeelCursusSectie({
+  stroom,
+  cursus,
+  leerlingen,
+  rijen,
+  badgeTekst,
+  deelKleuren,
+  deelNotities,
+  vergrendeld,
+  dicht,
+  onToggle,
+  onNieuw,
+  onBewerk,
+}: {
+  stroom: Stroom;
+  cursus: string;
+  leerlingen: Student[];
+  rijen: Deelevaluatie[];
+  badgeTekst: Map<string, string>;
+  deelKleuren: DeelKleuren;
+  deelNotities: DeelNotities;
+  vergrendeld: boolean;
+  dicht: boolean;
+  onToggle: () => void;
+  onNieuw: (typeId: string | null) => void;
+  onBewerk: (d: Deelevaluatie) => void;
+}) {
+  const types = typesVoorCursus(stroom, cursus);
+  const aantalPerType = new Map<string | null, number>();
+  for (const d of rijen) aantalPerType.set(d.typeId, (aantalPerType.get(d.typeId) ?? 0) + 1);
 
-          return (
-            <div key={cursus} className="de-cursus">
-              <button
-                type="button"
-                className="de-cursus-kop"
-                onClick={() => toggleCursus(cursus)}
-              >
-                <span className="grid-caret">{dicht ? "▶" : "▼"}</span>
-                <h2>{cursus}</h2>
-                <span className="de-cursus-meta">
-                  {rijen.length} {rijen.length === 1 ? "deelevaluatie" : "deelevaluaties"}
-                  {types.length > 0 && ` · ${types.length} types`}
-                </span>
-              </button>
+  return (
+    <div className="de-cursus">
+      <button type="button" className="de-cursus-kop" onClick={onToggle}>
+        <span className="grid-caret">{dicht ? "▶" : "▼"}</span>
+        <h2>{cursus}</h2>
+        <span className="de-cursus-meta">
+          {rijen.length} {rijen.length === 1 ? "deelevaluatie" : "deelevaluaties"}
+          {types.length > 0 && ` · ${types.length} types`}
+        </span>
+      </button>
 
-              {!dicht && (
-                <>
-                  {types.length > 0 && (
-                    <div className="de-kapstok">
-                      <table className="de-kapstok-tabel">
-                        <thead>
-                          <tr>
-                            <th>Verwacht in deze cursus</th>
-                            <th>Verplicht</th>
-                            <th>Richtaantal</th>
-                            <th>Aangemaakt</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {types.map((t) => (
-                            <tr key={t.id}>
-                              <td>{t.naam}</td>
-                              <td className="de-num">{t.verplicht}</td>
-                              <td className="de-num">{t.richtaantal}</td>
-                              <td className="de-num">{aantalPerType.get(t.id) ?? 0}</td>
-                              <td className="de-kapstok-actie">
-                                {!vergrendeld && (
-                                  <button
-                                    type="button"
-                                    className="knop-icoon knop-icoon-klein"
-                                    title={`Toets toevoegen voor "${t.naam}"`}
-                                    aria-label={`Toets toevoegen voor ${t.naam}`}
-                                    onClick={() =>
-                                      setEditor({ voorinvulling: { cursus, typeId: t.id } })
-                                    }
-                                  >
-                                    <PlusIcoon />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+      {!dicht && (
+        <>
+          {types.length > 0 && (
+            <div className="de-kapstok">
+              <table className="de-kapstok-tabel">
+                <thead>
+                  <tr>
+                    <th>Verwacht in deze cursus</th>
+                    <th>Verplicht</th>
+                    <th>Richtaantal</th>
+                    <th>Aangemaakt</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {types.map((t) => (
+                    <tr key={t.id}>
+                      <td>{t.naam}</td>
+                      <td className="de-num">{t.verplicht}</td>
+                      <td className="de-num">{t.richtaantal}</td>
+                      <td className="de-num">{aantalPerType.get(t.id) ?? 0}</td>
+                      <td className="de-kapstok-actie">
+                        {!vergrendeld && (
+                          <button
+                            type="button"
+                            className="knop-icoon knop-icoon-klein"
+                            title={`Toets toevoegen voor "${t.naam}"`}
+                            aria-label={`Toets toevoegen voor ${t.naam}`}
+                            onClick={() => onNieuw(t.id)}
+                          >
+                            <PlusIcoon />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                  {rijen.length === 0 ? (
-                    <div className="de-leeg de-leeg-rij">
-                      <span className="lege-staat">Nog geen deelevaluaties in deze cursus.</span>
-                      {!vergrendeld && (
-                        <button
-                          type="button"
-                          className="knop-icoon"
-                          title="Nieuwe deelevaluatie in deze cursus"
-                          aria-label="Nieuwe deelevaluatie in deze cursus"
-                          onClick={() => setEditor({ voorinvulling: { cursus, typeId: null } })}
-                        >
-                          <PlusIcoon />
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="grid-wrap">
-                      <table className="grid">
-                        <thead>
-                          <tr>
-                            <th className="grid-col-doel">Deelevaluatie</th>
-                            {zichtbaar.map((s) => (
-                              <th
-                                key={s.id}
-                                className="grid-col-leerling"
-                                title={`${s.firstName} ${s.lastName}`}
-                              >
-                                <Link to={`/students/${s.id}`}>{s.firstName}</Link>
-                                <span className="grid-col-leerling-sub">
-                                  {s.lastName} · {s.leerjaar}e · {s.klasgroep}
-                                </span>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rijen.map((d) => {
-                            const type = typeById(d.typeId);
-                            return (
-                              <tr key={d.id}>
-                                <td className="grid-col-doel grid-doel">
-                                  <div className="de-rij-kop">
-                                    <div className="de-rij-titel">
-                                      <strong>{d.titel}</strong>
-                                      {(d.datum || type) && (
-                                        <span className="de-rij-meta">
-                                          {[d.datum, type?.naam].filter(Boolean).join(" · ")}
-                                        </span>
-                                      )}
-                                      {d.leerdoelIds.length > 0 && (
-                                        <span className="de-rij-badges">
-                                          {d.leerdoelIds.slice(0, 3).map((id) => (
-                                            <span key={id} className="de-badge-chip" title={badgeTekst.get(id)}>
-                                              {badgeTekst.get(id) ?? "badge"}
-                                            </span>
-                                          ))}
-                                          {d.leerdoelIds.length > 3 && (
-                                            <span className="de-badge-chip">
-                                              +{d.leerdoelIds.length - 3}
-                                            </span>
-                                          )}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {!vergrendeld && (
-                                      <div className="de-rij-hoek">
-                                        <BulkKnop
-                                          aantal={zichtbaar.length}
-                                          disabled={vergrendeld}
-                                          onKies={(kleur) =>
-                                            setDeelKleurBulk(
-                                              d.id,
-                                              zichtbaar.map((s) => s.id),
-                                              kleur,
-                                            )
-                                          }
-                                        />
-                                        <button
-                                          type="button"
-                                          className="knop-icoon knop-icoon-klein"
-                                          title="Deelevaluatie bewerken"
-                                          aria-label={`"${d.titel}" bewerken`}
-                                          onClick={() => setEditor({ bestaand: d })}
-                                        >
-                                          <PotloodIcoon />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                {zichtbaar.map((s) => (
-                                  <td key={s.id} className="grid-cel">
-                                    <RatingCell
-                                      label={`${s.firstName} — ${d.titel}`}
-                                      readonly={vergrendeld}
-                                      value={getDeelKleur(deelKleuren, d.id, s.id)}
-                                      onChange={(next) => setDeelKleur(d.id, s.id, next)}
-                                    />
-                                  </td>
-                                ))}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
+          {rijen.length === 0 ? (
+            <div className="de-leeg de-leeg-rij">
+              <span className="lege-staat">Nog geen deelevaluaties in deze cursus.</span>
+              {!vergrendeld && (
+                <button
+                  type="button"
+                  className="knop-icoon"
+                  title="Nieuwe deelevaluatie in deze cursus"
+                  aria-label="Nieuwe deelevaluatie in deze cursus"
+                  onClick={() => onNieuw(null)}
+                >
+                  <PlusIcoon />
+                </button>
               )}
             </div>
-          );
-        })}
-    </section>
+          ) : (
+            <div className="grid-wrap">
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th className="grid-col-doel">Deelevaluatie</th>
+                    {leerlingen.map((s) => (
+                      <th
+                        key={s.id}
+                        className="grid-col-leerling"
+                        title={`${s.firstName} ${s.lastName}`}
+                      >
+                        <Link to={`/students/${s.id}`}>{s.firstName}</Link>
+                        <span className="grid-col-leerling-sub">
+                          {s.lastName} · {s.leerjaar}e · {s.klasgroep}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rijen.map((d) => {
+                    const type = typeById(d.typeId);
+                    return (
+                      <tr key={d.id}>
+                        <td className="grid-col-doel grid-doel">
+                          <div className="de-rij-kop">
+                            <div className="de-rij-titel">
+                              <strong>{d.titel}</strong>
+                              {(d.datum || type) && (
+                                <span className="de-rij-meta">
+                                  {[d.datum, type?.naam].filter(Boolean).join(" · ")}
+                                </span>
+                              )}
+                              {d.leerdoelIds.length > 0 && (
+                                <span className="de-rij-badges">
+                                  {d.leerdoelIds.slice(0, 3).map((id) => (
+                                    <span
+                                      key={id}
+                                      className="de-badge-chip"
+                                      title={badgeTekst.get(id)}
+                                    >
+                                      {badgeTekst.get(id) ?? "badge"}
+                                    </span>
+                                  ))}
+                                  {d.leerdoelIds.length > 3 && (
+                                    <span className="de-badge-chip">
+                                      +{d.leerdoelIds.length - 3}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            {!vergrendeld && (
+                              <div className="de-rij-hoek">
+                                <BulkKnop
+                                  aantal={leerlingen.length}
+                                  disabled={vergrendeld}
+                                  onKies={(kleur) =>
+                                    setDeelKleurBulk(
+                                      d.id,
+                                      leerlingen.map((s) => s.id),
+                                      kleur,
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="knop-icoon knop-icoon-klein"
+                                  title="Deelevaluatie bewerken"
+                                  aria-label={`"${d.titel}" bewerken`}
+                                  onClick={() => onBewerk(d)}
+                                >
+                                  <PotloodIcoon />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        {leerlingen.map((s) => {
+                          const kleur = getDeelKleur(deelKleuren, d.id, s.id);
+                          return (
+                            <td key={s.id} className="grid-cel">
+                              <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
+                                <RatingCell
+                                  label={`${s.firstName} — ${d.titel}`}
+                                  readonly={vergrendeld}
+                                  value={kleur}
+                                  onChange={(next) => setDeelKleur(d.id, s.id, next)}
+                                />
+                                <NotitieVeld
+                                  notitie={getDeelNotitie(deelNotities, d.id, s.id)}
+                                  onSave={(patch) => zetDeelNotitie(d.id, s.id, patch)}
+                                  readonly={vergrendeld}
+                                />
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

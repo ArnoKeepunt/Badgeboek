@@ -158,6 +158,10 @@ th {
   font-style: italic;
 }
 
+.filterbar-cursus {
+  font-weight: 600;
+}
+
 /* Voortgangskaarten op het overzicht */
 .voortgang-kaarten {
   display: grid;
@@ -284,11 +288,6 @@ th {
 .voortgang-kaart-ikn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-
-.grid-col-periode {
-  min-width: 74px;
-  text-align: center;
 }
 
 /* ---------------------------------------------------------------------------
@@ -440,6 +439,258 @@ th {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------------------------------------------------------------------------
+   Rubrics (uitgeschreven rubrieken met criteria per kleur)
+   --------------------------------------------------------------------------- */
+
+.rubriek-intro {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.rubriek-lijst {
+  margin: 0 0 14px;
+  padding-left: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rubriek {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.rubriek-bewerk {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.rubriek:hover .rubriek-bewerk,
+.rubriek:focus-within .rubriek-bewerk {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .rubriek-bewerk {
+    opacity: 1;
+  }
+}
+
+.rubriek-kop {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-right: 34px;
+}
+
+.rubriek-bewerkt {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.rubriek-editor-context {
+  margin: -6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.rubriek-editor-kleur {
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rating-border);
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+}
+
+.rubriek-naam {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.rubriek-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+
+.rubriek-doelen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0 2px;
+}
+
+/* De doelcodes zijn knoppen: kleur = soort, klik = nalezen. */
+.rubriek-doel {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.rubriek-doel.is-open {
+  box-shadow: inset 0 0 0 1px var(--rating-solid);
+}
+
+.rubriek-doel.is-treffer {
+  outline: 2px solid var(--rating-solid);
+  outline-offset: 1px;
+}
+
+/* Knop die zich als een <select> gedraagt (opent een multi-select dropdown). */
+.filterbar-select-knop {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.filterbar-select-knop:hover {
+  border-color: var(--accent);
+}
+
+.rubriek-soort-menu {
+  min-width: 210px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rubriek-soort-optie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.rubriek-soort-optie:hover {
+  background: var(--accent-soft);
+}
+
+.rubriek-soort-optie.is-actief {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.rubriek-doel-detail {
+  margin: 8px 0 4px;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rubriek-doel-detail-rij {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rubriek-doel-detail-rij dt {
+  margin: 0;
+}
+
+.rubriek-doel-detail-rij dd {
+  margin: 0;
+}
+
+.rubriek-doel-detail-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.rubriek-doel-detail-leeg {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.rubriek-criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+
+.rubriek-criterium {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--rating-border);
+  border-left: 3px solid var(--rating-solid);
+  border-radius: 6px;
+  background: var(--rating-bg);
+  font-size: 13px;
+}
+
+.rubriek-criterium-kleur {
+  font-weight: 700;
+  color: var(--rating-fg);
+}
+
+.rubriek-criterium-tekst {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .rubriek-lijst {
+    padding-left: 12px;
+  }
+
+  .rubriek-criterium {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 .doel-editor {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -542,10 +793,23 @@ th {
   white-space: nowrap;
 }
 
-.grid-cel,
-.grid-tel-cel,
 .grid-foot-cel {
   min-width: 96px;
+}
+
+/* Iets ruimer sinds er een notitie-vierkantje naast de kleur staat. */
+.grid-cel {
+  min-width: 118px;
+}
+
+.grid-cel-inhoud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  /* De wrapper draagt enkel de rating-<x>-klasse als var-drager voor het notitie-vierkantje.
+     De `border-style: dashed` van `.rating-empty` mag hier niets doen. */
+  border: 0;
 }
 
 .grid th,
@@ -650,6 +914,12 @@ th {
   flex: 1;
 }
 
+/* Cursus-/rubric-/subgroep-rij: de inklaptoggle vult de kolom, de bulk-knop staat rechts. */
+.grid-doel-rij > .grid-toggle {
+  flex: 1;
+  text-align: left;
+}
+
 .detail-terug {
   display: flex;
   align-items: center;
@@ -729,27 +999,52 @@ th {
 .notitie {
   position: relative;
   flex: none;
+  display: inline-flex;
+  align-self: stretch; /* even hoog als de kleurcel ernaast */
 }
 
-.notitie-knop {
-  border: 1px solid var(--border);
-  background: var(--surface);
+/* Klein vierkantje naast een kleurcel dat het notitiepaneel opent — even hoog als de
+   kleurcel en altijd vierkant. */
+.notitie-mini {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 24px;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  cursor: pointer;
+  /* Leeg (nog geen opmerking) = exact dezelfde look als een niet-ingevulde kleurcel
+     (`.rating-cell-btn.rating-empty`): gestippeld, zelfde randkleur/achtergrond. */
+  border: 1px dashed #d1d5db;
   border-radius: 6px;
-  padding: 2px 7px;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
+  background: #ffffff;
+  color: #9ca3af;
 }
 
-.notitie-knop.heeft-notitie {
+.notitie-mini svg {
+  width: 12px;
+  height: 12px;
+}
+
+.notitie-mini:hover {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--accent);
 }
 
-.notitie-knop:hover {
-  color: var(--text);
+/* Ingevuld: volle rand, licht getint in de kleur van de score ernaast (niet opdringerig). */
+.notitie-mini.heeft-notitie {
+  border: 1px solid var(--rating-border);
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+}
+
+/* Wel een notitie maar (nog) geen kleurscore: een subtiele accent-hint. */
+.rating-empty .notitie-mini.heeft-notitie {
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
 }
 
 .notitie-panel {
@@ -882,11 +1177,23 @@ th {
   color: var(--text-muted);
 }
 
-.grid-tel-cel {
-  text-align: center;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
+/* Stroom-kop op de deelevaluaties: titel links, "+ Nieuwe deelevaluatie" rechts. */
+.stroom-deel-kop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 32px 0 10px;
+}
+
+.stroom-deel-kop .stroom-matrix-titel {
+  margin: 0;
+}
+
+/* Op Rubrics: stroomtitel met lucht erboven wanneer er meerdere stromen getoond worden. */
+.rubriek-stroom-titel {
+  margin-top: 26px;
 }
 
 .grid-cel {

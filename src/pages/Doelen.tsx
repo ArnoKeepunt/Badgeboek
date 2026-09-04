@@ -22,7 +22,7 @@ type StroomKeuze = Stroom | "alle";
 
 /**
  * Doelen: de minimumdoelen / eindtermen (los van de badges). Bovenaan kies je de graad/stroom
- * (zoals de periodes bij de badges); daaronder zoek en filter je per soort. Gegroepeerd per
+ * (zoals de stroomchips bij de badges); daaronder zoek en filter je per soort. Gegroepeerd per
  * sleutelcompetentie. De beheerder kan elk doel bewerken; een mentor kan enkel bekijken
  * (en de uitleg openklappen).
  */
