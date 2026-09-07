@@ -10,10 +10,14 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
+import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
+import { useAangemeld } from "../lib/sessie";
 import { getDoelKleur, useStore } from "../lib/store";
 
 export function Students() {
-  const { students, kleuren, groepen, schooljaar } = useStore();
+  const { kleuren, groepen, schooljaar } = useStore();
+  const students = useZichtbareLeerlingen();
+  const scopeVestiging = bereikVestiging(useAangemeld());
   const [filter, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
 
@@ -25,6 +29,13 @@ export function Students() {
 
   return (
     <section>
+      {scopeVestiging && (
+        <p className="jaar-melding">
+          Je ziet enkel de leerlingen van vestiging <strong>{scopeVestiging}</strong>. Voor
+          toegang tot andere vestigingen contacteer je een beheerder.
+        </p>
+      )}
+
       <LeerlingFilterBar
         alle={students}
         zichtbaar={zichtbaar.length}

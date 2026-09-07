@@ -12,6 +12,8 @@ import {
 import type { Minimumdoel } from "./minimumdoelen";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "./schooljaar";
 import type {
+  AuditLog,
+  AuditRegel,
   Basisrol,
   DeelKleuren,
   DeelNotities,
@@ -75,6 +77,7 @@ const seed = (): PersistedStore => ({
   deelevaluaties: seedDeelevaluaties,
   deelKleuren: seedDeelKleuren,
   deelNotities: {},
+  auditLog: {},
   meldingen: seedMeldingen,
   meldingGezien: {},
   gewist: [],
@@ -96,14 +99,26 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   basis.notities = { ...standaard.notities, ...(bewaard.notities ?? {}) };
   basis.deelKleuren = { ...standaard.deelKleuren, ...(bewaard.deelKleuren ?? {}) };
   basis.deelNotities = { ...standaard.deelNotities, ...(bewaard.deelNotities ?? {}) };
+  // Wijzigingsgeschiedenis: de seed heeft er geen, dus gewoon de bewaarde overnemen.
+  basis.auditLog = { ...(bewaard.auditLog ?? {}) };
   // Bewust gewiste kleuren blijven weg, ook al zit er seed-data onder.
   basis.gewist = Array.isArray(bewaard.gewist) ? bewaard.gewist : [];
   for (const k of basis.gewist) {
     delete basis.kleuren[k];
     delete basis.deelKleuren[k];
   }
-  // De voorbeeld-deelevaluaties/-meldingen blijven staan tot er echte data is.
-  if (!Array.isArray(bewaard.deelevaluaties)) basis.deelevaluaties = standaard.deelevaluaties;
+  // De voorbeeld-deelevaluaties/-meldingen blijven staan tot er echte data is. Nieuwe seed-
+  // deelevaluaties (bv. per graad) schuiven onder de bewaarde: aangemaakte/gewijzigde blijven,
+  // ontbrekende seed-rijen komen erbij (op id).
+  if (Array.isArray(bewaard.deelevaluaties)) {
+    const aanwezig = new Set(bewaard.deelevaluaties.map((d) => d.id));
+    basis.deelevaluaties = [
+      ...bewaard.deelevaluaties,
+      ...standaard.deelevaluaties.filter((d) => !aanwezig.has(d.id)),
+    ];
+  } else {
+    basis.deelevaluaties = standaard.deelevaluaties;
+  }
   if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
   if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
   // Migratie: vroeger één stroom (`matrixStroom`), nu een lijst (`matrixStromen`).
@@ -217,6 +232,46 @@ export function useStore(): State {
   return useSyncExternalStore(subscribe, () => state);
 }
 
+// --- Wijzigingsgeschiedenis: wie wijzigde een evaluatiecel (kleur of notitie) wanneer --------
+
+/** De id van wie nu handelt, of "" voor de beheerder(smodus). */
+const huidigeGebruiker = (): string => state.sessie?.id ?? "";
+
+/** Ruime bovengrens per cel — de oudste regels vallen weg (het is een demo/prototype). */
+const MAX_AUDIT_PER_CEL = 50;
+
+type Wijziging = { sleutel: string; veld: AuditRegel["veld"]; van: string; naar: string };
+
+/** Voeg één of meer geschiedenisregels toe (één tijdstempel voor de hele beurt). */
+function metAudit(auditLog: AuditLog, wijzigingen: Wijziging[]): AuditLog {
+  if (wijzigingen.length === 0) return auditLog;
+  const op = Date.now();
+  const door = huidigeGebruiker();
+  const next = { ...auditLog };
+  for (const w of wijzigingen) {
+    const bestaand = next[w.sleutel] ?? [];
+    next[w.sleutel] = [...bestaand, { op, door, veld: w.veld, van: w.van, naar: w.naar }].slice(
+      -MAX_AUDIT_PER_CEL,
+    );
+  }
+  return next;
+}
+
+/** De volledige geschiedenis van een evaluatiecel (oudste eerst), of een lege lijst. */
+export function geschiedenisVoor(auditLog: AuditLog, sleutel: string): AuditRegel[] {
+  return auditLog[sleutel] ?? [];
+}
+
+/** De laatste wijziging van een evaluatiecel, of `null`. */
+export function laatsteWijziging(auditLog: AuditLog, sleutel: string): AuditRegel | null {
+  const g = auditLog[sleutel];
+  return g && g.length > 0 ? g[g.length - 1] : null;
+}
+
+/** Korte weergave van een notitie voor de geschiedenis (zichtbare tekst, of "(verborgen)"). */
+const notitieWeergave = (n: Notitie): string =>
+  n.zichtbaar || (n.verborgen ? "(verborgen notitie)" : "");
+
 /**
  * Zet (of wis, met `null`) de kleur van een node voor één leerling in een schooljaar. Een node
  * is een losse badge (leerdoel-id) of een hoger niveau: een cursus-id, rubric-id of
@@ -231,7 +286,9 @@ export function setDoelKleur(
   // Een afgesloten schooljaar staat vast: negeer wijzigingen.
   if (isAfgesloten(schooljaar)) return;
   const sleutel = doelSleutel(schooljaar, studentId, nodeId);
-  const verandert = kleur !== null && state.kleuren[sleutel] !== kleur;
+  const oud = state.kleuren[sleutel] ?? null;
+  const gewijzigd = oud !== kleur;
+  const verandert = kleur !== null && oud !== kleur;
   const kleuren = { ...state.kleuren };
   if (kleur) kleuren[sleutel] = kleur;
   else delete kleuren[sleutel];
@@ -243,7 +300,17 @@ export function setDoelKleur(
           ...cursusInfoVoorNode(nodeId),
         })
       : state.meldingen;
-  commit({ ...state, kleuren, meldingen, gewist: pasGewistAan(state.gewist, sleutel, kleur) });
+  commit({
+    ...state,
+    kleuren,
+    auditLog: gewijzigd
+      ? metAudit(state.auditLog, [
+          { sleutel, veld: "kleur", van: oud ?? "", naar: kleur ?? "" },
+        ])
+      : state.auditLog,
+    meldingen,
+    gewist: pasGewistAan(state.gewist, sleutel, kleur),
+  });
 }
 
 /** Lees de kleur van een node voor één leerling in een schooljaar (`null` = niet aangeboden). */
@@ -269,17 +336,21 @@ export function setDoelKleurBulk(
   const cursusInfo = logt ? cursusInfoVoorNode(nodeId) : null;
   let meldingen = state.meldingen;
   let gewist = state.gewist;
+  const wijzigingen: Wijziging[] = [];
   for (const studentId of studentIds) {
     const sleutel = doelSleutel(schooljaar, studentId, nodeId);
-    const verandert = kleur !== null && kleuren[sleutel] !== kleur;
+    const oud = kleuren[sleutel] ?? null;
+    if (oud !== kleur) {
+      wijzigingen.push({ sleutel, veld: "kleur", van: oud ?? "", naar: kleur ?? "" });
+    }
     if (kleur) kleuren[sleutel] = kleur;
     else delete kleuren[sleutel];
     gewist = pasGewistAan(gewist, sleutel, kleur);
-    if (verandert && cursusInfo) {
+    if (kleur !== null && oud !== kleur && cursusInfo) {
       meldingen = metMelding(meldingen, { studentId, soort: "kleur", ...cursusInfo });
     }
   }
-  commit({ ...state, kleuren, meldingen, gewist });
+  commit({ ...state, kleuren, auditLog: metAudit(state.auditLog, wijzigingen), meldingen, gewist });
 }
 
 // --- Notities ------------------------------------------------------------
@@ -307,10 +378,25 @@ export function zetNotitie(
     zichtbaar: (patch.zichtbaar ?? huidig.zichtbaar).trim(),
     verborgen: (patch.verborgen ?? huidig.verborgen).trim(),
   };
+  const gewijzigd =
+    huidig.zichtbaar !== nieuw.zichtbaar || huidig.verborgen !== nieuw.verborgen;
   const notities = { ...state.notities };
   if (nieuw.zichtbaar || nieuw.verborgen) notities[sleutel] = nieuw;
   else delete notities[sleutel];
-  commit({ ...state, notities });
+  commit({
+    ...state,
+    notities,
+    auditLog: gewijzigd
+      ? metAudit(state.auditLog, [
+          {
+            sleutel,
+            veld: "notitie",
+            van: notitieWeergave(huidig),
+            naar: notitieWeergave(nieuw),
+          },
+        ])
+      : state.auditLog,
+  });
 }
 
 /** Wissel het bekeken schooljaar. */
@@ -450,16 +536,28 @@ export function herstelRubriek(id: string) {
 export function maakDeelevaluatie(
   data: Omit<Deelevaluatie, "id">,
 ): string {
-  const id = `de${Date.now().toString(36)}`;
-  commit({ ...state, deelevaluaties: [...state.deelevaluaties, { ...data, id }] });
+  const nu = Date.now();
+  const id = `de${nu.toString(36)}`;
+  const wie = huidigeGebruiker();
+  commit({
+    ...state,
+    deelevaluaties: [
+      ...state.deelevaluaties,
+      { ...data, id, aangemaaktOp: nu, gewijzigdOp: nu, gewijzigdDoor: wie },
+    ],
+  });
   return id;
 }
 
-/** Wijzig een deelevaluatie. */
+/** Wijzig een deelevaluatie (het record zelf — titel/datum/badges/toelichting). */
 export function wijzigDeelevaluatie(id: string, patch: Partial<Omit<Deelevaluatie, "id">>) {
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
   commit({
     ...state,
-    deelevaluaties: state.deelevaluaties.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+    deelevaluaties: state.deelevaluaties.map((d) =>
+      d.id === id ? { ...d, ...patch, gewijzigdOp: nu, gewijzigdDoor: wie } : d,
+    ),
   });
 }
 
@@ -511,10 +609,25 @@ export function zetDeelNotitie(
     zichtbaar: (patch.zichtbaar ?? huidig.zichtbaar).trim(),
     verborgen: (patch.verborgen ?? huidig.verborgen).trim(),
   };
+  const gewijzigd =
+    huidig.zichtbaar !== nieuw.zichtbaar || huidig.verborgen !== nieuw.verborgen;
   const deelNotities = { ...state.deelNotities };
   if (nieuw.zichtbaar || nieuw.verborgen) deelNotities[sleutel] = nieuw;
   else delete deelNotities[sleutel];
-  commit({ ...state, deelNotities });
+  commit({
+    ...state,
+    deelNotities,
+    auditLog: gewijzigd
+      ? metAudit(state.auditLog, [
+          {
+            sleutel,
+            veld: "notitie",
+            van: notitieWeergave(huidig),
+            naar: notitieWeergave(nieuw),
+          },
+        ])
+      : state.auditLog,
+  });
 }
 
 const deelevaluatie = (id: string) => state.deelevaluaties.find((d) => d.id === id);
@@ -543,7 +656,9 @@ export function setDeelKleur(
   if (deelevaluatieVergrendeld(deelevaluatieId)) return;
   const deelKleuren = { ...state.deelKleuren };
   const sleutel = deelSleutel(deelevaluatieId, studentId);
-  const verandert = kleur !== null && deelKleuren[sleutel] !== kleur;
+  const oud = deelKleuren[sleutel] ?? null;
+  const gewijzigd = oud !== kleur;
+  const verandert = kleur !== null && oud !== kleur;
   if (kleur) deelKleuren[sleutel] = kleur;
   else delete deelKleuren[sleutel];
   const info = verandert ? deelMeldingInfo(deelevaluatieId) : null;
@@ -551,6 +666,11 @@ export function setDeelKleur(
   commit({
     ...state,
     deelKleuren,
+    auditLog: gewijzigd
+      ? metAudit(state.auditLog, [
+          { sleutel, veld: "kleur", van: oud ?? "", naar: kleur ?? "" },
+        ])
+      : state.auditLog,
     meldingen,
     gewist: pasGewistAan(state.gewist, sleutel, kleur),
   });
@@ -567,15 +687,27 @@ export function setDeelKleurBulk(
   const info = kleur !== null ? deelMeldingInfo(deelevaluatieId) : null;
   let meldingen = state.meldingen;
   let gewist = state.gewist;
+  const wijzigingen: Wijziging[] = [];
   for (const studentId of studentIds) {
     const sleutel = deelSleutel(deelevaluatieId, studentId);
-    const verandert = kleur !== null && deelKleuren[sleutel] !== kleur;
+    const oud = deelKleuren[sleutel] ?? null;
+    if (oud !== kleur) {
+      wijzigingen.push({ sleutel, veld: "kleur", van: oud ?? "", naar: kleur ?? "" });
+    }
     if (kleur) deelKleuren[sleutel] = kleur;
     else delete deelKleuren[sleutel];
     gewist = pasGewistAan(gewist, sleutel, kleur);
-    if (verandert && info) meldingen = metMelding(meldingen, { studentId, ...info });
+    if (kleur !== null && oud !== kleur && info) {
+      meldingen = metMelding(meldingen, { studentId, ...info });
+    }
   }
-  commit({ ...state, deelKleuren, meldingen, gewist });
+  commit({
+    ...state,
+    deelKleuren,
+    auditLog: metAudit(state.auditLog, wijzigingen),
+    meldingen,
+    gewist,
+  });
 }
 
 /** Wis alle lokale aanpassingen en ga terug naar de seed-data (meldt ook af). */

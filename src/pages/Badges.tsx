@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BulkKnop } from "../components/BulkKnop";
 import { ColorBar } from "../components/ColorBar";
+import { DeelPaneel } from "../components/DeelPaneel";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
@@ -15,21 +16,27 @@ import {
   rubricsVoorCursus,
   subgroepenVoorRubric,
 } from "../lib/curriculum";
-import { alleGroepDefs, groepLeden } from "../lib/groepen";
+import { deelevaluatiesVoorBadge } from "../lib/deelevaluaties";
+import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { telKleuren } from "../lib/kleurstats";
 import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import type { LeerlingFilter } from "../lib/leerlingen";
+import { useZichtbareLeerlingen } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
+import { useScrollSync } from "../lib/useScrollSync";
+import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
 import {
   getDoelKleur,
   getNotitie,
   setDoelKleur,
   setDoelKleurBulk,
   setMatrixCursus,
+  setMatrixStromen,
   useStore,
   zetNotitie,
 } from "../lib/store";
-import { STROOM_LABEL } from "../lib/types";
-import type { DoelKleuren, Leerdoel, Notities, Stroom, Student } from "../lib/types";
+import { STROOM_LABEL, doelSleutel } from "../lib/types";
+import type { Deelevaluatie, DoelKleuren, Leerdoel, Notities, Stroom, Student } from "../lib/types";
 
 /**
  * Badgematrix: badges (per cursus, per rubric) als rijen, leerlingen als kolommen.
@@ -86,11 +93,17 @@ interface StroomMatrixProps {
   toggleSubgroep: (key: string) => void;
   kleuren: DoelKleuren;
   notities: Notities;
+  deelevaluaties: Deelevaluatie[];
   schooljaar: string;
   vergrendeld: boolean;
   toonTitel: boolean;
   /** Cursusfilter op naam; "" = alle. */
   cursusFilter: string;
+  /** Leerdoel-id van de badge waarvan het deelevaluatie-zijpaneel open staat. */
+  gekozenBadge: string | null;
+  onKiesBadge: (leerdoelId: string) => void;
+  /** Koppelt het scroll-kader aan de gesynchroniseerde horizontale scroll met het zijpaneel. */
+  scrollRef?: (el: HTMLDivElement | null) => void;
 }
 
 /** Eén badgematrix voor precies één stroom: die stroom zijn cursussen × die stroom zijn leerlingen. */
@@ -103,13 +116,23 @@ function StroomMatrix({
   toggleSubgroep,
   kleuren,
   notities,
+  deelevaluaties,
   schooljaar,
   vergrendeld,
   toonTitel,
   cursusFilter,
+  gekozenBadge,
+  onKiesBadge,
+  scrollRef,
 }: StroomMatrixProps) {
+  const wijzigingLabel = useWijzigingLabel();
+  const geschiedenis = useGeschiedenis();
   const cursussen = cursussenVoorStroom(stroom).filter(
     (c) => !cursusFilter || c.naam === cursusFilter,
+  );
+  const stroomDeelevaluaties = useMemo(
+    () => deelevaluaties.filter((d) => d.schooljaar === schooljaar && d.stroom === stroom),
+    [deelevaluaties, schooljaar, stroom],
   );
   // De samenvatting onderaan telt de badges van de getoonde cursussen (dus mee gefilterd).
   const stroomLeerdoelen = useMemo(
@@ -127,14 +150,17 @@ function StroomMatrix({
   const kleurCellen = (nodeId: string, naam: string) =>
     leerlingen.map((s) => {
       const kleur = getDoelKleur(kleuren, schooljaar, s.id, nodeId);
+      const sleutel = doelSleutel(schooljaar, s.id, nodeId);
+      const wLabel = wijzigingLabel(sleutel) ?? undefined;
       return (
-        <td key={s.id} className="grid-cel">
+        <td key={s.id} className="grid-cel" title={wLabel}>
           {/* rating-klasse op de wrapper: het notitie-vierkantje pikt die kleur op */}
           <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
             <RatingCell
               label={`${s.firstName} — ${naam}`}
               readonly={vergrendeld}
               value={kleur}
+              geschiedenis={geschiedenis(sleutel)}
               onChange={(next) => setDoelKleur(schooljaar, s.id, nodeId, next)}
             />
             <NotitieVeld
@@ -171,21 +197,59 @@ function StroomMatrix({
     </th>
   );
 
-  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => (
-    <tr key={doel.id}>
-      <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
-        <div className="grid-doel-rij">
-          <span className="grid-doel-tekst">{doel.omschrijving}</span>
-          <BulkKnop
-            aantal={leerlingen.length}
-            disabled={vergrendeld}
-            onKies={(kleur) => setDoelKleurBulk(schooljaar, alleIds, doel.id, kleur)}
-          />
-        </div>
-      </td>
-      {kleurCellen(doel.id, doel.omschrijving)}
-    </tr>
-  );
+  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => {
+    const aantalDeel = deelevaluatiesVoorBadge(
+      stroomDeelevaluaties,
+      doel.id,
+      schooljaar,
+      cursusFilter,
+    ).length;
+    const gekozen = gekozenBadge === doel.id;
+    return (
+      <tr key={doel.id} className={gekozen ? "is-gekozen" : undefined}>
+        <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+          <div className="grid-doel-rij">
+            <span className="grid-doel-tekst">{doel.omschrijving}</span>
+            <button
+              type="button"
+              className={`grid-deel-chip${gekozen ? " is-actief" : ""}${
+                aantalDeel === 0 ? " is-leeg" : ""
+              }`}
+              title={
+                aantalDeel > 0
+                  ? `${aantalDeel} gekoppelde deelbadge${aantalDeel === 1 ? "" : "s"} — bekijk in het zijpaneel`
+                  : "Deelbadges bij deze badge — bekijk of maak er een aan"
+              }
+              aria-label={
+                aantalDeel > 0
+                  ? `Deelbadges bij deze badge (${aantalDeel})`
+                  : "Deelbadges bij deze badge"
+              }
+              aria-pressed={gekozen}
+              onClick={() => onKiesBadge(doel.id)}
+            >
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M5 2.5h6M4 4.5h8v9H4zM6.5 7.5h5M6.5 10h5"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {aantalDeel > 0 && aantalDeel}
+            </button>
+            <BulkKnop
+              aantal={leerlingen.length}
+              disabled={vergrendeld}
+              onKies={(kleur) => setDoelKleurBulk(schooljaar, alleIds, doel.id, kleur)}
+            />
+          </div>
+        </td>
+        {kleurCellen(doel.id, doel.omschrijving)}
+      </tr>
+    );
+  };
 
   const kolomTotalen = leerlingen.map((s) =>
     telKleuren(stroomLeerdoelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id))),
@@ -225,7 +289,7 @@ function StroomMatrix({
   return (
     <div className="stroom-matrix">
       {titel}
-      <div className="grid-wrap">
+      <div className="grid-wrap" ref={scrollRef}>
         <table className="grid">
           <thead>
             <tr>
@@ -341,14 +405,27 @@ function StroomMatrix({
 }
 
 export function Badges() {
-  const { students, kleuren, notities, groepen, schooljaar, matrixStromen, matrixCursus } =
+  const { kleuren, notities, deelevaluaties, groepen, schooljaar, matrixStromen, matrixCursus } =
     useStore();
+  const students = useZichtbareLeerlingen();
   const [filter, setFilter] = useLeerlingFilter();
   const [fold, setFold] = useState<Fold>(loadFold);
+  const [gekozenBadge, setGekozenBadge] = useState<string | null>(null);
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
 
   const groepDefs = useMemo(() => alleGroepDefs(students, groepen), [students, groepen]);
+
+  // Kies je een groep in de filterbalk, dan schuift de stroomkeuze automatisch mee naar de
+  // stromen van díé groep — anders kun je "1e graad" aanduiden en toch een groep uit het
+  // 3e jaar kiezen, waarna de matrix niemand toont.
+  const onFilterChange = (next: LeerlingFilter) => {
+    setFilter(next);
+    if (next.groepId && next.groepId !== filter.groepId) {
+      const stromen = stromenVanGroep(next.groepId, students, groepen);
+      if (stromen.length > 0) setMatrixStromen(stromen);
+    }
+  };
 
   // Cursusnamen over alle gekozen stromen (voor de cursusfilter).
   const cursusOpties = useMemo(() => {
@@ -380,6 +457,18 @@ export function Badges() {
       })),
     [matrixStromen, zichtbaar],
   );
+
+  // Het zijpaneel toont de deelevaluaties van de gekozen badge, met de leerlingen van díé
+  // badge zijn stroom (de badge-id begint met de stroomcode).
+  const paneelStroom = gekozenBadge
+    ? matrixStromen.find((s) => gekozenBadge.startsWith(`${s}-`))
+    : undefined;
+  const paneelLeerlingen =
+    leerlingenPerStroom.find((x) => x.stroom === paneelStroom)?.leerlingen ?? [];
+  const toonPaneel = Boolean(gekozenBadge && paneelStroom && paneelLeerlingen.length > 0);
+
+  // Horizontaal scrollen loopt gelijk tussen de badgematrix en het deelevaluatie-zijpaneel.
+  const syncScroll = useScrollSync();
 
   useEffect(() => {
     try {
@@ -439,7 +528,7 @@ export function Badges() {
         zichtbaar={zichtbaar.length}
         groepen={groepDefs}
         filter={filter}
-        onChange={setFilter}
+        onChange={onFilterChange}
         verbergVelden={["graad", "klasgroep"]}
         cursusOpties={cursusOpties}
         cursus={cursusFilter}
@@ -455,30 +544,50 @@ export function Badges() {
         </button>
       </div>
 
-      {zichtbaar.length === 0 ? (
-        <p className="lege-staat">
-          Geen leerlingen voor deze stroom en filter. Duid de juiste stroom aan of pas de filter
-          aan.
-        </p>
-      ) : (
-        leerlingenPerStroom.map(({ stroom, leerlingen }) => (
-          <StroomMatrix
-            key={stroom}
-            stroom={stroom}
-            leerlingen={leerlingen}
-            fold={fold}
-            toggleCursus={toggleCursus}
-            toggleRubric={toggleRubric}
-            toggleSubgroep={toggleSubgroep}
-            kleuren={kleuren}
-            notities={notities}
+      <div className={toonPaneel ? "badges-split" : undefined}>
+        <div className="badges-hoofd">
+          {zichtbaar.length === 0 ? (
+            <p className="lege-staat">
+              Geen leerlingen voor deze stroom en filter. Duid de juiste stroom aan of pas de
+              filter aan.
+            </p>
+          ) : (
+            leerlingenPerStroom.map(({ stroom, leerlingen }) => (
+              <StroomMatrix
+                key={stroom}
+                stroom={stroom}
+                leerlingen={leerlingen}
+                fold={fold}
+                toggleCursus={toggleCursus}
+                toggleRubric={toggleRubric}
+                toggleSubgroep={toggleSubgroep}
+                kleuren={kleuren}
+                notities={notities}
+                deelevaluaties={deelevaluaties}
+                schooljaar={schooljaar}
+                vergrendeld={vergrendeld}
+                toonTitel={matrixStromen.length > 1}
+                cursusFilter={cursusFilter}
+                gekozenBadge={gekozenBadge}
+                onKiesBadge={(id) => setGekozenBadge((cur) => (cur === id ? null : id))}
+                scrollRef={toonPaneel && stroom === paneelStroom ? syncScroll : undefined}
+              />
+            ))
+          )}
+        </div>
+
+        {toonPaneel && gekozenBadge && (
+          <DeelPaneel
+            leerdoelId={gekozenBadge}
+            leerlingen={paneelLeerlingen}
             schooljaar={schooljaar}
-            vergrendeld={vergrendeld}
-            toonTitel={matrixStromen.length > 1}
             cursusFilter={cursusFilter}
+            vergrendeld={vergrendeld}
+            onSluit={() => setGekozenBadge(null)}
+            scrollRef={syncScroll}
           />
-        ))
-      )}
+        )}
+      </div>
     </section>
   );
 }

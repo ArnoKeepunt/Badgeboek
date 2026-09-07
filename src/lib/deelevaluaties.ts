@@ -41,6 +41,21 @@ const CURSUS_ALIAS: Record<string, string> = {
 const norm = (s: string) => s.trim().toLowerCase();
 
 /**
+ * De kapstok-cursusnaam (zoals in `cursusNamenVoorStroom`) die bij een badge-cursus hoort,
+ * bv. "Basisvaardigheden" → "Basisfreinetvaardigheden". Zo staat een nieuwe deelevaluatie die
+ * je vanuit de badgematrix aanmaakt meteen op de juiste cursus. Valt terug op de badge-naam
+ * zelf als er geen kapstok-tegenhanger is.
+ */
+export function kapstokCursusVoorBadgeCursus(stroom: Stroom, badgeCursus: string): string {
+  const doel = CURSUS_ALIAS[norm(badgeCursus)] ?? norm(badgeCursus);
+  const match = cursusNamenVoorStroom(stroom).find((k) => {
+    const n = CURSUS_ALIAS[norm(k)] ?? norm(k);
+    return n === doel || n.startsWith(doel) || doel.startsWith(n);
+  });
+  return match ?? badgeCursus;
+}
+
+/**
  * De badges (leerdoelen) die een leerkracht kan koppelen, gegroepeerd per badge-cursus.
  * De cursus die bij de deelevaluatie hoort staat vooraan.
  */
@@ -62,7 +77,14 @@ export function koppelbareBadges(
   return rijen.sort((a, b) => Number(b.voorgesteld) - Number(a.voorgesteld));
 }
 
-/** Deelevaluaties van een stroom + schooljaar, op datum (leeg laatst) en titel. */
+/** Sorteervolgorde: op datum (leeg laatst), dan op titel. */
+const opDatumDanTitel = (a: Deelevaluatie, b: Deelevaluatie): number => {
+  if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
+  if (Boolean(a.datum) !== Boolean(b.datum)) return a.datum ? -1 : 1;
+  return a.titel.localeCompare(b.titel, "nl");
+};
+
+/** Deelevaluaties van een stroom + schooljaar, op datum en titel. */
 export function deelevaluatiesVoor(
   alle: Deelevaluatie[],
   stroom: Stroom,
@@ -70,9 +92,28 @@ export function deelevaluatiesVoor(
 ): Deelevaluatie[] {
   return alle
     .filter((d) => d.stroom === stroom && d.schooljaar === schooljaar)
-    .sort((a, b) => {
-      if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? -1 : 1;
-      if (Boolean(a.datum) !== Boolean(b.datum)) return a.datum ? -1 : 1;
-      return a.titel.localeCompare(b.titel, "nl");
-    });
+    .sort(opDatumDanTitel);
+}
+
+/**
+ * De deelevaluaties die aan één badge (leerdoel) gekoppeld zijn, in een schooljaar. Optioneel
+ * ook filteren op cursus (via dezelfde alias-logica als `koppelbareBadges`): dan verdwijnen
+ * deelevaluaties van een ander vak. De `schooljaar`-filter is nodig omdat de `deelKleuren`-
+ * sleutels zelf geen schooljaar bevatten.
+ */
+export function deelevaluatiesVoorBadge(
+  alle: Deelevaluatie[],
+  leerdoelId: string,
+  schooljaar: string,
+  cursusFilter?: string,
+): Deelevaluatie[] {
+  const doel = cursusFilter ? (CURSUS_ALIAS[norm(cursusFilter)] ?? norm(cursusFilter)) : "";
+  return alle
+    .filter((d) => d.schooljaar === schooljaar && d.leerdoelIds.includes(leerdoelId))
+    .filter((d) => {
+      if (!doel) return true;
+      const n = norm(d.cursus);
+      return n === doel || n.startsWith(doel) || doel.startsWith(n);
+    })
+    .sort(opDatumDanTitel);
 }

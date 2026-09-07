@@ -1,5 +1,6 @@
 import type { Minimumdoel } from "../minimumdoelen";
 import type {
+  AuditLog,
   DeelKleuren,
   DeelNotities,
   Deelevaluatie,
@@ -44,6 +45,8 @@ export interface PersistedStore {
   deelevaluaties: Deelevaluatie[];
   deelKleuren: DeelKleuren;
   deelNotities: DeelNotities;
+  /** Append-only wijzigingsgeschiedenis per evaluatiecel (kleur of notitie): wie, wanneer, van→naar. */
+  auditLog: AuditLog;
   meldingen: Melding[];
   meldingGezien: Record<string, number>;
   gewist: string[];

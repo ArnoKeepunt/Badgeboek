@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Voortgangsring } from "../components/Voortgangsring";
 import { cursussenVoorStroom, leerdoelenVoorCursus } from "../lib/curriculum";
-import { aantalIngevuld, telKleuren } from "../lib/kleurstats";
+import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
 import { graadKleur } from "../lib/leerlingVoortgang";
 import { RATINGS } from "../lib/ratings";
@@ -21,16 +21,15 @@ export function LeerlingHome({ leerling }: { leerling: Student }) {
     return {
       cursus,
       totaal: doelen.length,
-      // "Gedaan" = een badge met een kleur (welke dan ook). Het is een overzicht van wat al
-      // aan bod kwam, niet van geslaagd/gefaald.
-      gedaan: aantalIngevuld(telling),
+      // "Behaald" = de badge staat op groen of blauw. Geel/rood tellen niet mee.
+      behaald: aantalBehaald(telling),
       telling,
     };
   });
 
   const totaal = perCursus.reduce((n, x) => n + x.totaal, 0);
-  const gedaan = perCursus.reduce((n, x) => n + x.gedaan, 0);
-  const klaar = perCursus.filter((x) => x.totaal > 0 && x.gedaan === x.totaal).length;
+  const behaald = perCursus.reduce((n, x) => n + x.behaald, 0);
+  const klaar = perCursus.filter((x) => x.totaal > 0 && x.behaald === x.totaal).length;
 
   return (
     <div className="ll-home">
@@ -41,25 +40,25 @@ export function LeerlingHome({ leerling }: { leerling: Student }) {
             Je zit in de <strong>{graadLabel}</strong>. Zo ver ben je met je badges:
           </p>
           <p className="ll-hero-cijfer">
-            <strong>{gedaan}</strong> van {totaal} gedaan
+            <strong>{behaald}</strong> van {totaal} behaald
             {klaar > 0 && (
               <span className="ll-hero-klaar"> · {klaar} cursussen helemaal klaar 🎉</span>
             )}
           </p>
         </div>
-        <Voortgangsring behaald={gedaan} totaal={totaal} groot />
+        <Voortgangsring behaald={behaald} totaal={totaal} groot />
       </section>
 
       <h2 className="ll-kop">Mijn cursussen</h2>
       <div className="ll-cursussen">
-        {perCursus.map(({ cursus, totaal: t, gedaan: g, telling }) => (
+        {perCursus.map(({ cursus, totaal: t, behaald: b, telling }) => (
           <Link key={cursus.id} to={`/vak/${cursus.id}`} className="ll-cursus-kaart">
             <div className="ll-cursus-boven">
               <span className="ll-cursus-naam">{cursus.naam}</span>
-              <Voortgangsring behaald={g} totaal={t} />
+              <Voortgangsring behaald={b} totaal={t} />
             </div>
             <div className="ll-cursus-stand">
-              {t === 0 ? "Nog geen badges" : `${g} van ${t} gedaan`}
+              {t === 0 ? "Nog geen badges" : `${b} van ${t} behaald`}
             </div>
             <div className="ll-strook" aria-hidden="true">
               {RATINGS.map((r) =>

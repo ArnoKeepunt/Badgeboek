@@ -14,8 +14,10 @@ import {
   typeById,
   typesVoorCursus,
 } from "../lib/deelevaluaties";
-import { alleGroepDefs, groepLeden } from "../lib/groepen";
+import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import type { LeerlingFilter } from "../lib/leerlingen";
+import { useZichtbareLeerlingen } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
 import {
@@ -24,11 +26,17 @@ import {
   setDeelKleur,
   setDeelKleurBulk,
   setMatrixCursus,
+  setMatrixStromen,
   useStore,
   zetDeelNotitie,
 } from "../lib/store";
-import { STROOM_LABEL } from "../lib/types";
+import { STROOM_LABEL, deelSleutel } from "../lib/types";
 import type { DeelKleuren, DeelNotities, Deelevaluatie, Stroom, Student } from "../lib/types";
+import {
+  useDeelevaluatieWijzigingLabel,
+  useGeschiedenis,
+  useWijzigingLabel,
+} from "../lib/wijzigingslog";
 
 function PlusIcoon() {
   return (
@@ -84,7 +92,6 @@ type EditorState = {
 
 export function Deelevaluaties() {
   const {
-    students,
     groepen,
     schooljaar,
     deelevaluaties,
@@ -93,6 +100,7 @@ export function Deelevaluaties() {
     matrixStromen,
     matrixCursus,
   } = useStore();
+  const students = useZichtbareLeerlingen();
   const [filter, setFilter] = useLeerlingFilter();
   const aangemeld = useAangemeld();
   const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
@@ -105,6 +113,17 @@ export function Deelevaluaties() {
   const meerdereStromen = matrixStromen.length > 1;
 
   const groepDefs = useMemo(() => alleGroepDefs(students, groepen), [students, groepen]);
+
+  // Kies je een groep in de filterbalk, dan schuift de stroomkeuze automatisch mee naar de
+  // stromen van díé groep — anders kun je "1e graad" aanduiden en toch een groep uit het
+  // 3e jaar kiezen, waarna de matrix niemand toont.
+  const onFilterChange = (next: LeerlingFilter) => {
+    setFilter(next);
+    if (next.groepId && next.groepId !== filter.groepId) {
+      const stromen = stromenVanGroep(next.groepId, students, groepen);
+      if (stromen.length > 0) setMatrixStromen(stromen);
+    }
+  };
 
   // De stroomkeuze bepaalt al de graad/klasgroep-as: die velden weglaten en negeren.
   const stroomLeerlingen = useMemo(
@@ -167,7 +186,7 @@ export function Deelevaluaties() {
 
       {vergrendeld && (
         <p className="jaar-melding jaar-melding-slot">
-          🔒 Schooljaar <strong>{schooljaar}</strong> is afgesloten. Deelevaluaties staan vast.
+          🔒 Schooljaar <strong>{schooljaar}</strong> is afgesloten. Deelbadges staan vast.
         </p>
       )}
       {archief && (
@@ -181,7 +200,7 @@ export function Deelevaluaties() {
         zichtbaar={zichtbaar.length}
         groepen={groepDefs}
         filter={filter}
-        onChange={setFilter}
+        onChange={onFilterChange}
         verbergVelden={["graad", "klasgroep"]}
         cursusOpties={cursusOpties}
         cursus={cursusFilter}
@@ -195,7 +214,7 @@ export function Deelevaluaties() {
             className="knop-primair"
             onClick={() => setEditor({ stroom: matrixStromen[0] })}
           >
-            + Nieuwe deelevaluatie
+            + Nieuwe deelbadge
           </button>
         )}
         {alleSectieKeys.length > 0 && (
@@ -212,7 +231,7 @@ export function Deelevaluaties() {
 
       {editor && (
         <Modal
-          label={editor.bestaand ? "Deelevaluatie bewerken" : "Nieuwe deelevaluatie"}
+          label={editor.bestaand ? "Deelbadge bewerken" : "Nieuwe deelbadge"}
           onClose={() => setEditor(null)}
         >
           <DeelevaluatieEditor
@@ -247,7 +266,7 @@ export function Deelevaluaties() {
                     className="knop-secundair"
                     onClick={() => setEditor({ stroom })}
                   >
-                    + Nieuwe deelevaluatie
+                    + Nieuwe deelbadge
                   </button>
                 )}
               </div>
@@ -315,6 +334,9 @@ function DeelCursusSectie({
   onNieuw: (typeId: string | null) => void;
   onBewerk: (d: Deelevaluatie) => void;
 }) {
+  const wijzigingLabel = useWijzigingLabel();
+  const geschiedenis = useGeschiedenis();
+  const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
   const types = typesVoorCursus(stroom, cursus);
   const aantalPerType = new Map<string | null, number>();
   for (const d of rijen) aantalPerType.set(d.typeId, (aantalPerType.get(d.typeId) ?? 0) + 1);
@@ -325,7 +347,7 @@ function DeelCursusSectie({
         <span className="grid-caret">{dicht ? "▶" : "▼"}</span>
         <h2>{cursus}</h2>
         <span className="de-cursus-meta">
-          {rijen.length} {rijen.length === 1 ? "deelevaluatie" : "deelevaluaties"}
+          {rijen.length} {rijen.length === 1 ? "deelbadge" : "deelbadges"}
           {types.length > 0 && ` · ${types.length} types`}
         </span>
       </button>
@@ -356,8 +378,8 @@ function DeelCursusSectie({
                           <button
                             type="button"
                             className="knop-icoon knop-icoon-klein"
-                            title={`Toets toevoegen voor "${t.naam}"`}
-                            aria-label={`Toets toevoegen voor ${t.naam}`}
+                            title={`Deelbadge toevoegen voor "${t.naam}"`}
+                            aria-label={`Deelbadge toevoegen voor ${t.naam}`}
                             onClick={() => onNieuw(t.id)}
                           >
                             <PlusIcoon />
@@ -373,13 +395,13 @@ function DeelCursusSectie({
 
           {rijen.length === 0 ? (
             <div className="de-leeg de-leeg-rij">
-              <span className="lege-staat">Nog geen deelevaluaties in deze cursus.</span>
+              <span className="lege-staat">Nog geen deelbadges in deze cursus.</span>
               {!vergrendeld && (
                 <button
                   type="button"
                   className="knop-icoon"
-                  title="Nieuwe deelevaluatie in deze cursus"
-                  aria-label="Nieuwe deelevaluatie in deze cursus"
+                  title={`Nieuwe deelbadge voor "${cursus}"`}
+                  aria-label={`Nieuwe deelbadge voor ${cursus}`}
                   onClick={() => onNieuw(null)}
                 >
                   <PlusIcoon />
@@ -391,7 +413,7 @@ function DeelCursusSectie({
               <table className="grid">
                 <thead>
                   <tr>
-                    <th className="grid-col-doel">Deelevaluatie</th>
+                    <th className="grid-col-doel">Deelbadge</th>
                     {leerlingen.map((s) => (
                       <th
                         key={s.id}
@@ -411,7 +433,10 @@ function DeelCursusSectie({
                     const type = typeById(d.typeId);
                     return (
                       <tr key={d.id}>
-                        <td className="grid-col-doel grid-doel">
+                        <td
+                          className="grid-col-doel grid-doel"
+                          title={deelWijzigingLabel(d) ?? undefined}
+                        >
                           <div className="de-rij-kop">
                             <div className="de-rij-titel">
                               <strong>{d.titel}</strong>
@@ -455,7 +480,7 @@ function DeelCursusSectie({
                                 <button
                                   type="button"
                                   className="knop-icoon knop-icoon-klein"
-                                  title="Deelevaluatie bewerken"
+                                  title="Deelbadge bewerken"
                                   aria-label={`"${d.titel}" bewerken`}
                                   onClick={() => onBewerk(d)}
                                 >
@@ -467,13 +492,16 @@ function DeelCursusSectie({
                         </td>
                         {leerlingen.map((s) => {
                           const kleur = getDeelKleur(deelKleuren, d.id, s.id);
+                          const sleutel = deelSleutel(d.id, s.id);
+                          const wLabel = wijzigingLabel(sleutel) ?? undefined;
                           return (
-                            <td key={s.id} className="grid-cel">
+                            <td key={s.id} className="grid-cel" title={wLabel}>
                               <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
                                 <RatingCell
                                   label={`${s.firstName} — ${d.titel}`}
                                   readonly={vergrendeld}
                                   value={kleur}
+                                  geschiedenis={geschiedenis(sleutel)}
                                   onChange={(next) => setDeelKleur(d.id, s.id, next)}
                                 />
                                 <NotitieVeld

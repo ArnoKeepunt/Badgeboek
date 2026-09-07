@@ -109,7 +109,14 @@ export function Rubrics() {
   const totaalAlles = perStroom.reduce((n, s) => n + s.totaal, 0);
   const meerdereStromen = matrixStromen.length > 1;
 
+  const alleCursusSleutels = useMemo(
+    () => perStroom.flatMap((s) => s.perCursus.map(([cursus]) => `${s.stroom}|${cursus}`)),
+    [perStroom],
+  );
+
   const toggleCursus = (sleutel: string) => setDicht((prev) => vervang(prev, sleutel));
+  const allesOpen = () => setDicht(new Set());
+  const allesDicht = () => setDicht(new Set(alleCursusSleutels));
   const toggleLeerlijn = (id: string) => setLeerlijnOpen((prev) => vervang(prev, id));
   const toggleDoel = (sleutel: string) => setDoelOpen((prev) => vervang(prev, sleutel));
   const toggleSoort = (s: DoelSoort) =>
@@ -184,6 +191,17 @@ export function Rubrics() {
           </span>
         ))}
       </div>
+
+      {!filterActief && totaalGetoond > 0 && (
+        <div className="matrix-acties">
+          <button type="button" className="linkknop" onClick={allesOpen}>
+            Alles uitklappen
+          </button>
+          <button type="button" className="linkknop" onClick={allesDicht}>
+            Alles inklappen
+          </button>
+        </div>
+      )}
 
       {totaalGetoond === 0 ? (
         <p className="lege-staat">Geen rubrieken voor deze filter.</p>

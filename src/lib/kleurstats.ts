@@ -16,3 +16,9 @@ export function telKleuren(waarden: (Rating | null)[]): KleurTelling {
 /** Aantal ingevulde (niet-lege) waarden in een telling. */
 export const aantalIngevuld = (t: KleurTelling): number =>
   RATINGS.reduce((sum, r) => sum + t[r], 0);
+
+/**
+ * Aantal **behaald**: enkel groen of blauw telt mee. Geel/rood = wel al beoordeeld, maar nog
+ * niet behaald; leeg = nog niet aangeboden.
+ */
+export const aantalBehaald = (t: KleurTelling): number => t.green + t.blue;

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { cursusNamenVoorStroom, koppelbareBadges, typesVoorCursus } from "../lib/deelevaluaties";
 import { maakDeelevaluatie, verwijderDeelevaluatie, wijzigDeelevaluatie } from "../lib/store";
 import type { Deelevaluatie, Stroom } from "../lib/types";
+import { useDeelevaluatieWijzigingLabel } from "../lib/wijzigingslog";
 
 /**
  * Formulier om een deelevaluatie (toets/opdracht) aan te maken of te bewerken: een titel,
@@ -22,10 +23,12 @@ export function DeelevaluatieEditor({
   schooljaar: string;
   mentorId?: string;
   bestaand?: Deelevaluatie;
-  voorinvulling?: { cursus: string; typeId: string | null };
+  voorinvulling?: { cursus: string; typeId: string | null; leerdoelIds?: string[] };
   onSluit: () => void;
 }) {
   const cursussen = useMemo(() => cursusNamenVoorStroom(stroom), [stroom]);
+  const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
+  const wijzigingTekst = bestaand ? deelWijzigingLabel(bestaand) : null;
 
   const [titel, setTitel] = useState(bestaand?.titel ?? "");
   const [cursus, setCursus] = useState(
@@ -37,7 +40,7 @@ export function DeelevaluatieEditor({
   const [datum, setDatum] = useState(bestaand?.datum ?? "");
   const [toelichting, setToelichting] = useState(bestaand?.toelichting ?? "");
   const [leerdoelIds, setLeerdoelIds] = useState<Set<string>>(
-    () => new Set(bestaand?.leerdoelIds ?? []),
+    () => new Set(bestaand?.leerdoelIds ?? voorinvulling?.leerdoelIds ?? []),
   );
 
   const types = useMemo(() => typesVoorCursus(stroom, cursus), [stroom, cursus]);
@@ -62,7 +65,7 @@ export function DeelevaluatieEditor({
       stroom,
       cursus,
       typeId,
-      titel: titel.trim() || gekozenType?.naam || "Naamloze deelevaluatie",
+      titel: titel.trim() || gekozenType?.naam || "Naamloze deelbadge",
       datum,
       leerdoelIds: [...leerdoelIds],
       toelichting: toelichting.trim(),
@@ -75,7 +78,8 @@ export function DeelevaluatieEditor({
 
   return (
     <div className="de-editor">
-      <h2>{bestaand ? "Deelevaluatie bewerken" : "Nieuwe deelevaluatie"}</h2>
+      <h2>{bestaand ? "Deelbadge bewerken" : "Nieuwe deelbadge"}</h2>
+      {wijzigingTekst && <p className="de-editor-wijziging">{wijzigingTekst}</p>}
 
       <label className="de-veld">
         <span>
@@ -208,13 +212,13 @@ export function DeelevaluatieEditor({
             type="button"
             className="linkknop linkknop-gevaar de-editor-verwijder"
             onClick={() => {
-              if (confirm(`Deelevaluatie "${bestaand.titel}" verwijderen?`)) {
+              if (confirm(`Deelbadge "${bestaand.titel}" verwijderen?`)) {
                 verwijderDeelevaluatie(bestaand.id);
                 onSluit();
               }
             }}
           >
-            Deelevaluatie verwijderen
+            Deelbadge verwijderen
           </button>
         )}
       </div>

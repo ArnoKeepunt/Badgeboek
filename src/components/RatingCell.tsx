@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { usePopover } from "../lib/popover";
 import type { Rating } from "../lib/types";
 import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL } from "../lib/ratings";
+import type { GeschiedenisRegel } from "../lib/wijzigingslog";
 
 /**
  * Eén cel in de doelenmatrix, in de stijl van een Notion "status"-eigenschap:
@@ -14,6 +15,7 @@ export function RatingCell({
   onChange,
   label,
   readonly = false,
+  geschiedenis,
 }: {
   value: Rating | null;
   onChange: (next: Rating | null) => void;
@@ -21,12 +23,17 @@ export function RatingCell({
   label: string;
   /** Alleen tonen, niet bewerkbaar (bv. bij een afgesloten schooljaar). */
   readonly?: boolean;
+  /** Volledige wijzigingsgeschiedenis (nieuwste eerst), uitklapbaar onderaan het keuzemenu. */
+  geschiedenis?: GeschiedenisRegel[];
 }) {
   const [open, setOpen] = useState(false);
+  const [toonGeschiedenis, setToonGeschiedenis] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const regels = geschiedenis ?? [];
+  const heeftGeschiedenis = regels.length > 0;
   const pos = usePopover(open, trigger, () => setOpen(false), {
-    breedte: 176,
-    hoogte: 244,
+    breedte: heeftGeschiedenis ? 264 : 176,
+    hoogte: toonGeschiedenis ? 440 : heeftGeschiedenis ? 300 : 244,
     uitlijn: "midden",
   });
 
@@ -97,6 +104,32 @@ export function RatingCell({
                 <span className="rating-dot" />
                 {RATING_EMPTY_LABEL}
               </button>
+
+              {heeftGeschiedenis && (
+                <div className="rating-cell-historie">
+                  <button
+                    type="button"
+                    className="rating-cell-historie-knop"
+                    aria-expanded={toonGeschiedenis}
+                    onClick={() => setToonGeschiedenis((v) => !v)}
+                  >
+                    <span className="grid-caret">{toonGeschiedenis ? "▾" : "▸"}</span>
+                    Geschiedenis ({regels.length})
+                  </button>
+                  <ol className="rating-cell-historie-lijst">
+                    {(toonGeschiedenis ? regels : regels.slice(0, 1)).map((r, i) => (
+                      <li key={i}>
+                        <span className="rating-cell-historie-kop">
+                          <span className="rating-cell-historie-wie">{r.wie}</span>
+                          <span className="rating-cell-historie-leader" aria-hidden="true" />
+                          <span className="rating-cell-historie-moment">{r.moment}</span>
+                        </span>
+                        <span className="rating-cell-historie-overgang">{r.overgang}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
           </>,
           document.body,

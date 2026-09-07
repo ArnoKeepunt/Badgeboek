@@ -1,8 +1,11 @@
 import { type ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Eenvoudige gecentreerde overlay. Sluit met de knop, een klik naast het venster of Escape.
- * Terwijl de modal open staat, scrollt de pagina eronder niet mee.
+ * Terwijl de modal open staat, scrollt de pagina eronder niet mee. Rendert via een portal op
+ * `document.body`, zodat de overlay ook klopt wanneer de modal in een sticky/overflow-container
+ * staat (bv. het deelevaluatie-zijpaneel).
  */
 export function Modal({
   onClose,
@@ -30,7 +33,7 @@ export function Modal({
     };
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div
         className={`modal${groot ? " modal--groot" : ""}`}
@@ -51,6 +54,7 @@ export function Modal({
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

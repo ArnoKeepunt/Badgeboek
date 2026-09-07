@@ -1,5 +1,5 @@
-import { GRAAD_LABEL, graadVan, unieke } from "./leerlingen";
-import type { Groep, Student } from "./types";
+import { GRAAD_LABEL, graadVan, stroomVan, unieke } from "./leerlingen";
+import type { Groep, Stroom, Student } from "./types";
 
 /**
  * Groepen komen in twee smaken:
@@ -136,4 +136,16 @@ export function groepLeden(
   if (!groepId) return null;
   const def = alleGroepDefs(students, groepen).find((d) => d.id === groepId);
   return def ? new Set(def.leerlingIds) : null;
+}
+
+/**
+ * De stromen (badgeboeken) waarin de leden van een groep zitten, bv. `["1A", "1B"]` voor een
+ * groep die een hele graad omvat. Gebruikt om de stroomkeuze automatisch mee te laten
+ * opschuiven met een gekozen groep — anders kan de stroomfilter een andere graad tonen dan
+ * waar de groep zijn leerlingen in zitten, en toont de matrix niemand.
+ */
+export function stromenVanGroep(groepId: string, students: Student[], groepen: Groep[]): Stroom[] {
+  const leden = groepLeden(groepId, students, groepen);
+  if (!leden) return [];
+  return [...new Set(students.filter((s) => leden.has(s.id)).map((s) => stroomVan(s)))];
 }

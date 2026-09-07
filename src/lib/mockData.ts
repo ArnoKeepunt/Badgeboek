@@ -15,9 +15,10 @@ import type {
   Rating,
   Student,
 } from "./types";
-import { deelSleutel, doelSleutel } from "./types";
+import { STROMEN, deelSleutel, doelSleutel } from "./types";
 
 const HUIDIG = "2026-2027";
+const [JAAR1, JAAR2] = HUIDIG.split("-");
 
 /** Seed-data uit de fictieve-gebruikerslijst. Vervangbaar via CSV-import op /gegevens. */
 export const students: Student[] = seedLeerlingen;
@@ -107,7 +108,7 @@ const badgesVan = (cursusNaam: string, n: number): string[] => {
   return c ? leerdoelenVoorCursus(c.id).slice(0, n).map((d) => d.id) : [];
 };
 
-export const seedDeelevaluaties: Deelevaluatie[] = [
+const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
   {
     id: "seed-de-1",
     schooljaar: HUIDIG,
@@ -143,11 +144,56 @@ export const seedDeelevaluaties: Deelevaluatie[] = [
   },
 ];
 
+/**
+ * Voorbeeld-deelevaluaties voor élke graad, zodat de koppeling badges ↔ deelevaluaties meteen
+ * iets te tonen heeft. Bewust beperkt: enkel de eerste cursus van elke stroom en zijn eerste
+ * twee badges, met telkens een handvol deelevaluaties (elk gekoppeld aan één of beide badges).
+ */
+const perGraadDeelevaluaties: Deelevaluatie[] = STROMEN.flatMap((stroom) => {
+  const cursus = cursussenVoorStroom(stroom)[0];
+  if (!cursus) return [];
+  const badges = leerdoelenVoorCursus(cursus.id)
+    .slice(0, 2)
+    .map((d) => d.id);
+  if (badges.length === 0) return [];
+  const b1 = badges[0];
+  const b2 = badges[1] ?? badges[0];
+
+  const rijen: { titel: string; datum: string; doelen: string[]; toelichting: string }[] = [
+    { titel: "Startopdracht", datum: `${JAAR1}-09-24`, doelen: [b1], toelichting: "" },
+    {
+      titel: "Tussentoets",
+      datum: `${JAAR1}-11-06`,
+      doelen: [b1, b2],
+      toelichting: "Schriftelijke tussentijdse toets.",
+    },
+    { titel: "Werkstuk", datum: `${JAAR2}-01-22`, doelen: [b2], toelichting: "" },
+    { titel: "Eindpresentatie", datum: `${JAAR2}-03-11`, doelen: [b1, b2], toelichting: "" },
+  ];
+
+  return rijen.map((r, i) => ({
+    id: `seed-de-${stroom}-${i + 1}`,
+    schooljaar: HUIDIG,
+    stroom,
+    cursus: cursus.naam,
+    typeId: null,
+    titel: `${cursus.naam} — ${r.titel}`,
+    datum: r.datum,
+    leerdoelIds: [...new Set(r.doelen)],
+    toelichting: r.toelichting,
+  }));
+});
+
+export const seedDeelevaluaties: Deelevaluatie[] = [
+  ...voorbeeldDeelevaluaties1A,
+  ...perGraadDeelevaluaties,
+];
+
 export const deelKleuren: DeelKleuren = (() => {
   const map: DeelKleuren = {};
-  const leerlingen1A = GESEEDE_LEERLINGEN.filter((s) => stroomVan(s) === "1A");
   for (const de of seedDeelevaluaties) {
-    for (const s of leerlingen1A) {
+    const leerlingen = GESEEDE_LEERLINGEN.filter((s) => stroomVan(s) === de.stroom);
+    for (const s of leerlingen) {
       const bron = `${de.id}:${s.id}`;
       if ((hash(`${bron}#fill`) % 100) / 100 < 0.7) {
         map[deelSleutel(de.id, s.id)] = seedKleur(bron);

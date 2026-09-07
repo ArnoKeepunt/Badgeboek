@@ -1,6 +1,4 @@
-import { Icoon } from "./Icoon";
-
-/** De drie icoonknoppen om een groep in Badges / Deelevaluaties / Rubrics te openen. */
+/** Eén pijltje om een groep te openen in de badgematrix (zet de groep als filter). */
 export function GroepOpenen({
   naam,
   onOpen,
@@ -9,34 +7,22 @@ export function GroepOpenen({
   onOpen: (pad: string) => void;
 }) {
   return (
-    <div className="groep-openen">
-      <button
-        type="button"
-        className="voortgang-kaart-ikn"
-        title={`${naam} openen in Badges`}
-        aria-label={`${naam} openen in Badges`}
-        onClick={() => onOpen("/badges")}
-      >
-        <Icoon naam="badges" />
-      </button>
-      <button
-        type="button"
-        className="voortgang-kaart-ikn"
-        title={`${naam} openen in Deelevaluaties`}
-        aria-label={`${naam} openen in Deelevaluaties`}
-        onClick={() => onOpen("/deelevaluaties")}
-      >
-        <Icoon naam="deelevaluaties" />
-      </button>
-      <button
-        type="button"
-        className="voortgang-kaart-ikn"
-        title={`${naam} openen in Rubrics`}
-        aria-label={`${naam} openen in Rubrics`}
-        onClick={() => onOpen("/rubrics")}
-      >
-        <Icoon naam="rubrics" />
-      </button>
-    </div>
+    <button
+      type="button"
+      className="groep-openen-knop"
+      title={`${naam} openen in de badges`}
+      aria-label={`${naam} openen in de badges`}
+      onClick={() => onOpen("/badges")}
+    >
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M3 8h9M8.5 3.5 13 8l-4.5 4.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
   );
 }

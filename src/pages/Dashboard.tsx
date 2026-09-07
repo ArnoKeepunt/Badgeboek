@@ -6,9 +6,12 @@ import {
   type GroepSoort,
   SOORT_LABEL,
   alleGroepDefs,
+  stromenVanGroep,
   systeemGroepen,
 } from "../lib/groepen";
-import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import { LEEG_FILTER, useLeerlingFilter } from "../lib/leerlingen";
+import { useZichtbareLeerlingen } from "../lib/rechten";
+import { useAangemeld } from "../lib/sessie";
 import { RATINGS } from "../lib/ratings";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import { type Voortgang, voortgangVoor } from "../lib/voortgang";
@@ -36,7 +39,11 @@ function loadOverzicht(): string[] {
 
 /** Mentor-/beheerderoverzicht: eigen gekozen groepen + de vaste indeling per graad en jaar. */
 export function Dashboard() {
-  const { students, groepen, kleuren, schooljaar } = useStore();
+  const { groepen, kleuren, schooljaar } = useStore();
+  const students = useZichtbareLeerlingen();
+  // Een leerkracht krijgt een compact overzicht: enkel de eigen gekozen groepen, niet de
+  // volledige indeling per graad en per leerjaar (die is er "voor iedereen").
+  const isMentor = useAangemeld()?.rol === "mentor";
   const navigate = useNavigate();
   const [, setFilter] = useLeerlingFilter();
   const [gekozen, setGekozen] = useState<string[]>(loadOverzicht);
@@ -90,7 +97,7 @@ export function Dashboard() {
   // deelevaluaties, later rubrics). De filter is gedeeld, dus blijft ook daar staan.
   const openGroep = (def: GroepDef, pad: string) => {
     setFilter({ ...LEEG_FILTER, groepId: def.id });
-    const stromen = [...new Set(leden(def.leerlingIds).map((s) => stroomVan(s)))];
+    const stromen = stromenVanGroep(def.id, students, groepen);
     if (stromen.length > 0) setMatrixStromen(stromen);
     setMatrixCursus(""); // hele groep tonen, niet één cursus
     navigate(pad);
@@ -149,17 +156,21 @@ export function Dashboard() {
       {mijnRijen.length === 0 ? (
         <p className="lege-staat">
           Nog geen eigen groepen gekozen. Voeg er hierboven toe — je eigen klas, een groepje
-          leerlingen… De vaste indeling per graad en jaar staat er sowieso onder.
+          leerlingen…{isMentor ? "" : " De vaste indeling per graad en jaar staat er sowieso onder."}
         </p>
       ) : (
         kaarten(mijnRijen, verwijder)
       )}
 
-      <h2 style={{ marginTop: 30 }}>Per graad</h2>
-      {kaarten(graadRijen)}
+      {!isMentor && (
+        <>
+          <h2 style={{ marginTop: 30 }}>Per graad</h2>
+          {kaarten(graadRijen)}
 
-      <h2 style={{ marginTop: 30 }}>Per leerjaar</h2>
-      {kaarten(leerjaarRijen)}
+          <h2 style={{ marginTop: 30 }}>Per leerjaar</h2>
+          {kaarten(leerjaarRijen)}
+        </>
+      )}
     </section>
   );
 }
@@ -177,40 +188,50 @@ function VoortgangKaart({
   onOpen: (pad: string) => void;
   onVerwijder?: () => void;
 }) {
-  const pct = v.totaal > 0 ? Math.round((v.ingevuld / v.totaal) * 100) : 0;
+  const pct = v.totaal > 0 ? Math.round((v.ingevuld / v.totaal) * 100) : null;
   return (
     <div className="voortgang-kaart">
       <div className="voortgang-kaart-kop">
         <span className="voortgang-kaart-titel">{titel}</span>
-        <span className="voortgang-kaart-pct">{pct}%</span>
-        {onVerwijder && (
-          <button
-            type="button"
-            className="voortgang-kaart-x"
-            title="Uit mijn groepen halen"
-            aria-label={`${titel} uit mijn groepen halen`}
-            onClick={onVerwijder}
-          >
-            ×
-          </button>
-        )}
       </div>
-      <div className="voortgang-kaart-sub">
-        {sub} · {v.ingevuld}/{v.totaal} ingevuld
+
+      {(pct !== null || onVerwijder) && (
+        <div className={`voortgang-kaart-hoek${onVerwijder ? " heeft-x" : ""}`}>
+          {pct !== null && <span className="voortgang-kaart-pct">{pct}%</span>}
+          {onVerwijder && (
+            <button
+              type="button"
+              className="voortgang-kaart-x"
+              title="Uit mijn groepen halen"
+              aria-label={`${titel} uit mijn groepen halen`}
+              onClick={onVerwijder}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="voortgang-kaart-onder">
+        <div className="voortgang-kaart-progressie">
+          <span className="voortgang-kaart-sub">
+            {sub} · {v.ingevuld}/{v.totaal} ingevuld
+          </span>
+          <div className="voortgang-strook" aria-hidden="true">
+            {RATINGS.map((r) =>
+              v.telling[r] > 0 ? (
+                <span
+                  key={r}
+                  className={`rating-${r}`}
+                  style={{ flexGrow: v.telling[r], background: "var(--rating-solid)" }}
+                />
+              ) : null,
+            )}
+            {v.telling.leeg > 0 && <span style={{ flexGrow: v.telling.leeg }} />}
+          </div>
+        </div>
+        <GroepOpenen naam={titel} onOpen={onOpen} />
       </div>
-      <div className="voortgang-strook" aria-hidden="true">
-        {RATINGS.map((r) =>
-          v.telling[r] > 0 ? (
-            <span
-              key={r}
-              className={`rating-${r}`}
-              style={{ flexGrow: v.telling[r], background: "var(--rating-solid)" }}
-            />
-          ) : null,
-        )}
-        {v.telling.leeg > 0 && <span style={{ flexGrow: v.telling.leeg }} />}
-      </div>
-      <GroepOpenen naam={titel} onOpen={onOpen} />
     </div>
   );
 }

@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { GroepEditor } from "../components/GroepEditor";
 import { GroepOpenen } from "../components/GroepOpenen";
 import { Modal } from "../components/Modal";
-import { SOORT_LABEL, SYSTEEM_SOORTEN, systeemGroepen } from "../lib/groepen";
+import { SOORT_LABEL, SYSTEEM_SOORTEN, stromenVanGroep, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
 import { useAangemeld } from "../lib/sessie";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
@@ -30,7 +31,9 @@ function PotloodIcoon() {
  * wie erin zit (avatars) en de samenstelling per stroom.
  */
 export function Groepen() {
-  const { students, mentoren, groepen } = useStore();
+  const { mentoren, groepen } = useStore();
+  const students = useZichtbareLeerlingen();
+  const scopeVestiging = bereikVestiging(useAangemeld());
   const [, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
   const aangemeld = useAangemeld();
@@ -47,20 +50,21 @@ export function Groepen() {
     const m = mentoren.find((x) => x.id === id);
     return m ? `${m.voornaam} ${m.naam}` : "";
   };
-  const zichtbareGroepen =
-    alleenVanMij && mentorId ? groepen.filter((g) => g.mentorId === mentorId) : groepen;
+  const zichtbareGroepen = (
+    alleenVanMij && mentorId ? groepen.filter((g) => g.mentorId === mentorId) : groepen
+  ).filter(
+    // Binnen een vestiging-scope: enkel groepen met minstens één zichtbare leerling, of de
+    // eigen groepen (die de mentor sowieso moet kunnen beheren).
+    (g) => !scopeVestiging || g.mentorId === mentorId || leden(g.leerlingIds).length > 0,
+  );
   const teBewerken = editor?.id ? groepen.find((g) => g.id === editor.id) : undefined;
 
-  const toonInMatrix = (groepDefId: string) => {
+  // Groep als filter zetten + de stromen erop afstemmen (anders kan de stroomkeuze een andere
+  // stroom aanduiden dan waar de groep zijn leerlingen in zitten, en toont de matrix niemand —
+  // de twee filters moeten hier altijd in elkaars verlengde liggen, nooit los van elkaar staan).
+  const gaNaarGroep = (groepDefId: string, pad: string) => {
     setFilter({ ...LEEG_FILTER, groepId: groepDefId });
-    setMatrixCursus("");
-    navigate("/badges");
-  };
-
-  // Groep als filter zetten (+ juiste stromen) en naar de gekozen pagina springen.
-  const openGroep = (groepDefId: string, leerlingIds: string[], pad: string) => {
-    setFilter({ ...LEEG_FILTER, groepId: groepDefId });
-    const stromen = [...new Set(leden(leerlingIds).map((s) => stroomVan(s)))];
+    const stromen = stromenVanGroep(groepDefId, students, groepen);
     if (stromen.length > 0) setMatrixStromen(stromen);
     setMatrixCursus("");
     navigate(pad);
@@ -68,6 +72,12 @@ export function Groepen() {
 
   return (
     <section>
+      {scopeVestiging && (
+        <p className="jaar-melding">
+          Groepen en leerlingen zijn beperkt tot vestiging <strong>{scopeVestiging}</strong>.
+        </p>
+      )}
+
       {editor && (
         <Modal
           label={teBewerken ? "Groep bewerken" : "Nieuwe groep"}
@@ -118,19 +128,21 @@ export function Groepen() {
                 </button>
                 <div className="groep-kaart-naam">{g.naam}</div>
                 <div className="groep-kaart-meta">
-                  {g.leerlingIds.length} leerlingen
+                  {scopeVestiging && ll.length !== g.leerlingIds.length
+                    ? `${ll.length} van ${g.leerlingIds.length} leerlingen · rest in andere vestigingen`
+                    : `${g.leerlingIds.length} leerlingen`}
                   {g.mentorId && (
                     <> · {g.mentorId === mentorId ? "van mij" : mentorNaam(g.mentorId)}</>
                   )}
                 </div>
 
                 <Avatars leden={ll} />
-                <Samenstelling leden={ll} />
 
-                <div className="groep-kaart-acties">
+                <div className="groep-kaart-onder">
+                  <Samenstelling leden={ll} />
                   <GroepOpenen
                     naam={g.naam}
-                    onOpen={(pad) => openGroep(`eigen:${g.id}`, g.leerlingIds, pad)}
+                    onOpen={(pad) => gaNaarGroep(`eigen:${g.id}`, pad)}
                   />
                 </div>
               </div>
@@ -155,7 +167,7 @@ export function Groepen() {
                   key={d.id}
                   type="button"
                   className="groep-mini-kaart"
-                  onClick={() => toonInMatrix(d.id)}
+                  onClick={() => gaNaarGroep(d.id, "/badges")}
                 >
                   <span className="groep-mini-naam">{d.naam}</span>
                   <span className="groep-mini-aantal">

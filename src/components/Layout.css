@@ -21,10 +21,58 @@
   overflow-y: auto;
 }
 
+/* Vaste plek bovenaan de zijbalk — merkteken + "Badgeboek". Vaste hoogte en géén verticale
+   padding, zodat de positie identiek is in beide standen en er niks verspringt bij togglen. */
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
   font-weight: 700;
   font-size: 16px;
-  padding: 6px 10px;
+}
+
+.brand-mark {
+  flex: none;
+  width: 22px;
+  height: 21px;
+  color: var(--accent);
+}
+
+/* Voet: de in-/uitklapknop boven het account + af-/aanmelden. */
+.sidebar-voet {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-inklap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-inklap svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar-inklap:hover {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .sidebar nav {
@@ -48,7 +96,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  height: 36px;
+  padding: 0 10px;
   border-radius: 8px;
   color: var(--text-muted);
   text-decoration: none;
@@ -135,7 +184,6 @@
 
 /* Account onderaan de zijbalk (gebruikersstijl). */
 .sidebar-account {
-  margin-top: auto;
   border-top: 1px solid var(--border);
   padding-top: 14px;
   display: flex;
@@ -184,21 +232,34 @@
 }
 
 .sidebar-account-actie {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 0 10px;
   font: inherit;
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
   text-align: center;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .sidebar-account-actie:hover {
   background: var(--accent-soft);
   color: var(--text);
+}
+
+.sidebar-account-actie-icoon {
+  display: none;
+  width: 15px;
+  height: 15px;
+  flex: none;
 }
 
 .content {
@@ -213,7 +274,63 @@
   max-width: none;
 }
 
+/* Ingeklapte zijbalk — enkel op desktop; op mobiel is de balk sowieso al een topbalk en
+   negeren we de ingeklapte stand volledig (geen bijpassende regels onder de 720px-grens). */
+@media (min-width: 721px) {
+  .layout--ingeklapt {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .sidebar--ingeklapt {
+    padding: 20px 8px;
+    align-items: stretch;
+  }
+
+  .sidebar--ingeklapt .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar--ingeklapt .brand-tekst {
+    display: none;
+  }
+
+  .sidebar--ingeklapt .nav-link,
+  .sidebar--ingeklapt .sidebar-inklap {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar--ingeklapt .nav-link-label {
+    display: none;
+  }
+
+  .sidebar--ingeklapt .sidebar-account-hoofd {
+    justify-content: center;
+  }
+
+  .sidebar--ingeklapt .sidebar-account-tekst {
+    display: none;
+  }
+
+  .sidebar--ingeklapt .sidebar-account-actie-tekst {
+    display: none;
+  }
+
+  .sidebar--ingeklapt .sidebar-account-actie-icoon {
+    display: block;
+  }
+
+  .sidebar--ingeklapt .sidebar-account-actie {
+    padding: 0;
+  }
+}
+
 @media (max-width: 720px) {
+  .sidebar-inklap {
+    display: none;
+  }
+
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -246,9 +363,12 @@
     border-top: 0;
   }
 
-  .sidebar-account {
+  .sidebar-voet {
     margin-top: 0;
     margin-left: auto;
+  }
+
+  .sidebar-account {
     border-top: 0;
     padding-top: 0;
     flex-direction: row;

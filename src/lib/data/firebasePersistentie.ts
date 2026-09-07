@@ -15,6 +15,8 @@ import type { BadgeboekPersistentie, PersistedStore, RauweStore } from "./persis
  *          kleuren:      map  ("studentId:nodeId" → "red" | …)  nodeId = leerdoel-/cursus-/rubric-id
  *          notities:     map
  *          deelKleuren:  map
+ *          deelNotities: map
+ *          auditLog:     map  (kleur-/deelSleutel → array<{op,door,veld,van,naar}>)  geschiedenis
  *          gewist:       array<string>
  *        badgeboek/_globaal
  *          students, mentoren, groepen, deelevaluaties, doelWijzigingen,

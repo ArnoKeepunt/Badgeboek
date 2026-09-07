@@ -1,12 +1,15 @@
 :root {
-  --bg: #f6f7f9;
+  /* Neutraal grijs/zwart/wit voor de structuur; groen ("Killarney" uit de Keerpunt-huisstijl)
+     enkel als accent — knoppen, actieve nav, links, focus, selectie. Niet exact overgenomen.
+     De blauw-/teal-paletten uit docs/kleuren/ liggen klaar als alternatief. */
+  --bg: #f6f7f8;
   --surface: #ffffff;
   --text: #1c1e21;
   --text-muted: #6b7280;
   --border: #e4e7eb;
-  --accent: #4f46e5;
+  --accent: #3d684e;
   --accent-contrast: #ffffff;
-  --accent-soft: #eef2ff;
+  --accent-soft: #e9f0eb;
   --radius: 10px;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -92,10 +95,30 @@ th {
   background: var(--rating-solid);
 }
 
-.rating-red    { --rating-solid: #dc2626; --rating-bg: #fef2f2; --rating-fg: #991b1b; --rating-border: #fecaca; }
-.rating-yellow { --rating-solid: #d97706; --rating-bg: #fffbeb; --rating-fg: #92400e; --rating-border: #fde68a; }
-.rating-green  { --rating-solid: #16a34a; --rating-bg: #f0fdf4; --rating-fg: #166534; --rating-border: #bbf7d0; }
-.rating-blue   { --rating-solid: #2563eb; --rating-bg: #eff6ff; --rating-fg: #1e40af; --rating-border: #bfdbfe; }
+.rating-red {
+  --rating-solid: #dc2626;
+  --rating-bg: #fef2f2;
+  --rating-fg: #991b1b;
+  --rating-border: #fecaca;
+}
+.rating-yellow {
+  --rating-solid: #d97706;
+  --rating-bg: #fffbeb;
+  --rating-fg: #92400e;
+  --rating-border: #fde68a;
+}
+.rating-green {
+  --rating-solid: #16a34a;
+  --rating-bg: #f0fdf4;
+  --rating-fg: #166534;
+  --rating-border: #bbf7d0;
+}
+.rating-blue {
+  --rating-solid: #2563eb;
+  --rating-bg: #eff6ff;
+  --rating-fg: #1e40af;
+  --rating-border: #bfdbfe;
+}
 
 /* Empty / not-yet-offered state. */
 .rating-empty {
@@ -166,39 +189,77 @@ th {
 .voortgang-kaarten {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
-  margin: 12px 0;
+  gap: 16px;
+  margin: 14px 0;
 }
 
 .voortgang-kaart {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+}
+
+/* Onderkant zakt naar de kaartbodem: links de info-regel bovenop de balk, rechts het pijltje
+   (onderkant tegen de balk). */
+.voortgang-kaart-onder {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.voortgang-kaart-progressie {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
 }
 
 .voortgang-kaart-kop {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  padding-right: 48px;
 }
 
 .voortgang-kaart-titel {
   font-weight: 700;
-  margin-right: auto;
+}
+
+/* Rechterbovenhoek: normaal het percentage; bij een verwijderbare "mijn groepen"-kaart wisselt
+   dat bij hover naar het ×-knopje (op dezelfde plek, geen layout-sprong). */
+.voortgang-kaart-hoek {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  justify-items: end;
+  align-items: center;
+}
+
+.voortgang-kaart-hoek > * {
+  grid-area: 1 / 1;
+}
+
+.voortgang-kaart-pct {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  transition: opacity 0.12s;
 }
 
 .voortgang-kaart-x {
-  align-self: center;
   border: 0;
   background: none;
   color: var(--text-muted);
   font-size: 18px;
   line-height: 1;
-  padding: 2px 4px;
+  padding: 0 2px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
@@ -207,6 +268,10 @@ th {
 .voortgang-kaart:hover .voortgang-kaart-x,
 .voortgang-kaart-x:focus-visible {
   opacity: 1;
+}
+
+.voortgang-kaart:hover .heeft-x .voortgang-kaart-pct {
+  opacity: 0;
 }
 
 .voortgang-kaart-x:hover {
@@ -231,11 +296,6 @@ th {
   background: var(--accent-soft);
 }
 
-.voortgang-kaart-pct {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 .voortgang-kaart-sub {
   font-size: 12px;
   color: var(--text-muted);
@@ -254,18 +314,12 @@ th {
   height: 100%;
 }
 
-.groep-openen {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.voortgang-kaart > .groep-openen {
-  margin-top: auto;
-  padding-top: 4px;
-}
-
-.voortgang-kaart-ikn {
+/* Eén pijltje om de groep in de badges te openen. Het ligt naast de balk/samenstelling; via
+   een gestrekte ::after-laag is de héle kaart klikbaar (het pijltje licht op bij kaart-hover,
+   zodat je niet precies het knopje hoeft te raken). */
+.groep-openen-knop {
+  position: static;
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -277,15 +331,33 @@ th {
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
 }
 
-.voortgang-kaart-ikn:hover {
+.groep-openen-knop svg {
+  width: 15px;
+  height: 15px;
+}
+
+.groep-openen-knop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.voortgang-kaart:hover .groep-openen-knop,
+.groep-kaart:hover .groep-openen-knop,
+.groep-openen-knop:hover,
+.groep-openen-knop:focus-visible {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.voortgang-kaart-ikn:focus-visible {
+.groep-openen-knop:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -1586,7 +1658,9 @@ th {
   height: 38px;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.12s, border-color 0.12s;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
 }
 
 .ll-klok-icoon {
@@ -1712,7 +1786,7 @@ th {
 .ll-content {
   max-width: 900px;
   margin: 0 auto;
-  padding: 28px 20px 64px;
+  padding: 22px 18px 40px;
 }
 
 .ring-getal {
@@ -1791,7 +1865,9 @@ th {
   padding: 18px;
   text-decoration: none;
   color: var(--text);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .ll-cursus-kaart:hover {
@@ -1838,108 +1914,196 @@ th {
 
 .ll-terug {
   display: inline-block;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   font-weight: 600;
   font-size: 14px;
   text-decoration: none;
   color: var(--accent);
 }
 
+/* Compacte cursuskop — geen kader, gewoon de naam + een kleine voortgangsring ernaast. */
 .ll-cursus-hero {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 14px;
   flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 22px 24px;
+  margin-bottom: 12px;
+}
+
+.ll-cursus-hero > div {
+  flex: 1 1 200px;
 }
 
 .ll-cursus-hero h1 {
-  margin: 0 0 4px;
-  font-size: 24px;
+  margin: 0;
+  font-size: 19px;
 }
 
 .ll-cursus-hero p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 13px;
 }
 
+/* Cursusnaam + de graadsbadge-kleur van de mentor (kan leeg staan). */
+.ll-cursus-titel-rij {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+/* Eén kaart per rubriek: houdt zijn subgroepen + badges visueel bij elkaar. Compact — de rijen
+   staan dicht op elkaar zoals in de matrix. */
 .ll-rubriek {
-  margin-top: 26px;
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+/* Rubrieknaam + subgraadbadge-kleur (enkel als die effectief gezet is — anders geen pil). */
+.ll-rubriek-kop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.ll-rubriek-kop h2 {
+  margin: 0;
 }
 
 .ll-rubriek h2 {
-  font-size: 16px;
-  margin: 0 0 10px;
+  font-size: 15px;
+  margin: 0 0 6px;
 }
 
+/* Subgroep binnen een rubriek: een genoemde subgroep krijgt een dun lijntje links + een klein
+   label erboven. */
+.ll-subgroep-blok + .ll-subgroep-blok {
+  margin-top: 8px;
+}
+
+.ll-subgroep-blok.heeft-naam {
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+}
+
+.ll-subgroep-kop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 3px;
+}
+
+.ll-subgroep-kop h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* Badges als compacte lijstrijen met een dun scheidingslijntje — geen losse kaartjes meer. */
 .ll-badges {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .ll-badge {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 13px 16px;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.ll-badge + .ll-badge {
+  border-top: 1px solid var(--border);
 }
 
 .ll-badge-links {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
 }
 
 .ll-badge-tekst {
-  font-size: 15px;
-  line-height: 1.4;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .ll-badge-notitie {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-style: italic;
   color: var(--text-muted);
 }
 
+/* Lange mentoropmerking: inklapbaar (`<details>`). */
+.ll-notitie {
+  font-size: 12px;
+}
+
+.ll-notitie > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 600;
+  list-style: none;
+}
+
+.ll-notitie > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ll-notitie > summary::before {
+  content: "▸";
+  font-size: 10px;
+}
+
+.ll-notitie[open] > summary::before {
+  content: "▾";
+}
+
+.ll-notitie > summary:hover {
+  color: var(--text);
+}
+
+.ll-notitie[open] > summary {
+  margin-bottom: 2px;
+}
+
+/* Kleurvakje: dezelfde tint + rand als een cel in de mentormatrix (`--rating-*` tokens komen
+   van de `rating-<kleur>`-klasse op hetzelfde element). */
 .ll-status {
   flex: none;
+  border: 1px solid var(--rating-border);
   border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 13px;
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+  padding: 3px 11px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.ll-status.st-blauw {
-  background: #eff6ff;
-  color: #1e40af;
-}
-.ll-status.st-groen {
-  background: #f0fdf4;
-  color: #166534;
-}
-.ll-status.st-geel {
-  background: #fffbeb;
-  color: #92400e;
-}
-.ll-status.st-rood {
-  background: #fef2f2;
-  color: #991b1b;
-}
-.ll-status.st-leeg {
-  background: var(--bg);
+/* "Nog niet beoordeeld" blijft gewone gedempte tekst, geen vakje. */
+.ll-status.rating-empty {
+  border: 0;
+  background: transparent;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 500;
+  padding: 3px 0;
 }
 
 .ll-leeg {
@@ -1966,8 +2130,13 @@ th {
 }
 
 @keyframes foutpagina-wiebel {
-  0%, 100% { transform: rotate(-6deg); }
-  50% { transform: rotate(6deg); }
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2196,6 +2365,7 @@ th {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 1;
   opacity: 0;
   transition: opacity 0.12s;
 }
@@ -2217,12 +2387,21 @@ th {
   margin: -6px 0 0;
 }
 
-.groep-kaart-acties {
+/* Samenstelling + pijltje op één regel. */
+.groep-kaart-onder {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding-top: 4px;
+  align-items: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.groep-kaart-onder .groep-samenstelling {
+  flex: 1;
+}
+
+.groep-kaart-onder .groep-openen-knop,
+.voortgang-kaart-onder .groep-openen-knop {
+  margin-left: auto;
 }
 
 /* Avatars */
@@ -2402,11 +2581,17 @@ th {
   left: 50%;
   transform: translateX(-50%);
   min-width: 150px;
+  max-width: 300px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
   padding: 4px;
+}
+
+/* Menu met geschiedenis erin: iets breder zodat "naam ---- moment" past. */
+.rating-cell-menu:has(.rating-cell-historie) {
+  min-width: 240px;
 }
 
 /* Zwevende menu's/panelen hangen via een portal aan document.body: vaste positie (top/left
@@ -2440,6 +2625,96 @@ th {
 .rating-cell-option.is-current {
   background: var(--rating-bg, var(--accent-soft));
   box-shadow: inset 0 0 0 1px var(--rating-border, var(--border));
+}
+
+/* Wijzigingsgeschiedenis onderaan het kleurmenu (uitklapbaar). */
+.rating-cell-historie {
+  margin: 4px 2px 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.rating-cell-historie-knop {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 3px 4px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rating-cell-historie-knop:hover {
+  color: var(--text);
+}
+
+.rating-cell-historie-lijst {
+  margin: 4px 0 0;
+  padding: 0 2px;
+  list-style: none;
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rating-cell-historie-lijst li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+
+.rating-cell-historie-lijst li:first-child {
+  border-left-color: var(--accent);
+}
+
+.rating-cell-historie-kop {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.rating-cell-historie-wie {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating-cell-historie-leader {
+  flex: 1 1 12px;
+  min-width: 12px;
+  align-self: center;
+  border-bottom: 1px dotted var(--border);
+}
+
+.rating-cell-historie-moment {
+  flex: none;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-cell-historie-overgang {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.rating-cell-historie-lijst li:first-child .rating-cell-historie-overgang {
+  color: var(--text);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2499,6 +2774,12 @@ th {
 .de-editor h2 {
   margin: 0;
   padding-right: 28px;
+}
+
+.de-editor-wijziging {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .de-veld {
@@ -2790,7 +3071,10 @@ th {
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
 }
 
 .knop-icoon:hover {
@@ -2813,6 +3097,285 @@ th {
 .knop-icoon-klein svg {
   width: 14px;
   height: 14px;
+}
+
+/* ---------------------------------------------------------------------------
+   Badges ↔ deelevaluaties: split-screen + zijpaneel + aparte lijsten
+   --------------------------------------------------------------------------- */
+
+/* Badgematrix links, deelevaluatie-paneel rechts. Onder ~980px stapelen ze. */
+.badges-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.badges-hoofd {
+  min-width: 0;
+}
+
+/* In de split krijgen beide matrixen exact dezelfde eerste-kolombreedte, zodat het
+   gesynchroniseerde horizontale scrollen de leerlingkolommen laat samenvallen. Harde
+   ondergrens van 300px, maar groeit mee met het venster (tot 440px). */
+.badges-split .grid-col-doel {
+  min-width: clamp(300px, 20vw, 440px);
+  max-width: clamp(300px, 20vw, 440px);
+  width: clamp(300px, 20vw, 440px);
+}
+
+@media (max-width: 980px) {
+  .badges-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Geen eigen kader of padding: enkel een sticky scroll-kolom. De matrix eronder draagt zijn
+   eigen rand (net als links), zodat het rooster de volle breedte krijgt. */
+.badges-deelpaneel {
+  position: sticky;
+  top: 56px;
+  max-height: calc(100svh - 68px);
+  overflow: auto;
+}
+
+/* In het paneel scrollt het paneel zelf verticaal; de grid-wrap doet enkel het horizontale
+   schuiven (gesynchroniseerd met de badgematrix). */
+.badges-deelpaneel .grid-wrap {
+  position: static;
+  max-height: none;
+}
+
+@media (max-width: 980px) {
+  .badges-deelpaneel {
+    position: static;
+    max-height: none;
+  }
+}
+
+.badges-deelpaneel-kop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.badges-deelpaneel-kop h2 {
+  margin: 2px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.badges-deelpaneel-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.badges-deelpaneel-cursus {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.badges-deelpaneel-nieuw {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* Chipje in de badge-cel: opent het zijpaneel voor díé badge. */
+.grid-deel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+
+.grid-deel-chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.grid-deel-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Aangeduid: een gevuld pilletje zodat het opvalt, óók op een al opgelichte (gekozen) rij. */
+.grid-deel-chip.is-actief {
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* Badge zonder gekoppelde deelevaluaties: chipje blijft subtiel aanwezig (altijd klikbaar om
+   er een te bekijken of aan te maken), en licht op bij hover/selectie. */
+.grid-deel-chip.is-leeg {
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.4;
+}
+
+.grid-deel-chip.is-leeg:hover {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.grid-deel-chip.is-leeg.is-actief {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+/* Gekozen badge-rij én — op StudentDetail — de gekoppelde deelevaluatie-rijen in het paneel
+   lichten op. */
+.grid tbody tr.is-gekozen td,
+.grid tbody tr.is-gekozen .grid-col-doel,
+.grid tbody tr.is-gekoppeld td,
+.grid tbody tr.is-gekoppeld .grid-col-doel {
+  background: var(--accent-soft);
+}
+
+/* Bij een aangeduide badge dimmen de niet-gekoppelde deelevaluaties lichtjes weg, zodat de
+   gekoppelde meteen opvallen. */
+.grid tbody tr.is-gedimd td,
+.grid tbody tr.is-gedimd .grid-col-doel {
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+/* Titel + meta van een deelevaluatie in een matrixcel (paneel + StudentDetail). */
+.grid-deel-tekst {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grid-deel-titel {
+  line-height: 1.35;
+}
+
+.grid-deel-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* StudentDetail: badgematrix links, deelevaluaties-paneel rechts — zelfde split als Badges,
+   maar hier staat het paneel altijd open met ALLE deelevaluaties van de leerling (ingevuld of
+   niet), niet enkel die van één gekozen badge. Paneel hergebruikt `.badges-deelpaneel`. */
+.sd-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.sd-badges {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .sd-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sd-deel-badges-kop {
+  text-align: left;
+}
+
+.sd-deel-badges {
+  padding: 6px 10px;
+}
+
+.sd-deel-badges .de-badge-chip {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+}
+
+.sd-deel-geen {
+  color: var(--text-muted);
+}
+
+/* LeerlingCursus: alleen-lezen deelevaluatie-sectie — compacte lijst binnen één kader. */
+.ll-deel-sectie {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.ll-deel-sectie h2 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.ll-deel-lijst {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ll-deel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.ll-deel + .ll-deel {
+  border-top: 1px solid var(--border);
+}
+
+.ll-deel-links {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ll-deel-titel {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ll-deel-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Welke badge(s) een deelevaluatie voedt — zelfde chip als op StudentDetail. */
+.ll-deel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 .modal-overlay {

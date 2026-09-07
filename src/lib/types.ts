@@ -173,6 +173,12 @@ export interface Deelevaluatie {
   toelichting: string;
   /** De mentor die de deelevaluatie aanmaakte. */
   mentorId?: string;
+  /** Epoch-ms van aanmaak. */
+  aangemaaktOp?: number;
+  /** Epoch-ms + gebruikers-id ("" = beheerder) van de laatste wijziging aan het record zelf
+   * (titel, datum, gekoppelde badges, toelichting) — niet de kleuren per leerling. */
+  gewijzigdOp?: number;
+  gewijzigdDoor?: string;
 }
 
 /** Sleutel `${deelevaluatieId}:${studentId}` → Rating. Ontbreekt = niet gemaakt. */
@@ -183,6 +189,24 @@ export type DeelNotities = Record<string, Notitie>;
 
 export const deelSleutel = (deelevaluatieId: string, studentId: string): string =>
   `${deelevaluatieId}:${studentId}`;
+
+/**
+ * Eén regel in de wijzigingsgeschiedenis van een evaluatiecel (kleur of notitie). De log is
+ * append-only: een nieuwe waarde overschrijft de vorige niet in de geschiedenis, ze komt erbij.
+ * `door` = de gebruikers-id, of "" voor de beheerder(smodus). `op` = epoch-ms. `van`/`naar` =
+ * de waarde als tekst ("" = leeg; voor een kleur de `Rating`, voor een notitie een korte
+ * weergave).
+ */
+export interface AuditRegel {
+  op: number;
+  door: string;
+  veld: "kleur" | "notitie";
+  van: string;
+  naar: string;
+}
+
+/** Sleutel (`doelSleutel` / `deelSleutel`) → chronologische geschiedenis, oudste eerst. */
+export type AuditLog = Record<string, AuditRegel[]>;
 
 /**
  * Een melding voor het meldingencentrum van de leerling: "nieuwe beoordeling(en) in cursus X".

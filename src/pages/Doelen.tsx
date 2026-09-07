@@ -84,6 +84,8 @@ export function Doelen() {
       else next.add(nr);
       return next;
     });
+  const allesOpen = () => setDicht(new Set());
+  const allesDicht = () => setDicht(new Set(comps.map((c) => c.nr)));
 
   return (
     <section>
@@ -143,6 +145,17 @@ export function Doelen() {
           </button>
         ))}
       </div>
+
+      {!filterActief && comps.length > 0 && (
+        <div className="matrix-acties">
+          <button type="button" className="linkknop" onClick={allesOpen}>
+            Alles uitklappen
+          </button>
+          <button type="button" className="linkknop" onClick={allesDicht}>
+            Alles inklappen
+          </button>
+        </div>
+      )}
 
       {!alleStromen && stroomDoelen.length === 0 ? (
         <p className="lege-staat">

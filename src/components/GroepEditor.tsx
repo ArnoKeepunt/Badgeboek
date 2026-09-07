@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { SOORT_LABEL, alleGroepDefs } from "../lib/groepen";
 import { GRAAD_LABEL, graadVan, unieke } from "../lib/leerlingen";
+import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
+import { useAangemeld } from "../lib/sessie";
 import { maakGroep, useStore, verwijderGroep, wijzigGroep } from "../lib/store";
 import type { Groep } from "../lib/types";
 
@@ -30,7 +32,9 @@ export function GroepEditor({
   mentorId?: string;
   onSluit: () => void;
 }) {
-  const { students, groepen } = useStore();
+  const { groepen } = useStore();
+  const students = useZichtbareLeerlingen();
+  const scopeVestiging = bereikVestiging(useAangemeld());
   const [naam, setNaam] = useState(groep?.naam ?? "");
   const [zoek, setZoek] = useState("");
   const [vestiging, setVestiging] = useState("");
@@ -78,6 +82,11 @@ export function GroepEditor({
     [students, groepen],
   );
 
+  // Leden die buiten het bereik van deze gebruiker vallen: niet te zien of te wijzigen, maar
+  // ze blijven wél bij de groep horen.
+  const zichtbareIds = useMemo(() => new Set(students.map((s) => s.id)), [students]);
+  const verborgenLeden = [...gekozen].filter((id) => !zichtbareIds.has(id)).length;
+
   const zichtbaar = useMemo(() => {
     const q = zoek.trim().toLowerCase();
     return students.filter(
@@ -109,7 +118,9 @@ export function GroepEditor({
     );
   };
   const wisSelectie = () => {
-    setGekozen(new Set());
+    // Nooit leerlingen wissen die buiten het bereik vallen (die zie je niet, maar ze blijven
+    // bij de groep horen).
+    setGekozen((prev) => new Set([...prev].filter((id) => !zichtbareIds.has(id))));
     setMelding("");
   };
 
@@ -168,14 +179,16 @@ export function GroepEditor({
           value={zoek}
           onChange={(e) => setZoek(e.target.value)}
         />
-        <select value={vestiging} onChange={(e) => setVestiging(e.target.value)}>
-          <option value="">Alle vestigingen</option>
-          {vestigingen.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
+        {!scopeVestiging && (
+          <select value={vestiging} onChange={(e) => setVestiging(e.target.value)}>
+            <option value="">Alle vestigingen</option>
+            {vestigingen.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        )}
         <select value={graad} onChange={(e) => kiesGraad(e.target.value)}>
           <option value="">Alle graden</option>
           {graden.map((g) => (
@@ -224,6 +237,12 @@ export function GroepEditor({
             </button>
           )}
         </div>
+        {scopeVestiging && verborgenLeden > 0 && (
+          <p className="groep-editor-item-meta">
+            Waarvan {verborgenLeden} uit een andere vestiging — die zie je hieronder niet, maar
+            ze blijven bij de groep en worden niet gewist.
+          </p>
+        )}
         {melding && <p className="groep-editor-melding">✓ {melding}</p>}
       </div>
 

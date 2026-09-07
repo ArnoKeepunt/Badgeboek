@@ -41,6 +41,16 @@ Google-account (id + e-mail) → leerling / mentor / beheerder. Schrijf de inter
 (`AuthProvider`) met een `DemoAuthProvider` (huidige `/aanmelden`) en een lege
 `GoogleAuthProvider`.
 
+### 3b. Leerlingrechten (nieuw — vanwege de wetgeving)
+
+Niet elke leerkracht mag alle leerlingen zien. **Eerste laag is gebouwd** (`src/lib/rechten.ts`):
+een mentor ziet enkel de leerlingen van de **eigen vestiging**, een beheerder ziet iedereen,
+een leerling enkel zichzelf. Alle pagina's die leerlingen tonen gebruiken de hook
+`useZichtbareLeerlingen()`; `StudentDetail` blokkeert met "Geen toegang" bij een leerling buiten
+het bereik. Nog te doen: **fijnmaziger** (per klasgroep / groep / individuele leerling) en
+**database-gestuurd** — dat komt allemaal in `rechten.ts` (`leerlingenBinnenBereik` /
+`magLeerlingZien`), de pagina's hoeven niet mee te veranderen.
+
 ## 4. GDPR-document schrijven
 
 Dit is de blokker, dus naar voren halen. Een **DPIA-light / verwerkingsregister**: welke

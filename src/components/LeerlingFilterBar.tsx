@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   GRAAD_LABEL,
   graadVan,
@@ -49,6 +50,15 @@ export function LeerlingFilterBar({
 
   const zet = (veld: keyof LeerlingFilter, waarde: string) =>
     onChange({ ...filter, [veld]: waarde });
+
+  // De vestigingkeuze verdwijnt als er maar één vestiging in beeld is (bv. een leerkracht met
+  // een vestiging-scope). Een oude, niet meer passende `filter.vestiging` dan opschonen, anders
+  // filtert die stilletjes alles weg.
+  const vestigingMismatch =
+    vestigingen.length <= 1 && filter.vestiging !== "" && !vestigingen.includes(filter.vestiging);
+  useEffect(() => {
+    if (vestigingMismatch) onChange({ ...filter, vestiging: "" });
+  }, [vestigingMismatch, filter, onChange]);
 
   // Graad en leerjaar mogen niet tegenstrijdig zijn: een nieuwe graad wist een leerjaar dat
   // er niet bij past; een nieuw leerjaar zet de graad mee. Alle keuzes blijven bruikbaar.
@@ -127,14 +137,16 @@ export function LeerlingFilterBar({
         onChange={(e) => zet("zoek", e.target.value)}
       />
 
-      <select value={filter.vestiging} onChange={(e) => zet("vestiging", e.target.value)}>
-        <option value="">Alle vestigingen</option>
-        {vestigingen.map((v) => (
-          <option key={v} value={v}>
-            {v}
-          </option>
-        ))}
-      </select>
+      {vestigingen.length > 1 && (
+        <select value={filter.vestiging} onChange={(e) => zet("vestiging", e.target.value)}>
+          <option value="">Alle vestigingen</option>
+          {vestigingen.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      )}
 
       {toon("graad") && (
         <select value={filter.graad} onChange={(e) => zetGraad(e.target.value)}>
