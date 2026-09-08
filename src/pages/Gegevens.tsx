@@ -8,7 +8,12 @@ import {
   importGebruikers,
   importLeerlingen,
 } from "../lib/gegevens";
-import { actiefCurriculum } from "../lib/curriculum";
+import {
+  PERSISTENTIE_MODUS,
+  type MigratieResultaat,
+  migreerDatabase,
+  verwijderOudeStructuur,
+} from "../lib/data";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
 import {
   gebundeldCurriculum,
@@ -91,16 +96,14 @@ export function Gegevens() {
       if (!data) {
         setMelding({
           soort: "fout",
-          tekst:
-            "De JSON heeft niet de juiste vorm (arrays cursussen, rubrics, leerdoelen, " +
-            "deelevaluatieTypes) — niets gewijzigd.",
+          tekst: "De JSON heeft niet de juiste vorm (arrays `cursussen` en `badges`) — niets gewijzigd.",
         });
         return;
       }
       zetCurriculumOverride(data);
       setMelding({
         soort: "ok",
-        tekst: `Badge-set in de database gezet: ${data.cursussen.length} cursussen, ${data.leerdoelen.length} badges, ${data.deelevaluatieTypes.length} deelbadge-types.`,
+        tekst: `Badge-set in de database gezet: ${data.cursussen.length} cursussen, ${data.badges.length} badges.`,
       });
     });
   };
@@ -290,10 +293,12 @@ export function Gegevens() {
             <strong>
               {curriculumOverride ? "database-versie" : "ingebouwde bundel"}
             </strong>
-            . De badges + de deelbadge-kapstok leven dan in Firestore
-            (<code>curriculum/actief</code>) en worden <strong>rechtstreeks in de
-            Firebase-console</strong> bewerkt — alleen een beheerder mag schrijven. Bewerk je
-            liever offline, gebruik dan de JSON-download/upload hieronder.
+            . Elke badge is dan een apart document in Firestore
+            (<code>curriculum/{"{stroom}"}/cursussen/{"{cursus}"}/badges/{"{badge}"}</code>) en
+            wordt <strong>rechtstreeks in de Firebase-console</strong> bewerkt — alleen een
+            beheerder mag schrijven. De deelbadge-kapstok op <em>Deelevaluaties</em> volgt
+            automatisch (badges met dezelfde groep = één type). Bewerk je liever offline,
+            gebruik dan de JSON-download/upload hieronder.
           </p>
           <input
             ref={curriculumInput}
@@ -326,7 +331,7 @@ export function Gegevens() {
               onClick={() =>
                 downloadTekst(
                   `keerpunt-badges-${datumStempel()}.json`,
-                  JSON.stringify(actiefCurriculum(), null, 2),
+                  JSON.stringify(curriculumOverride ?? gebundeldCurriculum(), null, 2),
                 )
               }
             >
@@ -354,6 +359,89 @@ export function Gegevens() {
           </div>
         </div>
       </div>
+
+      {PERSISTENTIE_MODUS === "firebase" && (
+        <>
+          <h2 style={{ marginTop: 32 }}>Database opruimen</h2>
+          <DatabaseOpruimen onMelding={setMelding} />
+        </>
+      )}
     </section>
+  );
+}
+
+/** Eenmalige migratie van de oude 3-documenten-structuur naar de nette collecties. */
+function DatabaseOpruimen({ onMelding }: { onMelding: (m: Melding) => void }) {
+  const [bezig, setBezig] = useState<"" | "migreren" | "wissen">("");
+  const [resultaat, setResultaat] = useState<MigratieResultaat | null>(null);
+
+  const migreer = async () => {
+    setBezig("migreren");
+    try {
+      const r = await migreerDatabase();
+      setResultaat(r);
+      onMelding({
+        soort: "ok",
+        tekst: `Gemigreerd: ${r.leerlingen} leerlingen, ${r.mentoren} mentoren, ${r.groepen} groepen, ${r.deelbadges} deelbadges, ${r.evaluatieDocs} evaluatie-documenten.`,
+      });
+    } catch (e) {
+      onMelding({ soort: "fout", tekst: e instanceof Error ? e.message : "Migratie mislukt." });
+    } finally {
+      setBezig("");
+    }
+  };
+
+  const wis = async () => {
+    if (
+      !confirm(
+        "De oude documenten (badgeboek/*, curriculum/actief, test/*) definitief verwijderen? " +
+          "Doe dit pas nadat je de nieuwe structuur in de console gecontroleerd hebt.",
+      )
+    ) {
+      return;
+    }
+    setBezig("wissen");
+    try {
+      await verwijderOudeStructuur();
+      onMelding({ soort: "ok", tekst: "Oude documenten verwijderd." });
+    } catch (e) {
+      onMelding({ soort: "fout", tekst: e instanceof Error ? e.message : "Verwijderen mislukt." });
+    } finally {
+      setBezig("");
+    }
+  };
+
+  return (
+    <div className="gegevens-kaarten">
+      <div className="gegevens-kaart">
+        <div className="gegevens-kaart-naam">Structuur migreren</div>
+        <p>
+          Zet de oude <code>badgeboek/_globaal</code>, <code>badgeboek/{"{schooljaar}"}</code> en{" "}
+          <code>curriculum/actief</code> om naar de nette collecties (<code>leerlingen/</code>,{" "}
+          <code>deelbadges/</code>, <code>evaluaties/{"{jaar}"}/leerlingen/</code>,{" "}
+          <code>instellingen/</code>…). Eenmalig; overschrijft bestaande docs met dezelfde id.
+        </p>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="knop-primair"
+            disabled={bezig !== ""}
+            onClick={migreer}
+          >
+            {bezig === "migreren" ? "Bezig…" : "Migreer naar de nieuwe structuur"}
+          </button>
+          {resultaat && (
+            <button
+              type="button"
+              className="linkknop"
+              disabled={bezig !== ""}
+              onClick={wis}
+            >
+              {bezig === "wissen" ? "Bezig…" : "Verwijder de oude documenten"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

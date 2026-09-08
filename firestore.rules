@@ -7,69 +7,105 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Primitive and hardened helpers
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
+    // --- Helpers ------------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
-
     function isVerified() {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
-    function isAdmin() {
-      return isVerified() && (
-        request.auth.token.email == 'arno.boriau@keerpuntscholen.be'
-      );
+    // Personeelsaccounts (collectie /gebruikers, doc-id = het e-mailadres). Google doet de
+    // authenticatie; deze collectie bepaalt WIE toegang heeft en met WELKE rol. Geen wachtwoorden.
+    function eigenGebruikerPad() {
+      return /databases/$(database)/documents/gebruikers/$(request.auth.token.email);
+    }
+    function heeftAccount() {
+      return isVerified() && exists(eigenGebruikerPad());
+    }
+    function gebruikerDoc() {
+      return get(eigenGebruikerPad()).data;
+    }
+    function actieveRol() {
+      return heeftAccount() && gebruikerDoc().actief == true ? gebruikerDoc().rol : '';
+    }
+    // Noodluik: kan altijd binnen, ook als /gebruikers leeg of kapot is.
+    function isBootstrapAdmin() {
+      return isVerified() && request.auth.token.email == 'arno.boriau@keerpuntscholen.be';
+    }
+    function isBeheerder() {
+      return isBootstrapAdmin() || actieveRol() == 'beheerder';
+    }
+    function isPersoneel() {
+      return isBootstrapAdmin() ||
+        actieveRol() == 'beheerder' || actieveRol() == 'coordinator' || actieveRol() == 'mentor';
     }
 
-    function isSchoolStaff() {
-      return isVerified() && (
-        isAdmin() ||
-        (request.auth.token.email is string && request.auth.token.email.matches('.*@keerpuntscholen\\.be$'))
-      );
+    // --- Personeelsaccounts -----------------------------------------------------
+    match /gebruikers/{email} {
+      allow get: if isSignedIn() && (email == request.auth.token.email || isBeheerder());
+      allow list: if isBeheerder();
+      allow create, update: if isBeheerder()
+        && request.resource.data.keys().hasOnly(
+             ['email', 'naam', 'rol', 'vestiging', 'actief', 'updatedAt', 'updatedBy'])
+        && request.resource.data.rol in ['beheerder', 'coordinator', 'mentor']
+        && request.resource.data.actief is bool;
+      allow delete: if isBeheerder();
     }
 
-    function isValidBadgeboekDoc(data) {
-      return data.schooljaar is string && data.schooljaar.size() <= 30;
+    // --- Bewerkbare badge-set (curriculum) -----------------------------------
+    // Subcollectie-structuur: curriculum/{stroom}/cursussen/{cursusId}/badges/{badgeId}.
+    // Iedereen van het personeel mag lezen; enkel de beheerder mag de badge-set wijzigen.
+    match /curriculum/{stroom} {
+      allow get, list: if isPersoneel();
+      allow write: if isBeheerder();
+
+      match /cursussen/{cursusId} {
+        allow get, list: if isPersoneel();
+        allow write: if isBeheerder();
+
+        match /badges/{badgeId} {
+          allow get, list: if isPersoneel();
+          allow write: if isBeheerder();
+        }
+      }
     }
 
-    // Connection testing endpoint
-    match /test/{testId} {
-      allow get: if isValidId(testId);
-      allow list, write: if false;
+    // collectionGroup-queries op de curriculum-subcollecties (de app luistert zo).
+    match /{pad=**}/cursussen/{cursusId} {
+      allow list: if isPersoneel();
+    }
+    match /{pad=**}/badges/{badgeId} {
+      allow list: if isPersoneel();
     }
 
-    // Bewerkbare badge-set (curriculum + deelbadge-kapstok). Iedereen van het personeel leest;
-    // alleen de beheerder schrijft — dat IS de toegangscontrole (Arno: "niet de bedoeling dat
-    // iedereen hier aanpassingen aan maakt"). Bewerken gebeurt rechtstreeks in de console.
-    match /curriculum/{docId} {
-      allow get: if isValidId(docId) && isSchoolStaff();
-      allow list: if false;
-      allow write: if isValidId(docId) && isAdmin();
+    // --- Instellingen (app-instellingen + doelen-/rubriek-overlays) -----------
+    // Wordt meegeschreven in de normale app-save (`bewaar`), dus personeel-breed. Het
+    // bewerken van doelen/rubrieken zelf is client-side al beheerder-only.
+    match /instellingen/{sleutel} {
+      allow get, list, write: if isPersoneel();
     }
 
-    // Badgebook global config and per-year evaluations
-    match /badgeboek/{docId} {
-      // Lezen mag alleen door geverifieerd Keerpunt-personeel — dit document bevat
-      // leerlingnamen, e-mails en alle evaluaties (persoonsgegevens). Een willekeurig
-      // aangemeld Google-account mag hier NIET bij.
-      allow get: if isValidId(docId) && isSchoolStaff();
-      allow list: if false;
-      allow create: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());
-      allow update: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());
-      allow delete: if isValidId(docId) && isAdmin();
+    // --- Roster + inhoud: gedeeld door al het personeel -----------------------
+    match /leerlingen/{id}   { allow read, write: if isPersoneel(); }
+    match /mentoren/{id}     { allow read, write: if isPersoneel(); }
+    match /groepen/{id}      { allow read, write: if isPersoneel(); }
+    match /deelbadges/{id}   { allow read, write: if isPersoneel(); }
+    match /meldingen/{id}    { allow read, write: if isPersoneel(); }
+
+    // --- Evaluaties: /evaluaties/{schooljaar}/leerlingen/{leerlingId} ---------
+    match /evaluaties/{schooljaar}/leerlingen/{leerlingId} {
+      allow read, write: if isPersoneel();
+    }
+
+    // --- Legacy: oude AI-Studio-documenten -----------------------------------
+    // `badgeboek/_globaal`, `badgeboek/{schooljaar}`, `test/*`. De beheerder mag ze lezen
+    // (migratie) en wissen (opruimen) via /gegevens. Mag weg zodra de database opgeruimd is.
+    match /badgeboek/{doc} {
+      allow get, list, delete: if isBeheerder();
+    }
+    match /test/{doc} {
+      allow get, list, delete: if isBeheerder();
     }
   }
 }

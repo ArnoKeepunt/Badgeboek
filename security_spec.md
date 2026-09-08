@@ -1,25 +1,55 @@
 # Firestore Security Specification - Keerpunt Badgeboek
 
-## 1. Data Invariants
-1. Access to the school database (`/badgeboek/{docId}`) requires authenticated access by verified Google users belonging to Keerpunt (`keerpuntscholen.be`) or the bootstrapped administrator (`arno.boriau@keerpuntscholen.be`).
-2. Document IDs must be strictly validated (`isValidId`) with alphanumeric, hyphen, or underscore characters under 128 bytes.
-3. Catch-all security rule denies all access by default across arbitrary collections (`match /{document=**} { allow read, write: if false; }`).
-4. Writing to `/test/{testId}` is denied to prevent resource exhaustion attacks; only `get` is permitted for connection liveness checks.
-5. Deletion of global configuration or school year records is restricted to administrators.
-6. Identity spoofing via fake email claims is prohibited; all writes require `request.auth.token.email_verified == true`.
-7. The editable badge set (`/curriculum/{docId}`) is readable by all verified school staff but **writable only by the administrator** — this is the deliberate access control for who may change badges/courses. The app never writes it except via the admin-only "Badges in de database" action.
+## 1. Data model
 
-## 2. The Dirty Dozen Payloads (Designed to Fail)
-1. **Unauthenticated Read on Badgeboek**: Read attempt on `/badgeboek/_globaal` without `request.auth` token -> `PERMISSION_DENIED`.
-2. **Unauthenticated Write on Badgeboek**: Attempting to write arbitrary evaluation data without credentials -> `PERMISSION_DENIED`.
-3. **Unverified Email Write**: Write attempt with `email_verified: false` pretending to be admin -> `PERMISSION_DENIED`.
-4. **Non-School Domain Write**: Write attempt with a verified public account (`attacker@gmail.com`) -> `PERMISSION_DENIED`.
-5. **Path Traversal / ID Poisoning**: Document path `/badgeboek/../../passwords` or oversized 10KB doc ID -> `PERMISSION_DENIED`.
-6. **Write to Test Collection**: Attempting `create` or `update` on `/test/connection` -> `PERMISSION_DENIED`.
-7. **Deletion by Non-Admin**: Normal authenticated user attempting `delete` on `/badgeboek/2025-2026` -> `PERMISSION_DENIED`.
-8. **Catch-All Arbitrary Collection Read**: Reading `/system_secrets/keys` -> `PERMISSION_DENIED`.
-9. **Catch-All Arbitrary Collection Write**: Creating a document in `/admins/attacker` -> `PERMISSION_DENIED`.
-10. **Missing Required School Year Field**: Updating `/badgeboek/2025-2026` removing the required `schooljaar` attribute -> `PERMISSION_DENIED`.
-11. **Oversized String Injection**: Injecting a 2MB payload into `schooljaar` -> `PERMISSION_DENIED`.
-12. **Null Resource Manipulation**: Calling write methods while bypassing verification -> `PERMISSION_DENIED`.
-13. **Non-Admin Curriculum Write**: A regular `@keerpuntscholen.be` staff member attempting `set`/`delete` on `/curriculum/actief` -> `PERMISSION_DENIED` (read is allowed).
+The data lives in **one collection per concept** (small documents, browsable):
+
+| Collection | Doc id | Contents |
+|---|---|---|
+| `gebruikers/{email}` | e-mail | staff account: `{ naam, rol, vestiging, actief }` — **no passwords** |
+| `leerlingen/{id}` | pupil id | roster: name, vestiging, leerjaar, klasgroep, e-mail |
+| `mentoren/{id}` | mentor id | demo roster (fictional) |
+| `groepen/{id}` | group id | `{ naam, leerlingIds[], mentorId? }` |
+| `curriculum/{stroom}` | `1A`/`1B`/`2A`/`3A` | node marker (empty doc); the badge-set lives in subcollections |
+| `curriculum/{stroom}/cursussen/{cursusId}` | cursus id | `{ naam, volgorde }` |
+| `curriculum/{stroom}/cursussen/{cursusId}/badges/{badgeId}` | badge id | `{ groep, omschrijving, volgorde, categorie }` — one doc per badge |
+| `deelbadges/{id}` | deelbadge id | teacher-made test + `scores{leerlingId}` + `scoreNotities` + `scoreAudit` |
+| `evaluaties/{schooljaar}/leerlingen/{leerlingId}` | pupil id | `{ kleuren{badgeId}, notities{badgeId}, gewist[], auditLog{} }` |
+| `meldingen/{leerlingId}` | pupil id | `{ meldingen[], gezienOp }` |
+| `instellingen/app` | `app` | `{ schooljaar, matrixStromen[], matrixCursus }` |
+| `instellingen/overlays` | `overlays` | `{ doelWijzigingen, doelenImport, rubriekWijzigingen }` |
+
+## 2. Access rules
+
+1. Default-deny catch-all across every path.
+2. **Role resolution is server-side** via `get()` on the caller's `/gebruikers/{email}` doc
+   (`actieveRol()` → only if `actief == true`). The client cannot escalate its own role.
+3. `isBootstrapAdmin()` (`arno.boriau@keerpuntscholen.be`) is a permanent fallback so the first
+   beheerder can always sign in and create accounts, even when `/gebruikers` is empty.
+4. **`isPersoneel()`** (any active `beheerder`/`coordinator`/`mentor`, or bootstrap admin) may
+   read and write everything the normal app-save touches: `leerlingen`, `mentoren`, `groepen`,
+   `deelbadges`, `meldingen`, `evaluaties/{sj}/leerlingen/{id}`, `instellingen/*`, and read
+   the `curriculum` subtree (incl. the `cursussen`/`badges` collectionGroup queries the app
+   subscribes to). The deelbadge-"types" on `/deelevaluaties` are **derived** from the badges
+   (grouped by `groep`), not stored separately.
+5. **`isBeheerder()`** only may: write the `curriculum` subtree (`curriculum/{stroom}`, its
+   `cursussen/{id}` and `badges/{id}` docs) and manage `/gebruikers`
+   (create/update/delete + list). `/gebruikers` writes are shape-restricted (`hasOnly` key
+   allow-list, `rol` ∈ the three roles, `actief is bool`) and can never contain a password field.
+   (Editing doelen/rubrieken is gated to `beheerder` in the client UI; the `instellingen/overlays`
+   doc itself is personeel-writable because it rides along in the batched app-save.)
+6. Any verified user may read **only their own** `/gebruikers/{email}` doc (needed by the gate).
+7. A verified `@keerpuntscholen.be` account with **no** `/gebruikers` doc (or `actief:false`) is
+   denied everywhere except its own account doc.
+
+## 3. Payloads designed to fail (`PERMISSION_DENIED`)
+
+1. Unauthenticated read/write on any collection.
+2. `email_verified: false` token.
+3. Verified non-Keerpunt account (`x@gmail.com`) reading `leerlingen` or `evaluaties`.
+4. Verified `@keerpuntscholen.be` with no `/gebruikers` doc reading `evaluaties/.../{id}`.
+5. `mentor` / `coordinator` writing `curriculum/1A` or any `curriculum/1A/cursussen/.../badges/...` doc.
+6. `mentor` writing any `/gebruikers` doc (incl. `{rol:'beheerder'}` on their own doc).
+7. `beheerder` writing a `/gebruikers` doc with a `wachtwoord`/`password` key.
+8. Account with `actief:false` reading `badgeboek` data.
+9. Path traversal / oversized ids (Firestore rejects `/` in ids).

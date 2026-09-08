@@ -1554,6 +1554,107 @@ th {
   padding-left: 18px;
 }
 
+/* --- Personeelsaccounts (/gebruikers) ------------------------------------------ */
+.gebruikers-lijst {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.gebruikers-rij {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.gebruikers-rij + .gebruikers-rij {
+  border-top: 1px solid var(--border);
+}
+
+.gebruikers-rij.is-inactief {
+  color: var(--text-muted);
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    var(--accent-soft) 6px,
+    var(--accent-soft) 7px
+  );
+}
+
+.gebruikers-naam {
+  font-weight: 600;
+}
+
+.gebruikers-mail {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gebruikers-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.gebruikers-acties {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.gebruikers-form {
+  margin-top: 18px;
+  max-width: 460px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gebruikers-form h3 {
+  margin: 0;
+}
+
+.gebruikers-roluitleg {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gebruikers-actief {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.gebruikers-form-acties {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .gebruikers-rij {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Aanmelden + leerlingweergave
    --------------------------------------------------------------------------- */

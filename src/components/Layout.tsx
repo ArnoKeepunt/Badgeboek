@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { meldAfVanFirebase } from "../lib/data";
-import { useFirebaseGebruiker } from "../lib/firebaseAuth";
+import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
+import { useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
+import { PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
 import { meldAf } from "../lib/store";
@@ -28,8 +29,9 @@ const PAGINA_TITELS: Record<string, string> = {
   "/doelen": "Doelen",
   "/groepen": "Groepen",
   "/students": "Leerlingen",
+  "/gebruikers": "Gebruikers",
   "/gegevens": "Gegevens",
-  "/aanmelden": "Aanmelden",
+  "/aanmelden": "Bekijk als",
 };
 
 /** De titel voor de bovenbalk, afgeleid van het huidige pad. */
@@ -71,7 +73,13 @@ const mentorNav: NavGroep[] = [
 const beheerderNav: NavGroep[] = [
   ...mentorNav,
   {
-    items: [{ to: "/gegevens", label: "Gegevens", end: false, icoon: "gegevens" }],
+    items: [
+      // Accountbeheer heeft de Firestore-database nodig; in local-modus geen nut.
+      ...(PERSISTENTIE_MODUS === "firebase"
+        ? [{ to: "/gebruikers", label: "Gebruikers", end: false, icoon: "gebruikers" as const }]
+        : []),
+      { to: "/gegevens", label: "Gegevens", end: false, icoon: "gegevens" },
+    ],
   },
 ];
 
@@ -141,13 +149,22 @@ function GoogleAfmelden({ ingeklapt }: { ingeklapt: boolean }) {
 }
 
 function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingeklapt: boolean }) {
-  const naam = aangemeld ? naamVan(aangemeld) : "Beheerder";
-  const rol = aangemeld ? aangemeld.rol : "volledige toegang";
+  const { persoon } = useHuidigPersoneelslid();
+  // Toon de "bekijk als"-identiteit als die actief is, anders het echte personeelsaccount.
+  const naam = aangemeld
+    ? naamVan(aangemeld)
+    : (persoon?.naam ?? "Beheerder");
+  const rol = aangemeld
+    ? aangemeld.rol
+    : persoon
+      ? PERSONEEL_ROL_LABEL[persoon.rol] +
+        (persoon.rol === "mentor" && persoon.vestiging ? ` · ${persoon.vestiging}` : "")
+      : "volledige toegang";
   return (
     <div className="sidebar-account">
       <div className="sidebar-account-hoofd" title={ingeklapt ? `${naam} · ${rol}` : undefined}>
         <span className="sidebar-avatar" aria-hidden="true">
-          {aangemeld ? initialen(naam) : "BH"}
+          {naam && naam !== "Beheerder" ? initialen(naam) : "BH"}
         </span>
         <span className="sidebar-account-tekst">
           <span className="sidebar-account-naam">{naam}</span>
@@ -185,7 +202,7 @@ export function Layout() {
   const rol = useEffectieveRol();
   const students = useZichtbareLeerlingen();
   const isLeerling = rol === "leerling";
-  const nav = isLeerling ? leerlingNav : rol === "mentor" ? mentorNav : beheerderNav;
+  const nav = isLeerling ? leerlingNav : rol === "beheerder" ? beheerderNav : mentorNav;
   const breed =
     !isLeerling && (pathname.startsWith("/badges") || pathname.startsWith("/students/"));
   const titel = paginaTitel(pathname, students);

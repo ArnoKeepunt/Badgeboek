@@ -11,9 +11,8 @@ import {
 } from "../lib/curriculum";
 import { deelevaluatiesVoor, typeById } from "../lib/deelevaluaties";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
-import { magLeerlingZien } from "../lib/rechten";
+import { magLeerlingZien, useBereik } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
-import { useAangemeld } from "../lib/sessie";
 import {
   getDeelKleur,
   getDeelNotitie,
@@ -71,9 +70,9 @@ export function StudentDetail() {
   const wijzigingLabel = useWijzigingLabel();
   const geschiedenis = useGeschiedenis();
   const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
-  const aangemeld = useAangemeld();
+  const bereik = useBereik();
   const student = students.find((s) => s.id === studentId);
-  const geenToegang = Boolean(student && !magLeerlingZien(aangemeld, student));
+  const geenToegang = Boolean(student && !magLeerlingZien(bereik, student));
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
 

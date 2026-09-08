@@ -11,7 +11,7 @@ import {
 } from "../lib/groepen";
 import { LEEG_FILTER, useLeerlingFilter } from "../lib/leerlingen";
 import { useZichtbareLeerlingen } from "../lib/rechten";
-import { useAangemeld } from "../lib/sessie";
+import { useEffectieveRol } from "../lib/sessie";
 import { RATINGS } from "../lib/ratings";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import { type Voortgang, voortgangVoor } from "../lib/voortgang";
@@ -43,7 +43,7 @@ export function Dashboard() {
   const students = useZichtbareLeerlingen();
   // Een leerkracht krijgt een compact overzicht: enkel de eigen gekozen groepen, niet de
   // volledige indeling per graad en per leerjaar (die is er "voor iedereen").
-  const isMentor = useAangemeld()?.rol === "mentor";
+  const isMentor = useEffectieveRol() === "mentor";
   const navigate = useNavigate();
   const [, setFilter] = useLeerlingFilter();
   const [gekozen, setGekozen] = useState<string[]>(loadOverzicht);

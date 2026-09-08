@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
 import {
   GEBUNDELD,
+  GEBUNDELD_RUW,
   alleCursussen,
   alleLeerdoelen,
-  type CurriculumData,
+  type CurriculumRuw,
   cursusVanLeerdoel,
   cursusVanNode,
   zetCurriculum,
@@ -141,16 +142,15 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   return basis;
 }
 
-/** Snelle vormcontrole zodat een kapot document de app niet breekt (val dan terug op de bundel). */
-export function geldigCurriculum(d: unknown): CurriculumData | null {
+/** Snelle vormcontrole zodat een kapotte database-versie de app niet breekt (val terug op de bundel). */
+export function geldigCurriculum(d: unknown): CurriculumRuw | null {
   if (!d || typeof d !== "object") return null;
-  const c = d as Partial<CurriculumData>;
+  const c = d as Partial<CurriculumRuw>;
   return Array.isArray(c.cursussen) &&
-    Array.isArray(c.rubrics) &&
-    Array.isArray(c.leerdoelen) &&
-    Array.isArray(c.deelevaluatieTypes) &&
-    c.leerdoelen.length > 0
-    ? (c as CurriculumData)
+    Array.isArray(c.badges) &&
+    c.cursussen.length > 0 &&
+    c.badges.length > 0
+    ? (c as CurriculumRuw)
     : null;
 }
 
@@ -602,17 +602,18 @@ export function zetDoelenImport(doelen: Minimumdoel[] | null) {
 // --- Curriculum (badges) database-versie --------------------------------
 
 /**
- * Zet (of wis met `null`) de database-versie van de badges. Alleen de beheerder roept dit aan
- * (via /gegevens). In firebase-modus wordt het ook naar `curriculum/actief` geschreven; daarna
- * bewerkt de beheerder rechtstreeks in de Firestore-console.
+ * Zet (of wis met `null`) de database-versie van de badges (ruwe vorm: cursussen + badges).
+ * Alleen de beheerder roept dit aan (via /gegevens). In firebase-modus wordt het naar de
+ * `curriculum/{stroom}/cursussen/…/badges/…`-subboom geschreven; daarna bewerkt de beheerder
+ * rechtstreeks in de Firestore-console.
  */
-export function zetCurriculumOverride(data: CurriculumData | null) {
-  commit({ ...state, curriculumOverride: data });
-  void opslag.schrijfCurriculum?.(data);
+export function zetCurriculumOverride(ruw: CurriculumRuw | null) {
+  commit({ ...state, curriculumOverride: ruw });
+  void opslag.schrijfCurriculum?.(ruw);
 }
 
-/** De ingebouwde (gebundelde) badge-set — bron voor "zet de huidige badges in de database". */
-export const gebundeldCurriculum = (): CurriculumData => GEBUNDELD;
+/** De ingebouwde (gebundelde) badge-set, ruw — bron voor "zet de huidige badges in de database". */
+export const gebundeldCurriculum = (): CurriculumRuw => GEBUNDELD_RUW;
 
 // --- Rubrieken -----------------------------------------------------------
 

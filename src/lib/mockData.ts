@@ -78,11 +78,6 @@ export const doelKleuren: DoelKleuren = (() => {
 
 // --- Deelevaluaties (voorbeelden) ----------------------------------------------
 
-// Vaste type-id's uit deelevaluatieTypes.ts (kapstok 1A). Hier hard gezet zodat de seed de
-// volledige typelijst niet in de hoofdbundel trekt — die laadt met de Deelevaluaties-pagina.
-const TYPE_COACHINGGESPREK = "det-1A-1";
-const TYPE_ACTUARONDE_NL = "det-1A-23";
-
 /** Eerste paar badges van een badge-cursus (op naam), om een voorbeeld te koppelen. */
 const badgesVan = (cursusNaam: string, n: number): string[] => {
   const c = cursussenVoorStroom("1A").find(
@@ -97,7 +92,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     schooljaar: HUIDIG,
     stroom: "1A",
     cursus: "Planning en reflectie",
-    typeId: TYPE_COACHINGGESPREK,
+    typeId: null,
     titel: "Coachinggesprek 1 — startgesprek",
     datum: "2026-09-18",
     leerdoelIds: badgesVan("Planning en reflectie", 2),
@@ -108,7 +103,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     schooljaar: HUIDIG,
     stroom: "1A",
     cursus: "Actuaronde",
-    typeId: TYPE_ACTUARONDE_NL,
+    typeId: null,
     titel: "Actuaronde — verkiezingen VS",
     datum: "2026-10-14",
     leerdoelIds: badgesVan("Actuaronde", 2),

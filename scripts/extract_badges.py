@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
 """
-Genereer de badge- én deelbadge-data uit één bron:
-`docs/reference/deelevaluaties_alle-graden-2.xlsx` (het "Minimalistisch Overzicht").
-
-Vervangt `extract_badgeboeken.py` + `extract_deelevaluaties.py`: badges en deelbadge-types
-komen nu uit hetzelfde bestand, zodat ze per definitie in sync zijn.
+Genereer de gebundelde badge-data uit `docs/reference/deelevaluaties_alle-graden-2.xlsx`.
 
     python3 scripts/extract_badges.py
 
-Structuur van het bestand: per tabblad (graad/stroom) rijen `Cursus | Type | Aantal |
-Verplicht Aantal`. Elke rij wordt:
-  - `Aantal` losse badges "<Type> <n>" (of "<Type>" als Aantal = 1), plat onder de cursus;
-  - één deelbadge-type met `richtaantal` (= Aantal), `verplicht` (= Verplicht Aantal) en
-    `leerdoelIds` (de badge-ids van die rij).
+Per tabblad (stroom) rijen `Cursus | Deelevaluatie(=groep) | Aantal | Verplicht`. Elke rij →
+`Aantal` badges `"<groep> <n>"` (of `"<groep>"` als Aantal = 1), plat onder de cursus.
 
-Uitvoer:
-  - src/lib/curriculum{1A,1B,2A,3A}.ts  (Cursus -> 1 Rubric per cursus -> Leerdoel)
-  - src/lib/deelevaluatieTypes.ts
+Uitvoer per stroom: `src/lib/curriculum{1A,1B,2A,3A}.ts` met twee arrays:
+  - `cursussen{stroom}: CursusRuw[]`  ({ id, stroom, naam, volgorde })
+  - `badges{stroom}: BadgeRuw[]`      ({ id, cursusId, groep, omschrijving, volgorde, categorie })
 
-Deze bestanden zijn de *gebundelde* set. Staat er een database-versie klaar (Firestore
-`curriculum/actief`), dan gebruikt de app die en negeert ze de bundel. Na een nieuwe xlsx dus:
-dit script draaien EN in de app op /gegevens "Zet de ingebouwde badges in de database" klikken
-(of eerst "Gebruik terug de ingebouwde badges"), anders blijft de database-versie de oude.
+Rubrics + de deelbadge-"types" worden in de app afgeleid (`verrijk()` in curriculum.ts) — niet
+opgeslagen. Dit is de *gebundelde* set (offline-terugval); staat er een database-versie klaar
+(Firestore `curriculum/{stroom}/cursussen/…/badges/…`), dan gebruikt de app die.
 """
+import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -94,160 +88,100 @@ def num(s: str) -> int:
         return 0
 
 
+def slug(s: str) -> str:
+    """Leesbare, ascii-veilige id-component: 'Geïntegreerde opdrachten (GOP)' -> 'geintegreerde-opdrachten-gop'."""
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
+    return s or "x"
+
+
+def uniek(basis: str, gebruikt: set[str]) -> str:
+    kandidaat, n = basis, 2
+    while kandidaat in gebruikt:
+        kandidaat = f"{basis}-{n}"
+        n += 1
+    gebruikt.add(kandidaat)
+    return kandidaat
+
+
 def main() -> None:
     z = zipfile.ZipFile(XLSX)
     ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
     strings = ["".join(t.text or "" for t in si.iter(M + "t")) for si in ss]
     rel = sheet_rel_map(z)
 
-    type_entries = []  # voor deelevaluatieTypes.ts
-    type_n = 0
-    samenvatting = {}
-
     for sheet_name, stroom in SHEETS.items():
-        cursussen = []          # [{id, naam}]
-        cursus_id_van_naam = {}  # naam -> id
-        rubrics = []            # [{id, cursusId, naam}]
-        leerdoelen = []         # [{id, rubricId, omschrijving}]
-        doel_teller = {}        # cursusId -> laatste d-index
+        cursussen = []           # [{id, naam, volgorde}]
+        cursus_id_van_naam = {}   # naam -> id
+        cursus_ids = set()        # gebruikte cursus-slugs binnen deze stroom
+        badges = []               # [{id, cursusId, groep, omschrijving, volgorde}]
+        doel_teller = {}          # cursusId -> laatste d-index
 
         for cells in load_rows(z, rel[sheet_name], strings):
             cursus = cells.get(1, "")
-            naam = cells.get(2, "")
+            groep = cells.get(2, "")   # xlsx-kolom "Deelevaluatie" = de badge-groep
             aantal = num(cells.get(3, ""))
-            verplicht = num(cells.get(4, ""))
-            if not cursus or not naam:
+            if not cursus or not groep:
                 continue
             low = cursus.lower()
             if low == "cursus" or low.startswith("totaal"):
                 continue
 
             if cursus not in cursus_id_van_naam:
-                cid = f"{stroom}-c{len(cursussen) + 1}"
+                cid = uniek(f"{stroom}-{slug(cursus)}", cursus_ids)
                 cursus_id_van_naam[cursus] = cid
-                cursussen.append({"id": cid, "naam": cursus})
-                rubrics.append({"id": f"{cid}-r1", "cursusId": cid, "naam": cursus})
+                cursussen.append({"id": cid, "naam": cursus, "volgorde": len(cursussen)})
                 doel_teller[cid] = 0
             cid = cursus_id_van_naam[cursus]
-            rid = f"{cid}-r1"
 
             hoeveel = max(1, aantal)
-            rij_ids = []
             for i in range(1, hoeveel + 1):
                 doel_teller[cid] += 1
-                did = f"{rid}-d{doel_teller[cid]}"
-                omschrijving = naam if hoeveel == 1 else f"{naam} {i}"
-                leerdoelen.append(
-                    {"id": did, "rubricId": rid, "omschrijving": omschrijving}
+                # Leesbare id's: cursus op naam (`<stroom>-<cursusslug>`), badge met korte teller
+                # (`<cid>-d<n>`). Bij het hernoemen van een cursus/badge in de xlsx verschuift de id.
+                did = f"{cid}-d{doel_teller[cid]}"
+                omschrijving = groep if hoeveel == 1 else f"{groep} {i}"
+                badges.append(
+                    {
+                        "id": did,
+                        "cursusId": cid,
+                        "groep": groep,
+                        "omschrijving": omschrijving,
+                        "volgorde": doel_teller[cid] - 1,
+                    }
                 )
-                rij_ids.append(did)
 
-            type_n += 1
-            type_entries.append(
-                {
-                    "id": f"det-{stroom}-{type_n}",
-                    "stroom": stroom,
-                    "cursus": cursus,
-                    "naam": naam,
-                    "richtaantal": aantal,
-                    "verplicht": verplicht,
-                    "leerdoelIds": rij_ids,
-                }
-            )
-
-        write_curriculum(stroom, cursussen, rubrics, leerdoelen)
-        samenvatting[stroom] = {
-            "cursussen": len(cursussen),
-            "badges": len(leerdoelen),
-        }
-
-    write_types(type_entries)
-
-    per_type = {}
-    for e in type_entries:
-        per_type[e["stroom"]] = per_type.get(e["stroom"], 0) + 1
-    for stroom, s in samenvatting.items():
-        print(
-            f"  {stroom}: {s['cursussen']} cursussen, {s['badges']} badges, "
-            f"{per_type[stroom]} deelbadge-types"
-        )
-    print(f"{len(type_entries)} types weggeschreven naar src/lib/deelevaluatieTypes.ts")
+        write_curriculum(stroom, cursussen, badges)
+        print(f"  {stroom}: {len(cursussen)} cursussen, {len(badges)} badges")
 
 
-def write_curriculum(stroom, cursussen, rubrics, leerdoelen) -> None:
+def write_curriculum(stroom, cursussen, badges) -> None:
     out = LIB / f"curriculum{stroom}.ts"
     L = [
         "// AUTO-GEGENEREERD via scripts/extract_badges.py",
         "// uit docs/reference/deelevaluaties_alle-graden-2.xlsx — niet met de hand aanpassen.",
-        'import type { Cursus, Leerdoel, Rubric } from "./types";',
+        'import type { CursusRuw, BadgeRuw } from "./curriculum";',
         "",
-        f"export const cursussen{stroom}: Cursus[] = [",
+        f"export const cursussen{stroom}: CursusRuw[] = [",
     ]
     for c in cursussen:
         L.append(
-            f'  {{ id: "{c["id"]}", stroom: "{stroom}", naam: "{esc(c["naam"])}" }},'
+            f'  {{ id: "{c["id"]}", stroom: "{stroom}", '
+            f'naam: "{esc(c["naam"])}", volgorde: {c["volgorde"]} }},'
         )
     L.append("];")
     L.append("")
-    L.append(f"export const rubrics{stroom}: Rubric[] = [")
-    for r in rubrics:
+    L.append(f"export const badges{stroom}: BadgeRuw[] = [")
+    for d in badges:
         L.append(
-            f'  {{ id: "{r["id"]}", cursusId: "{r["cursusId"]}", naam: "{esc(r["naam"])}" }},'
-        )
-    L.append("];")
-    L.append("")
-    L.append(f"export const leerdoelen{stroom}: Leerdoel[] = [")
-    for d in leerdoelen:
-        L.append(
-            f'  {{ id: "{d["id"]}", rubricId: "{d["rubricId"]}", '
-            f'omschrijving: "{esc(d["omschrijving"])}", categorie: "standaard" }},'
+            f'  {{ id: "{d["id"]}", cursusId: "{d["cursusId"]}", '
+            f'groep: "{esc(d["groep"])}", omschrijving: "{esc(d["omschrijving"])}", '
+            f'volgorde: {d["volgorde"]}, categorie: "standaard" }},'
         )
     L.append("];")
     L.append("")
     out.write_text("\n".join(L), encoding="utf-8")
 
-
-def write_types(entries) -> None:
-    out = LIB / "deelevaluatieTypes.ts"
-    L = [
-        "// AUTO-GEGENEREERD via scripts/extract_badges.py",
-        "// uit docs/reference/deelevaluaties_alle-graden-2.xlsx — niet met de hand aanpassen.",
-        'import type { Stroom } from "./types";',
-        "",
-        "/**",
-        " * Een *type* deelbadge: per stroom en cursus, met het richtaantal en het verplichte",
-        " * aantal dat een leerling moet halen. `leerdoelIds` = de badges die deze rij in de",
-        " * badgematrix vertegenwoordigt (dezelfde bron). Leerkrachten maken hieronder in de app",
-        " * hun concrete toetsen/opdrachten aan.",
-        " */",
-        "export interface DeelevaluatieType {",
-        "  id: string;",
-        "  stroom: Stroom;",
-        "  cursus: string;",
-        "  naam: string;",
-        "  /** Richtaantal: hoeveel er in totaal kunnen worden aangeboden. */",
-        "  richtaantal: number;",
-        "  /** Verplicht aantal om de cursus af te ronden. */",
-        "  verplicht: number;",
-        "  /** De badge-ids (leerdoelen) die bij dit type horen. */",
-        "  leerdoelIds: string[];",
-        "}",
-        "",
-        "export const deelevaluatieTypes: DeelevaluatieType[] = [",
-    ]
-    for e in entries:
-        ids = ", ".join(f'"{i}"' for i in e["leerdoelIds"])
-        L.append(
-            "  { "
-            f'id: "{e["id"]}", stroom: "{e["stroom"]}", '
-            f'cursus: "{esc(e["cursus"])}", naam: "{esc(e["naam"])}", '
-            f'richtaantal: {e["richtaantal"]}, verplicht: {e["verplicht"]}, '
-            f"leerdoelIds: [{ids}] "
-            "},"
-        )
-    L.append("];")
-    L.append("")
-    out.write_text("\n".join(L), encoding="utf-8")
 
 
 if __name__ == "__main__":

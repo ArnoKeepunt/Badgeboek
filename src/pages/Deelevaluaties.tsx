@@ -359,9 +359,8 @@ function DeelCursusSectie({
               <table className="de-kapstok-tabel">
                 <thead>
                   <tr>
-                    <th>Verwacht in deze cursus</th>
-                    <th>Verplicht</th>
-                    <th>Richtaantal</th>
+                    <th>Groep in deze cursus</th>
+                    <th>Aantal badges</th>
                     <th>Aangemaakt</th>
                     <th />
                   </tr>
@@ -370,7 +369,6 @@ function DeelCursusSectie({
                   {types.map((t) => (
                     <tr key={t.id}>
                       <td>{t.naam}</td>
-                      <td className="de-num">{t.verplicht}</td>
                       <td className="de-num">{t.richtaantal}</td>
                       <td className="de-num">{aantalPerType.get(t.id) ?? 0}</td>
                       <td className="de-kapstok-actie">

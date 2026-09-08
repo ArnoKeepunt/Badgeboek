@@ -4,7 +4,19 @@ import type { BadgeboekPersistentie } from "./persistentie";
 
 export type { BadgeboekPersistentie, PersistedStore, RauweStore } from "./persistentie";
 export { sessieOpslag } from "./sessieOpslag";
-export { auth, db, meldAanMetGoogle, meldAfVanFirebase, abonneerAuth } from "./firebaseApp";
+export {
+  auth,
+  db,
+  meldAanMetGoogle,
+  meldAfVanFirebase,
+  abonneerAuth,
+  abonneerGebruiker,
+  abonneerGebruikers,
+  schrijfGebruiker,
+  verwijderGebruiker,
+} from "./firebaseApp";
+export { migreerDatabase, verwijderOudeStructuur } from "./migratie";
+export type { MigratieResultaat } from "./migratie";
 
 export type PersistentieModus = "local" | "firebase";
 

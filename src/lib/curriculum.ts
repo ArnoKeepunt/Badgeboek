@@ -1,21 +1,51 @@
-import type { Cursus, Leerdoel, Rubric, Stroom } from "./types";
-import { cursussen1A, leerdoelen1A, rubrics1A } from "./curriculum1A";
-import { cursussen1B, leerdoelen1B, rubrics1B } from "./curriculum1B";
-import { cursussen2A, leerdoelen2A, rubrics2A } from "./curriculum2A";
-import { cursussen3A, leerdoelen3A, rubrics3A } from "./curriculum3A";
-import { type DeelevaluatieType, deelevaluatieTypes } from "./deelevaluatieTypes";
+import type { Cursus, DoelCategorie, Leerdoel, Rubric, Stroom } from "./types";
+import { badges1A, cursussen1A } from "./curriculum1A";
+import { badges1B, cursussen1B } from "./curriculum1B";
+import { badges2A, cursussen2A } from "./curriculum2A";
+import { badges3A, cursussen3A } from "./curriculum3A";
 
 /**
- * Het badgeboek-curriculum: Cursus → Leerdoel (= badge), per graad/stroom. Er is precies één
- * (verborgen) Rubric per cursus — de badges staan plat onder de cursus. De **gebundelde** set
- * (`GEBUNDELD`) is auto-gegenereerd via `scripts/extract_badges.py` uit
- * `docs/reference/deelevaluaties_alle-graden-2.xlsx` (dezelfde bron als de deelbadge-kapstok).
+ * Het badgeboek-curriculum. De **ruwe** vorm (`CurriculumRuw`) is wat de bundel opslaat en wat
+ * in Firestore staat: gewoon cursussen + badges. Rubrics (1 onzichtbaar niveau per cursus) en de
+ * deelbadge-"types" (badges met dezelfde `groep`) worden door `verrijk()` afgeleid — niet
+ * opgeslagen. Zo blijft "Cursus → Badge" de enige echte structuur en volgt de rest automatisch.
  *
- * De gebundelde set is de onmiddellijke, offline terugval. Staat er een database-versie klaar
- * (`curriculum/actief` in Firestore, alleen door de beheerder bewerkbaar), dan **vervangt** die
- * de bundel volledig — de store roept dan `zetCurriculum(...)` aan. Alle helpers hieronder
- * lezen de *actieve* set, dus de rest van de app merkt er niets van.
+ * Auto-gegenereerd (de bundel): `scripts/extract_badges.py` uit
+ * `docs/reference/deelevaluaties_alle-graden-2.xlsx`.
  */
+
+export interface CursusRuw {
+  id: string;
+  stroom: Stroom;
+  naam: string;
+  volgorde: number;
+}
+
+export interface BadgeRuw {
+  id: string;
+  cursusId: string;
+  /** De badge-groep (xlsx-kolom "Deelevaluatie", bv. "Leerwandelingen & uitstappen"). */
+  groep: string;
+  omschrijving: string;
+  volgorde: number;
+  categorie: DoelCategorie;
+}
+
+export interface CurriculumRuw {
+  cursussen: CursusRuw[];
+  badges: BadgeRuw[];
+}
+
+/** Een deelbadge-"type": badges met dezelfde `groep` binnen een cursus. Afgeleid, niet opgeslagen. */
+export interface DeelevaluatieType {
+  id: string;
+  stroom: Stroom;
+  cursus: string;
+  naam: string;
+  /** Aantal badges in de groep. */
+  richtaantal: number;
+  leerdoelIds: string[];
+}
 
 export interface CurriculumData {
   cursussen: Cursus[];
@@ -24,22 +54,70 @@ export interface CurriculumData {
   deelevaluatieTypes: DeelevaluatieType[];
 }
 
-/** De ingebouwde set (uit de bundel). Ook de bron voor "zet de huidige badges in de database". */
-export const GEBUNDELD: CurriculumData = {
+/** De ruwe set → de verrijkte set die de rest van de app gebruikt. */
+export function verrijk(ruw: CurriculumRuw): CurriculumData {
+  const cursussen: Cursus[] = [...ruw.cursussen]
+    .sort((a, b) => a.volgorde - b.volgorde)
+    .map((c) => ({ id: c.id, stroom: c.stroom, naam: c.naam }));
+
+  const rubrics: Rubric[] = cursussen.map((c) => ({
+    id: `${c.id}-r1`,
+    cursusId: c.id,
+    naam: c.naam,
+  }));
+
+  const badgesGesorteerd = [...ruw.badges].sort((a, b) => a.volgorde - b.volgorde);
+  const leerdoelen: Leerdoel[] = badgesGesorteerd.map((b) => ({
+    id: b.id,
+    rubricId: `${b.cursusId}-r1`,
+    omschrijving: b.omschrijving,
+    categorie: b.categorie,
+  }));
+
+  const cursusById = new Map(cursussen.map((c) => [c.id, c]));
+  const perGroep = new Map<string, { cursusId: string; groep: string; ids: string[] }>();
+  for (const b of badgesGesorteerd) {
+    const sleutel = `${b.cursusId}::${b.groep}`;
+    let g = perGroep.get(sleutel);
+    if (!g) {
+      g = { cursusId: b.cursusId, groep: b.groep, ids: [] };
+      perGroep.set(sleutel, g);
+    }
+    g.ids.push(b.id);
+  }
+  const deelevaluatieTypes: DeelevaluatieType[] = [];
+  for (const [sleutel, g] of perGroep) {
+    const c = cursusById.get(g.cursusId);
+    if (!c) continue;
+    deelevaluatieTypes.push({
+      id: sleutel,
+      stroom: c.stroom,
+      cursus: c.naam,
+      naam: g.groep,
+      richtaantal: g.ids.length,
+      leerdoelIds: g.ids,
+    });
+  }
+
+  return { cursussen, rubrics, leerdoelen, deelevaluatieTypes };
+}
+
+/** De ingebouwde set (uit de bundel), ruw. Ook de bron voor "zet de huidige badges in de database". */
+export const GEBUNDELD_RUW: CurriculumRuw = {
   cursussen: [...cursussen1A, ...cursussen1B, ...cursussen2A, ...cursussen3A],
-  rubrics: [...rubrics1A, ...rubrics1B, ...rubrics2A, ...rubrics3A],
-  leerdoelen: [...leerdoelen1A, ...leerdoelen1B, ...leerdoelen2A, ...leerdoelen3A],
-  deelevaluatieTypes,
+  badges: [...badges1A, ...badges1B, ...badges2A, ...badges3A],
 };
+
+export const GEBUNDELD: CurriculumData = verrijk(GEBUNDELD_RUW);
 
 let actief: CurriculumData = GEBUNDELD;
 
-/** Wissel de actieve curriculum-set. `null` = terug naar de gebundelde set. */
-export function zetCurriculum(data: CurriculumData | null): void {
-  actief = data ?? GEBUNDELD;
+/** Wissel de actieve curriculum-set (ruwe database-versie), of `null` = terug naar de bundel. */
+export function zetCurriculum(ruw: CurriculumRuw | null): void {
+  actief = ruw ? verrijk(ruw) : GEBUNDELD;
 }
 
-/** De actieve set (database-versie of bundel). */
+/** De actieve (verrijkte) set. */
 export const actiefCurriculum = (): CurriculumData => actief;
 
 // --- Ruwe lijsten (actieve set) --------------------------------------------
@@ -67,8 +145,7 @@ export function cursusVanLeerdoel(leerdoelId: string): Cursus | undefined {
 
 /**
  * De cursus waartoe een node behoort. Een node-id is een cursus-id, een rubric-id of een
- * leerdoel-id. De id's zijn structureel ondubbelzinnig (`1A-c1` / `1A-c1-r1` / `1A-c1-r1-d1`),
- * dus de volgorde van de lookups kan niet mismatchen.
+ * leerdoel-id (`1A-planning-en-reflectie` / `…-r1` / `…-d1`).
  */
 export function cursusVanNode(nodeId: string): Cursus | undefined {
   const cursus = actief.cursussen.find((c) => c.id === nodeId);

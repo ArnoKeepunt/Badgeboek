@@ -1,0 +1,324 @@
+import type { BadgeRuw, CursusRuw, CurriculumRuw } from "../curriculum";
+import type {
+  AuditRegel,
+  Deelevaluatie,
+  Groep,
+  Melding,
+  Mentor,
+  Notitie,
+  Rating,
+  Stroom,
+  Student,
+} from "../types";
+import type { PersistedStore, RauweStore } from "./persistentie";
+
+/**
+ * Vertaalpaar tussen de platte `PersistedStore` (wat de app-store verwacht) en de
+ * Firestore-documentstructuur (één collectie per concept). `store → docs → store` moet een
+ * identiteit zijn.
+ *
+ * Collecties:
+ *   leerlingen/{id}            mentoren/{id}            groepen/{id}
+ *   deelbadges/{id}            (= Deelevaluatie + per-leerling scores/notities/audit)
+ *   evaluaties/{schooljaar}/leerlingen/{leerlingId}   (= badge-kleuren/notities/gewist/audit)
+ *   meldingen/{leerlingId}     instellingen/app        instellingen/overlays
+ *   curriculum/{stroom}/cursussen/{cursusId}/badges/{badgeId}
+ *                             (apart geschreven via schrijfCurriculum; hier NIET in storeNaarDocs)
+ */
+
+export type DocData = Record<string, unknown>;
+export type DocMap = Map<string, DocData>;
+
+const EVAL_PAD = (sj: string, sid: string) => `evaluaties/${sj}/leerlingen/${sid}`;
+
+/** Splits een audit-/gewist-sleutel. `a:b` = deelbadge (deId:sid); `a:b:c` = badge (sj:sid:badgeId). */
+const isDeelSleutel = (k: string) => k.split(":").length === 2;
+
+interface EvalDoc {
+  kleuren: Record<string, Rating>;
+  notities: Record<string, Notitie>;
+  gewist: string[];
+  auditLog: Record<string, AuditRegel[]>;
+}
+
+interface DeelbadgeDoc extends Deelevaluatie {
+  scores: Record<string, Rating>;
+  scoreNotities: Record<string, Notitie>;
+  scoreAudit: Record<string, AuditRegel[]>;
+}
+
+interface MeldingDoc {
+  meldingen: Melding[];
+  gezienOp: number | null;
+}
+
+// --- store → docs --------------------------------------------------------------
+
+/**
+ * Zet de store om in een `pad → documentinhoud`-map. Zonder `updatedAt`/`updatedBy` (die komen
+ * er bij het schrijven bij) en zonder de curriculum-docs (die gaan via `schrijfCurriculum`).
+ *
+ * `alleenSchooljaar`: enkel `evaluaties/{dat jaar}/leerlingen/*` meenemen. De store houdt kleuren
+ * van meerdere schooljaren tegelijk (seed + wat je bekeek); bij een gewone save mag `bewaar`
+ * enkel het actieve jaar aanraken, anders overschrijf je andere jaren met stale data.
+ */
+export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): DocMap {
+  const m: DocMap = new Map();
+
+  for (const l of s.students) m.set(`leerlingen/${l.id}`, { ...l });
+  for (const mn of s.mentoren) m.set(`mentoren/${mn.id}`, { ...mn });
+  for (const g of s.groepen) m.set(`groepen/${g.id}`, { ...g });
+
+  // deelbadges: definitie + per-leerling scores
+  for (const d of s.deelevaluaties) {
+    const doc: DeelbadgeDoc = { ...d, scores: {}, scoreNotities: {}, scoreAudit: {} };
+    for (const [k, v] of Object.entries(s.deelKleuren)) {
+      const i = k.lastIndexOf(":");
+      if (k.slice(0, i) === d.id) doc.scores[k.slice(i + 1)] = v;
+    }
+    for (const [k, v] of Object.entries(s.deelNotities)) {
+      const i = k.lastIndexOf(":");
+      if (k.slice(0, i) === d.id) doc.scoreNotities[k.slice(i + 1)] = v;
+    }
+    for (const [k, v] of Object.entries(s.auditLog)) {
+      if (isDeelSleutel(k) && k.slice(0, k.lastIndexOf(":")) === d.id) doc.scoreAudit[k] = v;
+    }
+    m.set(`deelbadges/${d.id}`, doc as unknown as DocData);
+  }
+
+  // evaluaties per (schooljaar, leerling)
+  const evalDocs = new Map<string, EvalDoc>();
+  const evalDoc = (sj: string, sid: string): EvalDoc => {
+    const p = EVAL_PAD(sj, sid);
+    let d = evalDocs.get(p);
+    if (!d) {
+      d = { kleuren: {}, notities: {}, gewist: [], auditLog: {} };
+      evalDocs.set(p, d);
+    }
+    return d;
+  };
+  const neemJaar = (sj: string) => !alleenSchooljaar || sj === alleenSchooljaar;
+  for (const [k, v] of Object.entries(s.kleuren)) {
+    const [sj, sid, ...rest] = k.split(":");
+    if (rest.length && neemJaar(sj)) evalDoc(sj, sid).kleuren[rest.join(":")] = v;
+  }
+  for (const [k, v] of Object.entries(s.notities)) {
+    const [sj, sid, ...rest] = k.split(":");
+    if (rest.length && neemJaar(sj)) evalDoc(sj, sid).notities[rest.join(":")] = v;
+  }
+  for (const k of s.gewist) {
+    if (isDeelSleutel(k)) continue; // deelbadge: afwezigheid = gewist
+    const [sj, sid, ...rest] = k.split(":");
+    if (rest.length && neemJaar(sj)) evalDoc(sj, sid).gewist.push(rest.join(":"));
+  }
+  for (const [k, v] of Object.entries(s.auditLog)) {
+    if (isDeelSleutel(k)) continue; // hoort bij een deelbadge-doc
+    const [sj, sid] = k.split(":");
+    if (sj && sid && neemJaar(sj)) evalDoc(sj, sid).auditLog[k] = v;
+  }
+  for (const [p, d] of evalDocs) m.set(p, d as unknown as DocData);
+
+  // meldingen per leerling
+  const meldDocs = new Map<string, MeldingDoc>();
+  for (const mel of s.meldingen) {
+    const p = `meldingen/${mel.studentId}`;
+    let d = meldDocs.get(p);
+    if (!d) {
+      d = { meldingen: [], gezienOp: s.meldingGezien[mel.studentId] ?? null };
+      meldDocs.set(p, d);
+    }
+    d.meldingen.push(mel);
+  }
+  for (const [sid, ts] of Object.entries(s.meldingGezien)) {
+    const p = `meldingen/${sid}`;
+    if (!meldDocs.has(p)) meldDocs.set(p, { meldingen: [], gezienOp: ts });
+  }
+  for (const [p, d] of meldDocs) m.set(p, d as unknown as DocData);
+
+  m.set("instellingen/app", {
+    schooljaar: s.schooljaar,
+    matrixStromen: s.matrixStromen,
+    matrixCursus: s.matrixCursus,
+  });
+  m.set("instellingen/overlays", {
+    doelWijzigingen: s.doelWijzigingen,
+    doelenImport: s.doelenImport,
+    rubriekWijzigingen: s.rubriekWijzigingen,
+  });
+
+  return m;
+}
+
+/**
+ * De ruwe curriculum-set → de subcollectie-documenten (voor `schrijfCurriculum`):
+ *   curriculum/{stroom}                                   (leeg marker-doc)
+ *   curriculum/{stroom}/cursussen/{cursusId}              { naam, volgorde }
+ *   curriculum/{stroom}/cursussen/{cursusId}/badges/{id}  { groep, omschrijving, volgorde, categorie }
+ */
+export function curriculumNaarDocs(ruw: CurriculumRuw): DocMap {
+  const m: DocMap = new Map();
+  const stroomVanCursus = new Map(ruw.cursussen.map((c) => [c.id, c.stroom]));
+  for (const c of ruw.cursussen) {
+    m.set(`curriculum/${c.stroom}`, {});
+    m.set(`curriculum/${c.stroom}/cursussen/${c.id}`, {
+      naam: c.naam,
+      volgorde: c.volgorde,
+    });
+  }
+  for (const b of ruw.badges) {
+    const stroom = stroomVanCursus.get(b.cursusId);
+    if (!stroom) continue;
+    m.set(`curriculum/${stroom}/cursussen/${b.cursusId}/badges/${b.id}`, {
+      groep: b.groep,
+      omschrijving: b.omschrijving,
+      volgorde: b.volgorde,
+      categorie: b.categorie,
+    });
+  }
+  return m;
+}
+
+// --- docs → store ------------------------------------------------------------
+
+/**
+ * Zet de (mogelijk gedeeltelijke) verzameling documenten terug in een `RauweStore`.
+ *
+ * Als de database nog niet geïnitialiseerd is (geen `instellingen/app`), geven we alleen de
+ * curriculum-override terug en laten we de rest ongezet, zodat de store de gebundelde seed
+ * behoudt (i.p.v. te vervangen door lege lijsten). De migratie / het eerste echte gebruik
+ * vult de collecties.
+ */
+export function docsNaarStore(docs: DocMap): RauweStore {
+  const geinitialiseerd = docs.has("instellingen/app");
+  const r: RauweStore = {};
+  const students: Student[] = [];
+  const mentoren: Mentor[] = [];
+  const groepen: Groep[] = [];
+  const deelevaluaties: Deelevaluatie[] = [];
+  const kleuren: Record<string, Rating> = {};
+  const notities: Record<string, Notitie> = {};
+  const deelKleuren: Record<string, Rating> = {};
+  const deelNotities: Record<string, Notitie> = {};
+  const auditLog: Record<string, AuditRegel[]> = {};
+  const gewist: string[] = [];
+  const meldingen: Melding[] = [];
+  const meldingGezien: Record<string, number> = {};
+
+  const currCursussen: CursusRuw[] = [];
+  const currBadges: BadgeRuw[] = [];
+  let heeftCurriculum = false;
+
+  for (const [pad, data] of docs) {
+    const seg = pad.split("/");
+    switch (seg[0]) {
+      case "leerlingen":
+        students.push(data as unknown as Student);
+        break;
+      case "mentoren":
+        mentoren.push(data as unknown as Mentor);
+        break;
+      case "groepen":
+        groepen.push(data as unknown as Groep);
+        break;
+      case "curriculum": {
+        // curriculum/{stroom}  |  .../cursussen/{c}  |  .../cursussen/{c}/badges/{b}
+        const stroom = seg[1] as Stroom;
+        if (seg[2] === "cursussen" && seg[4] === "badges") {
+          heeftCurriculum = true;
+          currBadges.push({
+            id: seg[5],
+            cursusId: seg[3],
+            groep: (data.groep as string) ?? (data.omschrijving as string) ?? "",
+            omschrijving: (data.omschrijving as string) ?? "",
+            volgorde: (data.volgorde as number) ?? 0,
+            categorie: (data.categorie as BadgeRuw["categorie"]) ?? "standaard",
+          });
+        } else if (seg[2] === "cursussen") {
+          heeftCurriculum = true;
+          currCursussen.push({
+            id: seg[3],
+            stroom,
+            naam: (data.naam as string) ?? seg[3],
+            volgorde: (data.volgorde as number) ?? 0,
+          });
+        }
+        break;
+      }
+      case "deelbadges": {
+        const { scores, scoreNotities, scoreAudit, ...def } = data as unknown as DeelbadgeDoc;
+        deelevaluaties.push(def as Deelevaluatie);
+        for (const [sid, v] of Object.entries(scores ?? {})) deelKleuren[`${def.id}:${sid}`] = v;
+        for (const [sid, v] of Object.entries(scoreNotities ?? {}))
+          deelNotities[`${def.id}:${sid}`] = v;
+        for (const [k, v] of Object.entries(scoreAudit ?? {})) auditLog[k] = v;
+        break;
+      }
+      case "evaluaties": {
+        // evaluaties/{sj}/leerlingen/{sid}
+        const sj = seg[1];
+        const sid = seg[3];
+        const d = data as unknown as EvalDoc;
+        for (const [b, v] of Object.entries(d.kleuren ?? {})) kleuren[`${sj}:${sid}:${b}`] = v;
+        for (const [b, v] of Object.entries(d.notities ?? {})) notities[`${sj}:${sid}:${b}`] = v;
+        for (const b of d.gewist ?? []) gewist.push(`${sj}:${sid}:${b}`);
+        for (const [k, v] of Object.entries(d.auditLog ?? {})) auditLog[k] = v;
+        break;
+      }
+      case "meldingen": {
+        const sid = seg[1];
+        const d = data as unknown as MeldingDoc;
+        meldingen.push(...(d.meldingen ?? []));
+        if (typeof d.gezienOp === "number") meldingGezien[sid] = d.gezienOp;
+        break;
+      }
+      case "instellingen": {
+        if (seg[1] === "app") {
+          r.schooljaar = data.schooljaar as string;
+          r.matrixStromen = data.matrixStromen as Stroom[];
+          r.matrixCursus = data.matrixCursus as string;
+        } else if (seg[1] === "overlays") {
+          r.doelWijzigingen = data.doelWijzigingen as RauweStore["doelWijzigingen"];
+          r.doelenImport = data.doelenImport as RauweStore["doelenImport"];
+          r.rubriekWijzigingen = data.rubriekWijzigingen as RauweStore["rubriekWijzigingen"];
+        }
+        break;
+      }
+    }
+  }
+
+  r.curriculumOverride =
+    heeftCurriculum && currBadges.length > 0
+      ? { cursussen: currCursussen, badges: currBadges }
+      : null;
+
+  if (!geinitialiseerd) return r; // enkel de curriculum-override; de rest = seed behouden
+
+  r.students = students;
+  r.mentoren = mentoren;
+  r.groepen = groepen;
+  r.deelevaluaties = deelevaluaties;
+  r.kleuren = kleuren;
+  r.notities = notities;
+  r.deelKleuren = deelKleuren;
+  r.deelNotities = deelNotities;
+  r.auditLog = auditLog;
+  r.gewist = gewist;
+  r.meldingen = meldingen;
+  r.meldingGezien = meldingGezien;
+  return r;
+}
+
+// --- diff -------------------------------------------------------------------
+
+const zelfde = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** De documenten die veranderd/nieuw zijn, en de paden die verdwenen. */
+export function diffDocs(oud: DocMap, nieuw: DocMap): { schrijf: DocMap; verwijder: string[] } {
+  const schrijf: DocMap = new Map();
+  for (const [pad, data] of nieuw) {
+    if (!zelfde(oud.get(pad), data)) schrijf.set(pad, data);
+  }
+  const verwijder: string[] = [];
+  for (const pad of oud.keys()) if (!nieuw.has(pad)) verwijder.push(pad);
+  return { schrijf, verwijder };
+}

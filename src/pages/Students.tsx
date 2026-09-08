@@ -10,14 +10,13 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
-import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
-import { useAangemeld } from "../lib/sessie";
+import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
 import { getDoelKleur, useStore } from "../lib/store";
 
 export function Students() {
   const { kleuren, groepen, schooljaar } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = bereikVestiging(useAangemeld());
+  const scopeVestiging = useBereik().vestiging;
   const [filter, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
 

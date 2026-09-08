@@ -8,13 +8,23 @@ import {
   type User,
 } from "firebase/auth";
 import {
+  type DocumentData,
+  type Unsubscribe,
+  collection,
+  collectionGroup,
   deleteDoc,
   doc,
-  getDocFromServer,
-  getFirestore,
+  getDoc,
+  getDocs,
+  initializeFirestore,
+  onSnapshot,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
-import type { CurriculumData } from "../curriculum";
+import type { CurriculumRuw } from "../curriculum";
+import { STROMEN } from "../types";
+import { type DocData, type DocMap, curriculumNaarDocs } from "./firestoreLayout";
+import type { Personeelslid } from "../gebruikers";
 
 const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -27,17 +37,19 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-/** Firestore-document waarin de bewerkbare badge-set leeft. */
-export const CURRICULUM_DOC = ["curriculum", "actief"] as const;
+/** Collectie waarin de bewerkbare badge-set leeft, één doc per stroom (`curriculum/1A` …). */
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
 // De Firestore-database is een *named* database (bv. "ai-studio-badgeboek-…"), niet "(default)".
-// Is de id niet meegegeven bij het bouwen, dan valt Firebase terug op de default database.
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// `ignoreUndefinedProperties`: optionele velden (`mentorId?`, …) die niet gezet zijn worden bij
+// het schrijven overgeslagen i.p.v. een fout te geven.
+export const db = initializeFirestore(
+  app,
+  { ignoreUndefinedProperties: true },
+  firebaseConfig.firestoreDatabaseId || undefined,
+);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -95,21 +107,6 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
-// CRITICAL CONSTRAINT: Test connection to Firestore upon initialization
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes("the client is offline")
-    ) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-void testConnection();
-
 /** Meld aan met Google via een pop-up */
 export async function meldAanMetGoogle(): Promise<User | null> {
   try {
@@ -134,25 +131,136 @@ export function abonneerAuth(
 }
 
 /**
- * Schrijf de database-versie van de badges naar `curriculum/actief` (of wis ze met `null`).
- * De Firestore-regels laten dit enkel toe voor de beheerder (`isAdmin()`).
+ * Schrijf de database-versie van de badges naar de subboom
+ * `curriculum/{stroom}/cursussen/{cursus}/badges/{badge}` (of wis alles met `null`). Alleen de
+ * beheerder mag dit (Firestore-regels).
  */
-export async function schrijfCurriculum(
-  data: CurriculumData | null,
-): Promise<void> {
+export async function schrijfCurriculum(ruw: CurriculumRuw | null): Promise<void> {
   if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
-  const ref = doc(db, CURRICULUM_DOC[0], CURRICULUM_DOC[1]);
   try {
-    if (data) {
-      await setDoc(ref, {
-        ...data,
-        updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
-      });
-    } else {
-      await deleteDoc(ref);
+    // Bestaande curriculum-docs ophalen (via collectionGroup) om verweesde te wissen.
+    const bestaand = new Set<string>();
+    for (const naam of ["cursussen", "badges"] as const) {
+      const snap = await getDocs(collectionGroup(db, naam));
+      snap.forEach((d) => bestaand.add(d.ref.path.replace(/^.*?\/documents\//, "")));
     }
+    for (const stroom of STROMEN) bestaand.add(`curriculum/${stroom}`);
+
+    const nieuw = ruw ? curriculumNaarDocs(ruw) : new Map<string, DocData>();
+    const verwijder: string[] = [];
+    for (const pad of bestaand) if (!nieuw.has(pad)) verwijder.push(pad);
+    await schrijfDocMap(nieuw, verwijder);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, "curriculum/actief");
+    handleFirestoreError(error, OperationType.WRITE, "curriculum");
+  }
+}
+
+const BATCH_MAX = 450;
+
+/** Documentref uit een pad `a/b/c/d`. */
+const refVoorPad = (pad: string) => {
+  const [c, ...rest] = pad.split("/");
+  return doc(db, c, ...rest);
+};
+
+/**
+ * Schrijf (`merge`) en verwijder documenten in batches van ≤ 450, met `updatedAt`/`updatedBy`
+ * op elk geschreven doc. Gedeeld door de persistentielaag en de migratie.
+ */
+export async function schrijfDocMap(schrijf: DocMap, verwijder: string[] = []): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  const meta = {
+    updatedAt: new Date().toISOString(),
+    updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
+  };
+  const ops: Array<{ soort: "set" | "del"; pad: string; data?: DocData }> = [];
+  for (const [pad, data] of schrijf) ops.push({ soort: "set", pad, data: { ...data, ...meta } });
+  for (const pad of verwijder) ops.push({ soort: "del", pad });
+  for (let i = 0; i < ops.length; i += BATCH_MAX) {
+    const batch = writeBatch(db);
+    for (const op of ops.slice(i, i + BATCH_MAX)) {
+      if (op.soort === "set") batch.set(refVoorPad(op.pad), op.data as DocData, { merge: true });
+      else batch.delete(refVoorPad(op.pad));
+    }
+    await batch.commit();
+  }
+}
+
+/** Alle docs van één collectie ophalen (voor de migratie). */
+export async function leesCollectie(pad: string): Promise<Array<{ id: string; data: DocumentData }>> {
+  const snap = await getDocs(collection(db, pad));
+  return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+}
+
+/** Eén document ophalen (voor de migratie). */
+export async function leesDoc(...pad: string[]): Promise<DocumentData | null> {
+  const [c, ...rest] = pad;
+  const snap = await getDoc(doc(db, c, ...rest));
+  return snap.exists() ? snap.data() : null;
+}
+
+/** Documenten verwijderen (voor de opkuis). */
+export async function verwijderDocs(paden: string[][]): Promise<void> {
+  const batch = writeBatch(db);
+  for (const pad of paden) {
+    const [c, ...rest] = pad;
+    batch.delete(doc(db, c, ...rest));
+  }
+  await batch.commit();
+}
+
+// --- Personeelsaccounts (collectie /gebruikers, doc-id = e-mailadres) --------------------
+
+const gebruikerRef = (email: string) => doc(db, "gebruikers", email);
+
+/** Luister naar het `gebruikers`-doc van één e-mailadres (voor de toegangspoort + zijbalk). */
+export function abonneerGebruiker(
+  email: string,
+  cb: (p: Personeelslid | null) => void,
+): Unsubscribe {
+  return onSnapshot(
+    gebruikerRef(email),
+    (snap) => cb(snap.exists() ? (snap.data() as Personeelslid) : null),
+    (err) => {
+      console.warn("Firestore gebruiker snapshot melding:", err.message);
+      cb(null);
+    },
+  );
+}
+
+/** Luister naar de volledige personeelslijst (alleen bruikbaar als beheerder). */
+export function abonneerGebruikers(cb: (lijst: Personeelslid[]) => void): Unsubscribe {
+  return onSnapshot(
+    collection(db, "gebruikers"),
+    (snap) => cb(snap.docs.map((d) => d.data() as Personeelslid)),
+    (err) => console.warn("Firestore gebruikers snapshot melding:", err.message),
+  );
+}
+
+/** Voeg een personeelslid toe of werk het bij (beheerder). */
+export async function schrijfGebruiker(p: Personeelslid): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  try {
+    await setDoc(gebruikerRef(p.email), {
+      email: p.email,
+      naam: p.naam,
+      rol: p.rol,
+      vestiging: p.rol === "mentor" ? p.vestiging : "",
+      actief: p.actief,
+      updatedAt: new Date().toISOString(),
+      updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `gebruikers/${p.email}`);
+  }
+}
+
+/** Verwijder een personeelslid definitief (beheerder). Deactiveren gaat via `schrijfGebruiker`. */
+export async function verwijderGebruiker(email: string): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  try {
+    await deleteDoc(gebruikerRef(email));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `gebruikers/${email}`);
   }
 }

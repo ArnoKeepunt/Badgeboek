@@ -5,7 +5,7 @@ import { GroepOpenen } from "../components/GroepOpenen";
 import { Modal } from "../components/Modal";
 import { SOORT_LABEL, SYSTEEM_SOORTEN, stromenVanGroep, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
-import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
+import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
 import { useAangemeld } from "../lib/sessie";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
@@ -33,7 +33,7 @@ function PotloodIcoon() {
 export function Groepen() {
   const { mentoren, groepen } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = bereikVestiging(useAangemeld());
+  const scopeVestiging = useBereik().vestiging;
   const [, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
   const aangemeld = useAangemeld();

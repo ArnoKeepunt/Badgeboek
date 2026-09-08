@@ -1,23 +1,22 @@
 import {
-  doc,
-  onSnapshot,
-  setDoc,
+  type DocumentData,
   type Unsubscribe,
+  collection,
+  collectionGroup,
+  onSnapshot,
 } from "firebase/firestore";
+import { HUIDIG_SCHOOLJAAR } from "../schooljaar";
 import {
   auth,
-  CURRICULUM_DOC,
   db,
   handleFirestoreError,
   OperationType,
   schrijfCurriculum as schrijfCurriculumDoc,
+  schrijfDocMap,
 } from "./firebaseApp";
-import type { CurriculumData } from "../curriculum";
-import type {
-  BadgeboekPersistentie,
-  PersistedStore,
-  RauweStore,
-} from "./persistentie";
+import { type DocData, type DocMap, diffDocs, docsNaarStore, storeNaarDocs } from "./firestoreLayout";
+import type { CurriculumRuw } from "../curriculum";
+import type { BadgeboekPersistentie, PersistedStore, RauweStore } from "./persistentie";
 
 const CACHE_SLEUTEL = "keerpunt-badgeboek:firebase-cache";
 
@@ -38,9 +37,25 @@ function bewaarCache(data: RauweStore): void {
   }
 }
 
+/** `updatedAt`/`updatedBy` weghalen zodat de diff inhoud-tegen-inhoud vergelijkt. */
+function zonderMeta(d: DocumentData): DocData {
+  const kopie = { ...d };
+  delete kopie.updatedAt;
+  delete kopie.updatedBy;
+  return kopie;
+}
+
 export function firebasePersistentie(): BadgeboekPersistentie {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let laatsteStore: PersistedStore | null = null;
+  /** De documentstand zoals die in Firestore staat (zonder meta). `bewaar` diff't hiertegen. */
+  let vorigeDocs: DocMap | null = null;
+  /** Het schooljaar waarvoor `vorigeDocs` de evaluatie-docs bevat. */
+  let vorigeDocsSchooljaar: string = HUIDIG_SCHOOLJAAR;
+  /** Het schooljaar waarvoor de `evaluaties`-luisteraar draait. */
+  let actiefSchooljaar: string = HUIDIG_SCHOOLJAAR;
+  /** Gezet door `abonneer`: herabonneer de evaluaties-luisteraar op een ander schooljaar. */
+  let herabonneerEvaluaties: ((sj: string) => void) | null = null;
 
   return {
     naam: "firebase (Firestore)",
@@ -49,199 +64,153 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       return laadCache();
     },
 
-    schrijfCurriculum(data: CurriculumData | null): Promise<void> {
+    schrijfCurriculum(data: CurriculumRuw | null): Promise<void> {
       return schrijfCurriculumDoc(data);
     },
 
     bewaar(store: PersistedStore): void {
       laatsteStore = store;
-      // Werk lokale offline cache altijd onmiddellijk bij
       bewaarCache(store);
+      if (store.schooljaar !== actiefSchooljaar) {
+        actiefSchooljaar = store.schooljaar;
+        herabonneerEvaluaties?.(store.schooljaar);
+      }
 
-      // Debounce Firestore writes (~600ms) om overbodige writes te vermijden
       if (timer) clearTimeout(timer);
       timer = setTimeout(async () => {
-        if (!laatsteStore) return;
-        const teBewaren = laatsteStore;
-
-        if (!auth.currentUser) {
-          // Niet ingelogd via Firebase Auth; wijziging blijft in lokale cache
-          return;
-        }
-
-        const email = auth.currentUser.email ?? auth.currentUser.uid;
-        const now = new Date().toISOString();
-
-        const globaalDoc = {
-          schooljaar: teBewaren.schooljaar,
-          students: teBewaren.students,
-          mentoren: teBewaren.mentoren,
-          groepen: teBewaren.groepen,
-          deelevaluaties: teBewaren.deelevaluaties,
-          doelWijzigingen: teBewaren.doelWijzigingen,
-          doelenImport: teBewaren.doelenImport,
-          rubriekWijzigingen: teBewaren.rubriekWijzigingen,
-          matrixStromen: teBewaren.matrixStromen,
-          matrixCursus: teBewaren.matrixCursus,
-          meldingen: teBewaren.meldingen,
-          meldingGezien: teBewaren.meldingGezien,
-          updatedAt: now,
-          updatedBy: email,
-        };
-
-        const evaluatieDoc = {
-          schooljaar: teBewaren.schooljaar,
-          kleuren: teBewaren.kleuren,
-          notities: teBewaren.notities,
-          deelKleuren: teBewaren.deelKleuren,
-          deelNotities: teBewaren.deelNotities,
-          auditLog: teBewaren.auditLog,
-          gewist: teBewaren.gewist,
-          updatedAt: now,
-          updatedBy: email,
-        };
-
+        if (!auth.currentUser || !laatsteStore) return;
+        // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar —
+        // anders zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
+        if (vorigeDocs && vorigeDocsSchooljaar !== actiefSchooljaar) return;
+        // Alleen het actieve schooljaar aanraken.
+        const nu = storeNaarDocs(laatsteStore, actiefSchooljaar);
+        const { schrijf, verwijder } = vorigeDocs
+          ? diffDocs(vorigeDocs, nu)
+          : { schrijf: nu, verwijder: [] };
+        if (schrijf.size === 0 && verwijder.length === 0) return;
         try {
-          await Promise.all([
-            setDoc(doc(db, "badgeboek", "_globaal"), globaalDoc, { merge: true }),
-            setDoc(doc(db, "badgeboek", teBewaren.schooljaar), evaluatieDoc, { merge: true }),
-          ]);
+          await schrijfDocMap(schrijf, verwijder);
+          vorigeDocs = nu;
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, "badgeboek");
+          handleFirestoreError(error, OperationType.WRITE, "batch");
         }
       }, 600);
     },
 
     abonneer(luister: (store: RauweStore) => void): () => void {
-      let unsubs: Unsubscribe[] = [];
-      let globaalData: Partial<PersistedStore> | null = null;
-      let evaluatieData: Partial<PersistedStore> | null = null;
-      // `undefined` = nog niet geladen, `null` = geladen maar geen database-versie (= bundel).
-      let curriculumData: CurriculumData | null | undefined = undefined;
-
-      const triggerLuister = () => {
-        if (!globaalData && !evaluatieData && curriculumData === undefined) return;
-        const samengevoegd: RauweStore = {
-          ...(globaalData ?? {}),
-          ...(evaluatieData ?? {}),
-        };
-        if (curriculumData !== undefined) samengevoegd.curriculumOverride = curriculumData;
-        bewaarCache(samengevoegd);
-        luister(samengevoegd);
+      // Per bron het laatst ontvangen fragment. `undefined` = nog geen snapshot gehad.
+      const bron: Record<string, DocMap | undefined> = {
+        leerlingen: undefined,
+        mentoren: undefined,
+        groepen: undefined,
+        deelbadges: undefined,
+        meldingen: undefined,
+        currCursussen: undefined,
+        currBadges: undefined,
+        instellingen: undefined,
+        evaluaties: undefined,
       };
 
-      const startLuisteraars = (schooljaar: string) => {
-        // Stop eerdere luisteraars indien schooljaar gewisseld is
+      const emit = () => {
+        if (Object.values(bron).some((f) => f === undefined)) return;
+        const docs: DocMap = new Map();
+        for (const frag of Object.values(bron)) {
+          if (frag) for (const [pad, data] of frag) docs.set(pad, data);
+        }
+        vorigeDocs = new Map(docs);
+        vorigeDocsSchooljaar = actiefSchooljaar;
+        const rauw = docsNaarStore(docs);
+        bewaarCache(rauw);
+        luister(rauw);
+      };
+
+      const collectieLuisteraar = (
+        naam: string,
+        pad: string,
+        padVoor: (id: string) => string,
+      ): Unsubscribe =>
+        onSnapshot(
+          collection(db, pad),
+          (snap) => {
+            const frag: DocMap = new Map();
+            snap.forEach((d) => frag.set(padVoor(d.id), zonderMeta(d.data())));
+            bron[naam] = frag;
+            emit();
+          },
+          (err) => console.warn(`Firestore ${naam}:`, err.message),
+        );
+
+      // Curriculum staat in subcollecties (curriculum/{stroom}/cursussen/{c}/badges/{b}) —
+      // via twee collectionGroup-luisteraars i.p.v. per stroom.
+      const curriculumGroepLuisteraar = (naam: "cursussen" | "badges"): Unsubscribe =>
+        onSnapshot(
+          collectionGroup(db, naam),
+          (snap) => {
+            const frag: DocMap = new Map();
+            snap.forEach((d) => {
+              const pad = d.ref.path.replace(/^.*?\/documents\//, "");
+              if (pad.startsWith("curriculum/")) frag.set(pad, zonderMeta(d.data()));
+            });
+            bron[naam === "cursussen" ? "currCursussen" : "currBadges"] = frag;
+            emit();
+          },
+          (err) => console.warn(`Firestore curriculum/${naam}:`, err.message),
+        );
+
+      let unsubs: Unsubscribe[] = [];
+      let unsubEval: Unsubscribe | null = null;
+
+      const startEvaluaties = (sj: string) => {
+        unsubEval?.();
+        bron.evaluaties = undefined;
+        unsubEval = onSnapshot(
+          collection(db, "evaluaties", sj, "leerlingen"),
+          (snap) => {
+            const frag: DocMap = new Map();
+            snap.forEach((d) =>
+              frag.set(`evaluaties/${sj}/leerlingen/${d.id}`, zonderMeta(d.data())),
+            );
+            bron.evaluaties = frag;
+            emit();
+          },
+          (err) => console.warn(`Firestore evaluaties/${sj}:`, err.message),
+        );
+      };
+      herabonneerEvaluaties = startEvaluaties;
+
+      const stopAlles = () => {
         unsubs.forEach((u) => u());
         unsubs = [];
-
-        // 1. Luister naar globaal
-        const unsubGlobaal = onSnapshot(
-          doc(db, "badgeboek", "_globaal"),
-          (snap) => {
-            if (snap.exists()) {
-              globaalData = snap.data() as Partial<PersistedStore>;
-              triggerLuister();
-            } else if (laatsteStore && auth.currentUser) {
-              // Als document nog niet bestaat, initialiseer eenmalig
-              const now = new Date().toISOString();
-              void setDoc(
-                doc(db, "badgeboek", "_globaal"),
-                {
-                  schooljaar: laatsteStore.schooljaar,
-                  students: laatsteStore.students,
-                  mentoren: laatsteStore.mentoren,
-                  groepen: laatsteStore.groepen,
-                  deelevaluaties: laatsteStore.deelevaluaties,
-                  doelWijzigingen: laatsteStore.doelWijzigingen,
-                  doelenImport: laatsteStore.doelenImport,
-                  rubriekWijzigingen: laatsteStore.rubriekWijzigingen,
-                  matrixStromen: laatsteStore.matrixStromen,
-                  matrixCursus: laatsteStore.matrixCursus,
-                  meldingen: laatsteStore.meldingen,
-                  meldingGezien: laatsteStore.meldingGezien,
-                  updatedAt: now,
-                  updatedBy: auth.currentUser?.email ?? "systeem",
-                },
-                { merge: true },
-              );
-            }
-          },
-          (err) => {
-            // Als de gebruiker nog niet bevoegd is, loggen we zonder te crashen
-            console.warn("Firestore _globaal snapshot melding:", err.message);
-          },
-        );
-        unsubs.push(unsubGlobaal);
-
-        // 2. Luister naar evaluaties van huidig schooljaar
-        const unsubEval = onSnapshot(
-          doc(db, "badgeboek", schooljaar),
-          (snap) => {
-            if (snap.exists()) {
-              evaluatieData = snap.data() as Partial<PersistedStore>;
-              triggerLuister();
-            } else if (laatsteStore && auth.currentUser) {
-              const now = new Date().toISOString();
-              void setDoc(
-                doc(db, "badgeboek", schooljaar),
-                {
-                  schooljaar: laatsteStore.schooljaar,
-                  kleuren: laatsteStore.kleuren,
-                  notities: laatsteStore.notities,
-                  deelKleuren: laatsteStore.deelKleuren,
-                  deelNotities: laatsteStore.deelNotities,
-                  auditLog: laatsteStore.auditLog,
-                  gewist: laatsteStore.gewist,
-                  updatedAt: now,
-                  updatedBy: auth.currentUser?.email ?? "systeem",
-                },
-                { merge: true },
-              );
-            }
-          },
-          (err) => {
-            console.warn(`Firestore ${schooljaar} snapshot melding:`, err.message);
-          },
-        );
-        unsubs.push(unsubEval);
+        unsubEval?.();
+        unsubEval = null;
+        for (const k of Object.keys(bron)) bron[k] = undefined;
       };
 
-      // 3. Luister naar de database-versie van de badges (`curriculum/actief`) — niet
-      //    schooljaar-gebonden, dus één luisteraar voor de sessie.
-      let unsubCurriculum: Unsubscribe | null = null;
-      const startCurriculum = () => {
-        unsubCurriculum?.();
-        unsubCurriculum = onSnapshot(
-          doc(db, CURRICULUM_DOC[0], CURRICULUM_DOC[1]),
-          (snap) => {
-            curriculumData = snap.exists() ? (snap.data() as CurriculumData) : null;
-            triggerLuister();
-          },
-          (err) => {
-            console.warn("Firestore curriculum/actief snapshot melding:", err.message);
-          },
-        );
+      const startAlles = () => {
+        stopAlles();
+        actiefSchooljaar = laatsteStore?.schooljaar ?? HUIDIG_SCHOOLJAAR;
+        unsubs = [
+          collectieLuisteraar("leerlingen", "leerlingen", (id) => `leerlingen/${id}`),
+          collectieLuisteraar("mentoren", "mentoren", (id) => `mentoren/${id}`),
+          collectieLuisteraar("groepen", "groepen", (id) => `groepen/${id}`),
+          collectieLuisteraar("deelbadges", "deelbadges", (id) => `deelbadges/${id}`),
+          collectieLuisteraar("meldingen", "meldingen", (id) => `meldingen/${id}`),
+          collectieLuisteraar("instellingen", "instellingen", (id) => `instellingen/${id}`),
+          curriculumGroepLuisteraar("cursussen"),
+          curriculumGroepLuisteraar("badges"),
+        ];
+        startEvaluaties(actiefSchooljaar);
       };
 
-      // Luister naar auth wijzigingen om Firestore-verbinding te starten
       const unsubAuth = auth.onAuthStateChanged((user) => {
-        if (user) {
-          const sj = laatsteStore?.schooljaar ?? "2025-2026";
-          startLuisteraars(sj);
-          startCurriculum();
-        } else {
-          unsubs.forEach((u) => u());
-          unsubs = [];
-          unsubCurriculum?.();
-          unsubCurriculum = null;
-        }
+        if (user) startAlles();
+        else stopAlles();
       });
 
       return () => {
         unsubAuth();
-        unsubs.forEach((u) => u());
-        unsubCurriculum?.();
+        stopAlles();
+        herabonneerEvaluaties = null;
       };
     },
   };

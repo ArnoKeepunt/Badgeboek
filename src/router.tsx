@@ -24,6 +24,8 @@ const Rubrics = lazy(() => import("./pages/Rubrics").then((m) => ({ default: m.R
 const Doelen = lazy(() => import("./pages/Doelen").then((m) => ({ default: m.Doelen })));
 // oxlint-disable-next-line react/only-export-components
 const Gegevens = lazy(() => import("./pages/Gegevens").then((m) => ({ default: m.Gegevens })));
+// oxlint-disable-next-line react/only-export-components
+const Gebruikers = lazy(() => import("./pages/Gebruikers").then((m) => ({ default: m.Gebruikers })));
 
 const traag = (node: ReactNode) => (
   <Suspense fallback={<p style={{ padding: 24, color: "var(--text-muted)" }}>Laden…</p>}>
@@ -52,6 +54,12 @@ export const router = createHashRouter([
         path: "gegevens",
         element: (
           <AlleenBeheerder>{traag(<Gegevens />)}</AlleenBeheerder>
+        ),
+      },
+      {
+        path: "gebruikers",
+        element: (
+          <AlleenBeheerder>{traag(<Gebruikers />)}</AlleenBeheerder>
         ),
       },
       { path: "students", element: <Students /> },

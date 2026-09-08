@@ -1,18 +1,27 @@
+import { useHuidigPersoneelslid } from "./firebaseAuth";
 import { useStore } from "./store";
 import type { Mentor, Student } from "./types";
 
 /**
- * De effectieve rol. Zonder aanmelding werk je als **beheerder** — volledige toegang.
- * Meld je aan als mentor of leerling om hun weergave te zien.
+ * De effectieve rol waarmee de app zich gedraagt.
+ *
+ * - Bij een Firebase-login komt de rol uit het personeelsaccount (`gebruikers/{email}`):
+ *   `beheerder` | `coordinator` | `mentor`.
+ * - De demo-`sessie` in de store is de **"bekijk als"-override** (enkel door een beheerder te
+ *   zetten via `/aanmelden`): tijdelijk de weergave van een leerling of mentor testen.
+ * - Zonder beide (local-modus) → `beheerder`, zoals vroeger.
  */
-export type EffectieveRol = "beheerder" | "mentor" | "leerling";
+export type EffectieveRol = "beheerder" | "coordinator" | "mentor" | "leerling";
 
 export function useEffectieveRol(): EffectieveRol {
   const { sessie } = useStore();
-  return sessie?.rol ?? "beheerder";
+  const { persoon } = useHuidigPersoneelslid();
+  if (sessie) return sessie.rol; // "bekijk als" leerling/mentor
+  if (persoon?.actief) return persoon.rol;
+  return "beheerder";
 }
 
-/** De aangemelde gebruiker, uitgezocht uit de sessie. `null` = beheerdersmodus. */
+/** De aangemelde gebruiker via de "bekijk als"-kiezer. `null` = geen bekijk-als actief. */
 export type Aangemeld =
   | { rol: "leerling"; leerling: Student }
   | { rol: "mentor"; mentor: Mentor }

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SOORT_LABEL, alleGroepDefs } from "../lib/groepen";
 import { GRAAD_LABEL, graadVan, unieke } from "../lib/leerlingen";
-import { bereikVestiging, useZichtbareLeerlingen } from "../lib/rechten";
-import { useAangemeld } from "../lib/sessie";
+import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
 import { maakGroep, useStore, verwijderGroep, wijzigGroep } from "../lib/store";
 import type { Groep } from "../lib/types";
 
@@ -34,7 +33,7 @@ export function GroepEditor({
 }) {
   const { groepen } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = bereikVestiging(useAangemeld());
+  const scopeVestiging = useBereik().vestiging;
   const [naam, setNaam] = useState(groep?.naam ?? "");
   const [zoek, setZoek] = useState("");
   const [vestiging, setVestiging] = useState("");

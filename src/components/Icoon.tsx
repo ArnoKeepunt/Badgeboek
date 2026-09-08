@@ -13,6 +13,7 @@ export type IcoonNaam =
   | "doelen"
   | "groepen"
   | "leerlingen"
+  | "gebruikers"
   | "gegevens";
 
 const basis = {
@@ -77,6 +78,14 @@ const paden: Record<IcoonNaam, ReactNode> = {
     <>
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+    </>
+  ),
+  // Gebruikers — twee personen (accountbeheer).
+  gebruikers: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 5.5a3 3 0 0 1 0 5.8M17.5 19a5.5 5.5 0 0 0-3-4.9" />
     </>
   ),
   // Gegevens — import/export (pijlen naar een bak).

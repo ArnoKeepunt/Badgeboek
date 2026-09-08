@@ -1,8 +1,12 @@
-import { alleDeelevaluatieTypes, cursussenVoorStroom, leerdoelenVoorCursus } from "./curriculum";
-import type { DeelevaluatieType } from "./deelevaluatieTypes";
+import {
+  type DeelevaluatieType,
+  alleDeelevaluatieTypes,
+  cursussenVoorStroom,
+  leerdoelenVoorCursus,
+} from "./curriculum";
 import type { Deelevaluatie, Leerdoel, Stroom } from "./types";
 
-export type { DeelevaluatieType } from "./deelevaluatieTypes";
+export type { DeelevaluatieType } from "./curriculum";
 
 /** Alle deelevaluatie-types van één stroom. */
 export const typesVoorStroom = (stroom: Stroom): DeelevaluatieType[] =>

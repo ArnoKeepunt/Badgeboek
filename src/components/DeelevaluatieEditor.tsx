@@ -122,7 +122,7 @@ export function DeelevaluatieEditor({
             <option value="">Geen type</option>
             {types.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.naam} · verplicht {t.verplicht}
+                {t.naam} ({t.richtaantal})
               </option>
             ))}
           </select>
@@ -136,8 +136,7 @@ export function DeelevaluatieEditor({
 
       {gekozenType && (
         <p className="de-type-hint">
-          {gekozenType.naam}: een leerling haalt er <strong>{gekozenType.verplicht}</strong>{" "}
-          verplicht (richtaantal {gekozenType.richtaantal}).
+          {gekozenType.naam}: <strong>{gekozenType.richtaantal}</strong> badges in deze groep.
         </p>
       )}
 

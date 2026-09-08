@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase } from "../lib/data";
-import { isKeerpuntAccount, useFirebaseGebruiker } from "../lib/firebaseAuth";
+import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
 import { LogoIcoon } from "./LogoIcoon";
 
 /**
@@ -15,17 +15,20 @@ export function Toegangspoort({ children }: { children: ReactNode }) {
 }
 
 function FirebasePoort({ children }: { children: ReactNode }) {
-  const { gebruiker, laden } = useFirebaseGebruiker();
+  const status = useAuthStatus();
 
-  if (laden) {
+  if (status.laden) {
     return (
       <PoortScherm>
         <p className="toegangspoort-tekst">Even geduld…</p>
       </PoortScherm>
     );
   }
-  if (!gebruiker) return <Inloggen />;
-  if (!isKeerpuntAccount(gebruiker)) return <GeenToegang gebruiker={gebruiker} />;
+  if (!status.gebruiker) return <Inloggen />;
+  if (!isKeerpuntAccount(status.gebruiker)) {
+    return <GeenToegang gebruiker={status.gebruiker} reden="domein" />;
+  }
+  if (!heeftToegang(status)) return <GeenToegang gebruiker={status.gebruiker} reden="account" />;
   return <>{children}</>;
 }
 
@@ -104,13 +107,21 @@ function Inloggen() {
   );
 }
 
-function GeenToegang({ gebruiker }: { gebruiker: User }) {
+function GeenToegang({ gebruiker, reden }: { gebruiker: User; reden: "domein" | "account" }) {
   return (
     <PoortScherm>
       <p className="toegangspoort-tekst">
-        Je bent aangemeld als <strong>{gebruiker.email ?? gebruiker.displayName}</strong>, maar
-        dat account hoort niet bij Keerpunt (<code>@keerpuntscholen.be</code>). Vraag toegang of
-        meld je aan met je Keerpunt-account.
+        Je bent aangemeld als <strong>{gebruiker.email ?? gebruiker.displayName}</strong>.{" "}
+        {reden === "domein" ? (
+          <>
+            Dat account hoort niet bij Keerpunt (<code>@keerpuntscholen.be</code>). Meld je aan
+            met je Keerpunt-account.
+          </>
+        ) : (
+          <>
+            Je hebt nog geen toegang tot het Badgeboek. Vraag een beheerder om je toe te voegen.
+          </>
+        )}
       </p>
       <button
         type="button"
