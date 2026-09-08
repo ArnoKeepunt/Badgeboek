@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+VERVANGEN door scripts/extract_badges.py — badges + deelbadge-types komen nu uit één bestand
+(docs/reference/deelevaluaties_alle-graden-2.xlsx). Dit script en de Word-badgeboeken blijven
+alleen als historische referentie bewaard; niet meer draaien.
+
 Genereer src/lib/curriculum{1A,1B,2A,3A}.ts uit de Word-badgeboeken in docs/reference/.
 
 Er bestaan geen CSV-versies van de badgeboeken; deze parser leest de .docx rechtstreeks.

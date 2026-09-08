@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BulkKnop } from "../components/BulkKnop";
 import { ColorBar } from "../components/ColorBar";
@@ -11,14 +11,11 @@ import {
   cursussen as alleCursussen,
   cursussenVoorStroom,
   leerdoelenVoorCursus,
-  leerdoelenVoorRubric,
   leerdoelenVoorStroom,
-  rubricsVoorCursus,
-  subgroepenVoorRubric,
 } from "../lib/curriculum";
 import { deelevaluatiesVoorBadge } from "../lib/deelevaluaties";
 import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
-import { telKleuren } from "../lib/kleurstats";
+import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
 import { useZichtbareLeerlingen } from "../lib/rechten";
@@ -39,8 +36,8 @@ import { STROOM_LABEL, doelSleutel } from "../lib/types";
 import type { Deelevaluatie, DoelKleuren, Leerdoel, Notities, Stroom, Student } from "../lib/types";
 
 /**
- * Badgematrix: badges (per cursus, per rubric) als rijen, leerlingen als kolommen.
- * Cursussen en rubrics zijn in- en uitklapbaar zodat een mentor enkel toont wat relevant is
+ * Badgematrix: badges (plat per cursus) als rijen, leerlingen als kolommen.
+ * Cursussen zijn in- en uitklapbaar zodat een mentor enkel toont wat relevant is
  * (bv. wiskunde zonder de talen). De inklapstand wordt lokaal onthouden.
  *
  * De stroomkeuze bepaalt zowel welke badges als welke leerlingen zichtbaar zijn: sta je op
@@ -56,10 +53,8 @@ const FOLD_KEY = "keerpunt-badgeboek:matrix-fold:v2";
 const alleCursusIds = () => alleCursussen.map((c) => c.id);
 
 interface Fold {
+  /** Ingeklapte cursussen (badges eronder verborgen). */
   cursus: string[];
-  rubric: string[];
-  /** Ingeklapte subgroepen, sleutel `${rubricId}|${subgroepnaam}`. */
-  subgroep: string[];
 }
 
 function loadFold(): Fold {
@@ -67,19 +62,13 @@ function loadFold(): Fold {
     const raw = localStorage.getItem(FOLD_KEY);
     if (raw) {
       const p = JSON.parse(raw) as Partial<Fold>;
-      return {
-        cursus: p.cursus ?? alleCursusIds(),
-        rubric: p.rubric ?? [],
-        subgroep: p.subgroep ?? [],
-      };
+      return { cursus: p.cursus ?? alleCursusIds() };
     }
   } catch {
     // geen opgeslagen stand
   }
-  return { cursus: alleCursusIds(), rubric: [], subgroep: [] };
+  return { cursus: alleCursusIds() };
 }
-
-const subgroepSleutel = (rubricId: string, naam: string) => `${rubricId}|${naam}`;
 
 const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
 const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id]);
@@ -89,8 +78,6 @@ interface StroomMatrixProps {
   leerlingen: Student[];
   fold: Fold;
   toggleCursus: (id: string) => void;
-  toggleRubric: (id: string) => void;
-  toggleSubgroep: (key: string) => void;
   kleuren: DoelKleuren;
   notities: Notities;
   deelevaluaties: Deelevaluatie[];
@@ -112,8 +99,6 @@ function StroomMatrix({
   leerlingen,
   fold,
   toggleCursus,
-  toggleRubric,
-  toggleSubgroep,
   kleuren,
   notities,
   deelevaluaties,
@@ -173,7 +158,7 @@ function StroomMatrix({
       );
     });
 
-  /** De eerste kolom van een cursus-/rubric-/subgroep-rij: inklaptoggle + bulk-knop. */
+  /** De eerste kolom van een cursusrij: inklaptoggle + bulk-knop. */
   const nodeKop = (
     nodeId: string,
     naam: string,
@@ -197,7 +182,7 @@ function StroomMatrix({
     </th>
   );
 
-  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => {
+  const doelRij = (doel: Leerdoel) => {
     const aantalDeel = deelevaluatiesVoorBadge(
       stroomDeelevaluaties,
       doel.id,
@@ -207,7 +192,7 @@ function StroomMatrix({
     const gekozen = gekozenBadge === doel.id;
     return (
       <tr key={doel.id} className={gekozen ? "is-gekozen" : undefined}>
-        <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+        <td className="grid-col-doel grid-doel grid-doel-n1">
           <div className="grid-doel-rij">
             <span className="grid-doel-tekst">{doel.omschrijving}</span>
             <button
@@ -313,10 +298,6 @@ function StroomMatrix({
             // Filter je op één cursus, dan staat die sowieso open.
             const cursusDicht = !cursusFilter && fold.cursus.includes(cursus.id);
             const cursusDoelen = leerdoelenVoorCursus(cursus.id);
-            const cursusRubrics = rubricsVoorCursus(cursus.id);
-            // Eén rubriek met dezelfde naam als de cursus = een overbodig tussenniveau:
-            // toon de badges dan meteen onder de cursus.
-            const enkeleRubriek = cursusRubrics.length === 1;
             return (
               <tbody key={cursus.id}>
                 <tr className="grid-cursus">
@@ -327,60 +308,30 @@ function StroomMatrix({
                     cursusDicht,
                     () => toggleCursus(cursus.id),
                   )}
-                  {kleurCellen(cursus.id, cursus.naam)}
-                </tr>
-
-                {!cursusDicht &&
-                  cursusRubrics.map((rubric) => {
-                    const rubricDicht = !enkeleRubriek && fold.rubric.includes(rubric.id);
-                    const doelen = leerdoelenVoorRubric(rubric.id);
-                    const subgroepen = subgroepenVoorRubric(rubric.id);
+                  {/* Geen evaluatie op cursusniveau, wel een leesbare samenvatting per leerling:
+                      hoeveel badges van deze cursus al behaald + de kleurverdeling. */}
+                  {leerlingen.map((s) => {
+                    const t = telKleuren(
+                      cursusDoelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id)),
+                    );
                     return (
-                      <Fragment key={rubric.id}>
-                        {!enkeleRubriek && (
-                          <tr className="grid-group">
-                            {nodeKop(
-                              rubric.id,
-                              rubric.naam,
-                              doelen.length,
-                              rubricDicht,
-                              () => toggleRubric(rubric.id),
-                            )}
-                            {kleurCellen(rubric.id, rubric.naam)}
-                          </tr>
-                        )}
-
-                        {!rubricDicht &&
-                          subgroepen.map((groep) => {
-                            if (!groep.naam) {
-                              const losNiveau = enkeleRubriek ? 1 : 2;
-                              return (
-                                <Fragment key={`${rubric.id}|los`}>
-                                  {groep.leerdoelen.map((d) => doelRij(d, losNiveau))}
-                                </Fragment>
-                              );
-                            }
-                            const sgKey = subgroepSleutel(rubric.id, groep.naam);
-                            const sgDicht = fold.subgroep.includes(sgKey);
-                            return (
-                              <Fragment key={sgKey}>
-                                <tr className="grid-group grid-subgroep">
-                                  {nodeKop(
-                                    sgKey,
-                                    groep.naam,
-                                    groep.leerdoelen.length,
-                                    sgDicht,
-                                    () => toggleSubgroep(sgKey),
-                                  )}
-                                  {kleurCellen(sgKey, groep.naam)}
-                                </tr>
-                                {!sgDicht && groep.leerdoelen.map((d) => doelRij(d, 3))}
-                              </Fragment>
-                            );
-                          })}
-                      </Fragment>
+                      <td
+                        key={s.id}
+                        className="grid-cel grid-cel-cursus"
+                        title={`${s.firstName} — ${aantalBehaald(t)} van ${cursusDoelen.length} badges behaald in ${cursus.naam}`}
+                      >
+                        <div className="grid-cursus-samenvatting">
+                          <span>
+                            {aantalBehaald(t)}/{cursusDoelen.length}
+                          </span>
+                          <ColorBar telling={t} />
+                        </div>
+                      </td>
                     );
                   })}
+                </tr>
+
+                {!cursusDicht && cursusDoelen.map((d) => doelRij(d))}
               </tbody>
             );
           })}
@@ -480,31 +431,14 @@ export function Badges() {
 
   const toggleCursus = (id: string) =>
     setFold((f) => ({
-      ...f,
       cursus: f.cursus.includes(id) ? zonder(f.cursus, id) : met(f.cursus, id),
-    }));
-  const toggleRubric = (id: string) =>
-    setFold((f) => ({
-      ...f,
-      rubric: f.rubric.includes(id) ? zonder(f.rubric, id) : met(f.rubric, id),
-    }));
-  const toggleSubgroep = (key: string) =>
-    setFold((f) => ({
-      ...f,
-      subgroep: f.subgroep.includes(key) ? zonder(f.subgroep, key) : met(f.subgroep, key),
     }));
 
   const allesDicht = () => {
     const cursusIds = matrixStromen.flatMap((s) => cursussenVoorStroom(s).map((c) => c.id));
-    const rubricIds = cursusIds.flatMap((id) => rubricsVoorCursus(id).map((r) => r.id));
-    const subgroepKeys = rubricIds.flatMap((rid) =>
-      subgroepenVoorRubric(rid)
-        .filter((g) => g.naam)
-        .map((g) => `${rid}|${g.naam}`),
-    );
-    setFold({ cursus: cursusIds, rubric: rubricIds, subgroep: subgroepKeys });
+    setFold({ cursus: cursusIds });
   };
-  const allesOpen = () => setFold({ cursus: [], rubric: [], subgroep: [] });
+  const allesOpen = () => setFold({ cursus: [] });
 
   return (
     <section>
@@ -559,8 +493,6 @@ export function Badges() {
                 leerlingen={leerlingen}
                 fold={fold}
                 toggleCursus={toggleCursus}
-                toggleRubric={toggleRubric}
-                toggleSubgroep={toggleSubgroep}
                 kleuren={kleuren}
                 notities={notities}
                 deelevaluaties={deelevaluaties}

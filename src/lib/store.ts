@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { cursusVanLeerdoel, cursusVanNode } from "./curriculum";
+import { cursusVanLeerdoel, cursusVanNode, cursussen, leerdoelen } from "./curriculum";
 import { type PersistedStore, type RauweStore, maakPersistentie, sessieOpslag } from "./data";
 import {
   deelKleuren as seedDeelKleuren,
@@ -125,7 +125,60 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   if (!Array.isArray(bewaard.matrixStromen)) {
     basis.matrixStromen = bewaard.matrixStroom ? [bewaard.matrixStroom] : standaard.matrixStromen;
   }
+  schoonOrphans(basis);
   return basis;
+}
+
+/**
+ * Opkuis-migratie. Sinds de badges herwerkt zijn uit `deelevaluaties_alle-graden-2.xlsx`
+ * (cursus "Basisvaardigheden" weg, geen cursus-/rubric-/subgroep-graadsbadges meer, badge-ids
+ * hernummerd) wijzen oude opgeslagen sleutels naar badges die niet meer bestaan. Die worden
+ * hier weggegooid. Idempotent — draait bij elke load.
+ */
+function schoonOrphans(basis: PersistedStore): void {
+  const geldigeBadges = new Set(leerdoelen.map((l) => l.id));
+  const geldigeCursusIds = new Set(cursussen.map((c) => c.id));
+  const geldigeCursusNamen = new Set(cursussen.map((c) => c.naam));
+
+  const badgeVanSleutel = (sleutel: string): string => {
+    const i1 = sleutel.indexOf(":");
+    const i2 = sleutel.indexOf(":", i1 + 1);
+    return i2 === -1 ? "" : sleutel.slice(i2 + 1);
+  };
+  const snoeiKleurMap = <T,>(map: Record<string, T>): Record<string, T> => {
+    const uit: Record<string, T> = {};
+    for (const [k, v] of Object.entries(map)) {
+      if (geldigeBadges.has(badgeVanSleutel(k))) uit[k] = v;
+    }
+    return uit;
+  };
+
+  basis.kleuren = snoeiKleurMap(basis.kleuren);
+  basis.notities = snoeiKleurMap(basis.notities);
+  // `auditLog` (geschiedenis) blijft ongemoeid: verweesde regels worden nooit getoond.
+
+  basis.deelevaluaties = basis.deelevaluaties.map((d) => ({
+    ...d,
+    leerdoelIds: d.leerdoelIds.filter((id) => geldigeBadges.has(id)),
+  }));
+  const deIds = new Set(basis.deelevaluaties.map((d) => d.id));
+  const snoeiDeelMap = <T,>(map: Record<string, T>): Record<string, T> => {
+    const uit: Record<string, T> = {};
+    for (const [k, v] of Object.entries(map)) {
+      if (deIds.has(k.slice(0, k.lastIndexOf(":")))) uit[k] = v;
+    }
+    return uit;
+  };
+  basis.deelKleuren = snoeiDeelMap(basis.deelKleuren);
+  basis.deelNotities = snoeiDeelMap(basis.deelNotities);
+
+  basis.meldingen = basis.meldingen.map((m) =>
+    m.cursusId && !geldigeCursusIds.has(m.cursusId) ? { ...m, cursusId: "" } : m,
+  );
+  if (basis.matrixCursus && !geldigeCursusNamen.has(basis.matrixCursus)) {
+    basis.matrixCursus = "";
+  }
+  basis.gewist = basis.gewist.filter((k) => geldigeBadges.has(badgeVanSleutel(k)));
 }
 
 function load(): State {
@@ -273,9 +326,8 @@ const notitieWeergave = (n: Notitie): string =>
   n.zichtbaar || (n.verborgen ? "(verborgen notitie)" : "");
 
 /**
- * Zet (of wis, met `null`) de kleur van een node voor één leerling in een schooljaar. Een node
- * is een losse badge (leerdoel-id) of een hoger niveau: een cursus-id, rubric-id of
- * subgroep-sleutel `${rubricId}|${naam}` (de manuele graadsbadge/subgraadbadge).
+ * Zet (of wis, met `null`) de kleur van een badge voor één leerling in een schooljaar.
+ * `nodeId` is een leerdoel-id (badge).
  */
 export function setDoelKleur(
   schooljaar: string,

@@ -1,14 +1,13 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ColorBar } from "../components/ColorBar";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
+import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import {
   cursussenVoorStroom,
   leerdoelenVoorCursus,
-  leerdoelenVoorRubric,
   leerdoelenVoorStroom,
-  rubricsVoorCursus,
-  subgroepenVoorRubric,
 } from "../lib/curriculum";
 import { deelevaluatiesVoor, typeById } from "../lib/deelevaluaties";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
@@ -36,17 +35,14 @@ import {
 
 /**
  * Leerlingdetail: dezelfde badges als in de badgematrix (`Badges.tsx`), maar voor één leerling
- * met één kleurkolom en een notitieveld per badge. Cursussen, rubrics en subgroepen krijgen —
- * net als in de matrix — een eigen kleur (graadsbadge) en zijn in- en uitklapbaar. De koprij
- * en de eerste kolom blijven leesbaar staan bij het scrollen.
+ * met één kleurkolom en een notitieveld per badge. Cursussen zijn in- en uitklapbaar; de badges
+ * staan plat eronder. De koprij en de eerste kolom blijven leesbaar staan bij het scrollen.
  */
 
 const FOLD_KEY = "keerpunt-badgeboek:student-fold";
 
 interface Fold {
   cursus: string[];
-  rubric: string[];
-  subgroep: string[];
 }
 
 function loadFold(): Fold {
@@ -54,17 +50,16 @@ function loadFold(): Fold {
     const raw = localStorage.getItem(FOLD_KEY);
     if (raw) {
       const p = JSON.parse(raw) as Partial<Fold>;
-      return { cursus: p.cursus ?? [], rubric: p.rubric ?? [], subgroep: p.subgroep ?? [] };
+      return { cursus: p.cursus ?? [] };
     }
   } catch {
     // geen opgeslagen stand — begin volledig uitgeklapt
   }
-  return { cursus: [], rubric: [], subgroep: [] };
+  return { cursus: [] };
 }
 
 const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
 const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id]);
-const subgroepSleutel = (rubricId: string, naam: string) => `${rubricId}|${naam}`;
 
 export function StudentDetail() {
   const { studentId } = useParams();
@@ -141,33 +136,13 @@ export function StudentDetail() {
 
   const toggleCursus = (id: string) =>
     setFold((f) => ({
-      ...f,
       cursus: f.cursus.includes(id) ? zonder(f.cursus, id) : met(f.cursus, id),
     }));
-  const toggleRubric = (id: string) =>
-    setFold((f) => ({
-      ...f,
-      rubric: f.rubric.includes(id) ? zonder(f.rubric, id) : met(f.rubric, id),
-    }));
-  const toggleSubgroep = (key: string) =>
-    setFold((f) => ({
-      ...f,
-      subgroep: f.subgroep.includes(key) ? zonder(f.subgroep, key) : met(f.subgroep, key),
-    }));
 
-  const allesDicht = () => {
-    const cursusIds = cursussen.map((c) => c.id);
-    const rubricIds = cursusIds.flatMap((id) => rubricsVoorCursus(id).map((r) => r.id));
-    const subgroepKeys = rubricIds.flatMap((rid) =>
-      subgroepenVoorRubric(rid)
-        .filter((g) => g.naam)
-        .map((g) => `${rid}|${g.naam}`),
-    );
-    setFold({ cursus: cursusIds, rubric: rubricIds, subgroep: subgroepKeys });
-  };
-  const allesOpen = () => setFold({ cursus: [], rubric: [], subgroep: [] });
+  const allesDicht = () => setFold({ cursus: cursussen.map((c) => c.id) });
+  const allesOpen = () => setFold({ cursus: [] });
 
-  /** De ene kleurcel voor één node (badge, cursus, rubric of subgroep). */
+  /** De ene kleurcel voor één badge. */
   const kleurCel = (nodeId: string, naam: string) => {
     const kleur = getDoelKleur(kleuren, schooljaar, student.id, nodeId);
     const sleutel = doelSleutel(schooljaar, student.id, nodeId);
@@ -192,7 +167,7 @@ export function StudentDetail() {
     );
   };
 
-  /** De eerste kolom van een cursus-/rubric-/subgroep-rij. */
+  /** De eerste kolom van een cursusrij. */
   const nodeKop = (naam: string, aantal: number, dicht: boolean, onToggle: () => void) => (
     <th className="grid-col-doel">
       <button type="button" className="grid-toggle" onClick={onToggle}>
@@ -203,12 +178,12 @@ export function StudentDetail() {
     </th>
   );
 
-  const doelRij = (doel: Leerdoel, niveau: 1 | 2 | 3) => {
+  const doelRij = (doel: Leerdoel) => {
     const aantalDeel = mijnDeel.filter((d) => d.leerdoelIds.includes(doel.id)).length;
     const gekozen = gekozenBadge === doel.id;
     return (
       <tr key={doel.id} className={gekozen ? "is-gekozen" : undefined}>
-        <td className={`grid-col-doel grid-doel grid-doel-n${niveau}`}>
+        <td className="grid-col-doel grid-doel grid-doel-n1">
           <div className="grid-doel-rij">
             <span className="grid-doel-tekst">{doel.omschrijving}</span>
             {aantalDeel > 0 && (
@@ -285,61 +260,36 @@ export function StudentDetail() {
               {cursussen.map((cursus) => {
                 const cursusDicht = fold.cursus.includes(cursus.id);
                 const cursusDoelen = leerdoelenVoorCursus(cursus.id);
-                const cursusRubrics = rubricsVoorCursus(cursus.id);
-                // Eén rubriek = overbodig tussenniveau: badges meteen onder de cursus.
-                const enkeleRubriek = cursusRubrics.length === 1;
                 return (
                   <tbody key={cursus.id}>
                     <tr className="grid-cursus">
                       {nodeKop(cursus.naam, cursusDoelen.length, cursusDicht, () =>
                         toggleCursus(cursus.id),
                       )}
-                      {kleurCel(cursus.id, cursus.naam)}
+                      {/* Geen evaluatie op cursusniveau, wel een samenvatting: behaald + verdeling. */}
+                      {(() => {
+                        const t = telKleuren(
+                          cursusDoelen.map((d) =>
+                            getDoelKleur(kleuren, schooljaar, student.id, d.id),
+                          ),
+                        );
+                        return (
+                          <td
+                            className="grid-cel grid-cel-cursus"
+                            title={`${aantalBehaald(t)} van ${cursusDoelen.length} badges behaald`}
+                          >
+                            <div className="grid-cursus-samenvatting">
+                              <span>
+                                {aantalBehaald(t)}/{cursusDoelen.length}
+                              </span>
+                              <ColorBar telling={t} />
+                            </div>
+                          </td>
+                        );
+                      })()}
                     </tr>
 
-                    {!cursusDicht &&
-                      cursusRubrics.map((rubric) => {
-                        const rubricDicht = !enkeleRubriek && fold.rubric.includes(rubric.id);
-                        const doelen = leerdoelenVoorRubric(rubric.id);
-                        const subgroepen = subgroepenVoorRubric(rubric.id);
-                        return (
-                          <Fragment key={rubric.id}>
-                            {!enkeleRubriek && (
-                              <tr className="grid-group">
-                                {nodeKop(rubric.naam, doelen.length, rubricDicht, () =>
-                                  toggleRubric(rubric.id),
-                                )}
-                                {kleurCel(rubric.id, rubric.naam)}
-                              </tr>
-                            )}
-
-                            {!rubricDicht &&
-                              subgroepen.map((groep) => {
-                                if (!groep.naam) {
-                                  const losNiveau = enkeleRubriek ? 1 : 2;
-                                  return (
-                                    <Fragment key={`${rubric.id}|los`}>
-                                      {groep.leerdoelen.map((d) => doelRij(d, losNiveau))}
-                                    </Fragment>
-                                  );
-                                }
-                                const sgKey = subgroepSleutel(rubric.id, groep.naam);
-                                const sgDicht = fold.subgroep.includes(sgKey);
-                                return (
-                                  <Fragment key={sgKey}>
-                                    <tr className="grid-group grid-subgroep">
-                                      {nodeKop(groep.naam, groep.leerdoelen.length, sgDicht, () =>
-                                        toggleSubgroep(sgKey),
-                                      )}
-                                      {kleurCel(sgKey, groep.naam)}
-                                    </tr>
-                                    {!sgDicht && groep.leerdoelen.map((d) => doelRij(d, 3))}
-                                  </Fragment>
-                                );
-                              })}
-                          </Fragment>
-                        );
-                      })}
+                    {!cursusDicht && cursusDoelen.map((d) => doelRij(d))}
                   </tbody>
                 );
               })}

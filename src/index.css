@@ -959,16 +959,34 @@ th {
   padding-left: 28px;
 }
 
-/* Trapsgewijze inspringing: de badge-items staan telkens één stap dieper dan hun kop
-   (cursus → rubric → subgroep). */
+/* De badge-items staan één stap dieper dan hun cursuskop. */
 .grid-doel.grid-doel-n1 {
   padding-left: 22px;
 }
-.grid-doel.grid-doel-n2 {
-  padding-left: 40px;
+
+/* Cursusrij heeft geen evaluatie meer, wel een leesbare samenvatting per leerling:
+   "behaald/totaal" + een compacte kleurverdeling. Geen hover/klik-affordance. */
+.grid-cel-cursus {
+  background: var(--surface);
+  vertical-align: middle;
 }
-.grid-doel.grid-doel-n3 {
-  padding-left: 58px;
+
+.grid-cursus-samenvatting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-cursus-samenvatting .colorbar {
+  min-width: 0;
+  width: 100%;
+  height: 5px;
 }
 
 /* De inhoud van de badge-cel flext; de <td> zelf blijft een gewone tabelcel, anders
@@ -986,7 +1004,7 @@ th {
   flex: 1;
 }
 
-/* Cursus-/rubric-/subgroep-rij: de inklaptoggle vult de kolom, de bulk-knop staat rechts. */
+/* Cursusrij: de inklaptoggle vult de kolom, de bulk-knop staat rechts. */
 .grid-doel-rij > .grid-toggle {
   flex: 1;
   text-align: left;
@@ -1197,29 +1215,6 @@ th {
 }
 
 /* Rubric-rij (tweede inklapniveau). */
-.grid-group th,
-.grid-group td {
-  background: #fbfbfc;
-  font-size: 12px;
-}
-
-.grid-group .grid-toggle {
-  font-weight: 600;
-  padding-left: 18px;
-}
-
-/* Subgroep-rij (derde inklapniveau, bv. Getallenleer onder een rubric). */
-.grid-subgroep th,
-.grid-subgroep td {
-  background: var(--surface);
-}
-
-.grid-subgroep .grid-toggle {
-  font-weight: 500;
-  padding-left: 36px;
-  color: var(--text-muted);
-}
-
 .grid-count {
   font-weight: 600;
   color: var(--text-muted);
@@ -1945,7 +1940,7 @@ th {
   font-size: 13px;
 }
 
-/* Cursusnaam + de graadsbadge-kleur van de mentor (kan leeg staan). */
+/* Cursusnaam bovenaan de leerlingweergave. */
 .ll-cursus-titel-rij {
   display: flex;
   align-items: center;
@@ -1954,60 +1949,14 @@ th {
   margin-bottom: 2px;
 }
 
-/* Eén kaart per rubriek: houdt zijn subgroepen + badges visueel bij elkaar. Compact — de rijen
-   staan dicht op elkaar zoals in de matrix. */
+/* Eén kaart met alle badges van de cursus, plat. Compact — de rijen staan dicht op elkaar
+   zoals in de matrix. */
 .ll-rubriek {
   margin-top: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 14px;
-}
-
-/* Rubrieknaam + subgraadbadge-kleur (enkel als die effectief gezet is — anders geen pil). */
-.ll-rubriek-kop {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-
-.ll-rubriek-kop h2 {
-  margin: 0;
-}
-
-.ll-rubriek h2 {
-  font-size: 15px;
-  margin: 0 0 6px;
-}
-
-/* Subgroep binnen een rubriek: een genoemde subgroep krijgt een dun lijntje links + een klein
-   label erboven. */
-.ll-subgroep-blok + .ll-subgroep-blok {
-  margin-top: 8px;
-}
-
-.ll-subgroep-blok.heeft-naam {
-  padding-left: 10px;
-  border-left: 3px solid var(--border);
-}
-
-.ll-subgroep-kop {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 4px 0 3px;
-}
-
-.ll-subgroep-kop h3 {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
 }
 
 /* Badges als compacte lijstrijen met een dun scheidingslijntje — geen losse kaartjes meer. */

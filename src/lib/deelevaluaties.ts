@@ -28,23 +28,18 @@ export const typeById = (id: string | null | undefined): DeelevaluatieType | und
   id ? deelevaluatieTypes.find((t) => t.id === id) : undefined;
 
 /**
- * De naam van de deelevaluatie-cursus verschilt soms licht van de badge-cursus
- * ("Actuaronde" ↔ "Actua"). Deze alias helpt om de juiste badges voor te stellen.
+ * De deelbadge-types en de badges komen nu uit hetzelfde bestand, dus de cursusnamen zijn
+ * gelijk. Deze alias-map blijft als vangnet voor kleine afwijkingen (bv. een oude
+ * deelevaluatie met een licht andere cursusnaam).
  */
-const CURSUS_ALIAS: Record<string, string> = {
-  actuaronde: "actua",
-  "vrije tekst": "vrije tekst",
-  "focusateliers & vrije ateliers": "ateliers",
-  basisfreinetvaardigheden: "basisvaardigheden",
-};
+const CURSUS_ALIAS: Record<string, string> = {};
 
 const norm = (s: string) => s.trim().toLowerCase();
 
 /**
- * De kapstok-cursusnaam (zoals in `cursusNamenVoorStroom`) die bij een badge-cursus hoort,
- * bv. "Basisvaardigheden" → "Basisfreinetvaardigheden". Zo staat een nieuwe deelevaluatie die
- * je vanuit de badgematrix aanmaakt meteen op de juiste cursus. Valt terug op de badge-naam
- * zelf als er geen kapstok-tegenhanger is.
+ * De kapstok-cursusnaam (zoals in `cursusNamenVoorStroom`) die bij een badge-cursus hoort. De
+ * namen zijn nu gelijk (zelfde bronbestand), dus dit is meestal een 1-op-1 match; valt terug
+ * op de badge-naam zelf als er geen kapstok-tegenhanger is.
  */
 export function kapstokCursusVoorBadgeCursus(stroom: Stroom, badgeCursus: string): string {
   const doel = CURSUS_ALIAS[norm(badgeCursus)] ?? norm(badgeCursus);

@@ -5,10 +5,10 @@ import { cursussen2A, leerdoelen2A, rubrics2A } from "./curriculum2A";
 import { cursussen3A, leerdoelen3A, rubrics3A } from "./curriculum3A";
 
 /**
- * Het badgeboek-curriculum: Cursus → Rubric → Leerdoel (= badge), per graad/stroom.
- * De data is een best-effort extractie uit de Word-badgeboeken
- * (docs/reference/2025 Badgeboek …). Kan onvolledig zijn en mag bijgewerkt worden.
- * 3e graad (3A) heeft weinig vaste badges (modulair systeem).
+ * Het badgeboek-curriculum: Cursus → Leerdoel (= badge), per graad/stroom. Er is precies één
+ * (verborgen) Rubric per cursus — de badges staan plat onder de cursus. Auto-gegenereerd via
+ * `scripts/extract_badges.py` uit `docs/reference/deelevaluaties_alle-graden-2.xlsx`, dezelfde
+ * bron als `deelevaluatieTypes.ts`.
  */
 
 export const cursussen: Cursus[] = [
@@ -44,13 +44,12 @@ export function cursusVanLeerdoel(leerdoelId: string): Cursus | undefined {
 }
 
 /**
- * De cursus waartoe een node behoort. Een node-id is een cursus-id, een rubric-id, een
- * subgroep-sleutel `${rubricId}|${naam}` of een leerdoel-id. De id's zijn structureel
- * ondubbelzinnig (`1A-c1` / `1A-c1-r1` / `1A-c1-r1-d1`), dus de volgorde van de lookups kan
- * niet mismatchen.
+ * De cursus waartoe een node behoort. Een node-id is een cursus-id, een rubric-id of een
+ * leerdoel-id. De id's zijn structureel ondubbelzinnig (`1A-c1` / `1A-c1-r1` / `1A-c1-r1-d1`),
+ * dus de volgorde van de lookups kan niet mismatchen.
  */
 export function cursusVanNode(nodeId: string): Cursus | undefined {
-  const basis = nodeId.includes("|") ? nodeId.slice(0, nodeId.indexOf("|")) : nodeId;
+  const basis = nodeId;
   const cursus = cursussen.find((c) => c.id === basis);
   if (cursus) return cursus;
   const rubric = rubrics.find((r) => r.id === basis);
@@ -71,26 +70,3 @@ export const leerdoelenVoorStroom = (stroom: Stroom): Leerdoel[] => {
   const rubricIds = new Set(rubrics.filter((r) => cursusIds.has(r.cursusId)).map((r) => r.id));
   return leerdoelen.filter((l) => rubricIds.has(l.rubricId));
 };
-
-export interface Subgroep {
-  /** `null` = losse leerdoelen zonder subgroep. */
-  naam: string | null;
-  leerdoelen: Leerdoel[];
-}
-
-/**
- * De leerdoelen van een rubric, gegroepeerd per `subgroep` (op volgorde). Rubrics zonder
- * subgroepen geven één groep terug met `naam: null`.
- */
-export function subgroepenVoorRubric(rubricId: string): Subgroep[] {
-  const lds = leerdoelenVoorRubric(rubricId);
-  if (!lds.some((l) => l.subgroep)) return [{ naam: null, leerdoelen: lds }];
-  const uit: Subgroep[] = [];
-  for (const l of lds) {
-    const naam = l.subgroep ?? null;
-    const laatste = uit[uit.length - 1];
-    if (laatste && laatste.naam === naam) laatste.leerdoelen.push(l);
-    else uit.push({ naam, leerdoelen: [l] });
-  }
-  return uit;
-}

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+VERVANGEN door scripts/extract_badges.py, dat zowel de badges als de deelbadge-types uit
+docs/reference/deelevaluaties_alle-graden-2.xlsx genereert. Niet meer draaien.
+
 Genereer src/lib/deelevaluatieTypes.ts uit docs/reference/deelevaluaties_alle-graden.xlsx.
 
 Het bestand geeft per graad/stroom en per cursus de *types* deelevaluatie (deelbadge) met

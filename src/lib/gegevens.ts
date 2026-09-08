@@ -177,23 +177,19 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
 
 const EVAL_KOP = [
   "schooljaar",
-  "niveau",
   "leerling_id",
   "voornaam",
   "achternaam",
   "stroom",
   "cursus",
-  "rubric",
-  "subgroep",
   "badge",
   "kleur",
   "behaald",
 ];
 
 /**
- * Elke ingevulde kleur als één rij — de "download op elk moment"-back-up. Een kleur kan op een
- * losse badge staan of op een hoger niveau (cursus/rubric/subgroep = graadsbadge); de kolom
- * `niveau` zegt welke.
+ * Elke ingevulde badgekleur als één rij — de "download op elk moment"-back-up. Elke sleutel
+ * wijst naar één badge (leerdoel); er is geen evaluatie meer op cursus-/rubric-niveau.
  */
 export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): string {
   const studById = new Map(studenten.map((s) => [s.id, s]));
@@ -203,8 +199,7 @@ export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): st
 
   const rijen: (string | number)[][] = [EVAL_KOP];
   for (const [sleutel, kleur] of Object.entries(kleuren)) {
-    // Sleutel = `${schooljaar}:${studentId}:${nodeId}`; nodeId kan zelf een `:` bevatten? Nee,
-    // maar een subgroep-sleutel bevat een `|`. Slice op de eerste twee dubbelpunten.
+    // Sleutel = `${schooljaar}:${studentId}:${nodeId}`.
     const i1 = sleutel.indexOf(":");
     const i2 = sleutel.indexOf(":", i1 + 1);
     const schooljaar = sleutel.slice(0, i1);
@@ -212,56 +207,18 @@ export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): st
     const nodeId = sleutel.slice(i2 + 1);
     const s = studById.get(studentId);
 
-    let niveau = "badge";
-    let stroom = "";
-    let cursusNaam = "";
-    let rubricNaam = "";
-    let subgroepNaam = "";
-    let badgeNaam = "";
-
-    if (nodeId.includes("|")) {
-      niveau = "subgroep";
-      const rubricId = nodeId.slice(0, nodeId.indexOf("|"));
-      subgroepNaam = nodeId.slice(nodeId.indexOf("|") + 1);
-      const rub = rubById.get(rubricId);
-      rubricNaam = rub?.naam ?? "";
-      const cur = rub ? curById.get(rub.cursusId) : undefined;
-      cursusNaam = cur?.naam ?? "";
-      stroom = cur?.stroom ?? "";
-    } else if (curById.has(nodeId)) {
-      niveau = "cursus";
-      const cur = curById.get(nodeId);
-      cursusNaam = cur?.naam ?? "";
-      stroom = cur?.stroom ?? "";
-    } else if (rubById.has(nodeId)) {
-      niveau = "rubric";
-      const rub = rubById.get(nodeId);
-      rubricNaam = rub?.naam ?? "";
-      const cur = rub ? curById.get(rub.cursusId) : undefined;
-      cursusNaam = cur?.naam ?? "";
-      stroom = cur?.stroom ?? "";
-    } else {
-      const d = doelById.get(nodeId);
-      badgeNaam = d?.omschrijving ?? nodeId;
-      subgroepNaam = d?.subgroep ?? "";
-      const rub = d ? rubById.get(d.rubricId) : undefined;
-      rubricNaam = rub?.naam ?? "";
-      const cur = rub ? curById.get(rub.cursusId) : undefined;
-      cursusNaam = cur?.naam ?? "";
-      stroom = cur?.stroom ?? "";
-    }
+    const d = doelById.get(nodeId);
+    const rub = d ? rubById.get(d.rubricId) : undefined;
+    const cur = rub ? curById.get(rub.cursusId) : undefined;
 
     rijen.push([
       schooljaar,
-      niveau,
       studentId,
       s?.firstName ?? "",
       s?.lastName ?? "",
-      stroom,
-      cursusNaam,
-      rubricNaam,
-      subgroepNaam,
-      badgeNaam,
+      cur?.stroom ?? "",
+      cur?.naam ?? "",
+      d?.omschrijving ?? nodeId,
       RATING_LABEL[kleur as Rating],
       kleur === "green" || kleur === "blue" ? "ja" : "nee",
     ]);

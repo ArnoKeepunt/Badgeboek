@@ -50,11 +50,6 @@ export interface Leerdoel {
   categorie: DoelCategorie;
   /** Optioneel: de rubric-omschrijving per kleur. */
   kleuren?: Kleurcriteria;
-  /**
-   * Optioneel: een subgroep binnen de rubric (bv. "Getallenleer" onder "Inzicht en
-   * vaardigheden in wiskundige domeinen"). Leerdoelen zonder subgroep staan los onder de rubric.
-   */
-  subgroep?: string;
 }
 
 /**
@@ -119,11 +114,10 @@ export interface Groep {
 }
 
 /**
- * Kleur per (schooljaar, leerling, node). Bewaard als één map met sleutel
- * `${schooljaar}:${studentId}:${nodeId}`. Een `nodeId` is een leerdoel-id (een losse badge),
- * of een cursus-/rubric-id of subgroep-sleutel `${rubricId}|${naam}` (de manueel gezette
- * graadsbadge/subgraadbadge op dat niveau). Een ontbrekende sleutel = "nog niet aangeboden
- * / geëvalueerd".
+ * Kleur per (schooljaar, leerling, badge). Bewaard als één map met sleutel
+ * `${schooljaar}:${studentId}:${nodeId}`, waarbij `nodeId` altijd een leerdoel-id (badge) is.
+ * (Vroeger kon het ook een cursus-/rubric-/subgroep-node zijn; die niveaus zijn weg.)
+ * Een ontbrekende sleutel = "nog niet aangeboden / geëvalueerd".
  */
 export type DoelKleuren = Record<string, Rating>;
 
@@ -141,7 +135,7 @@ export interface Notitie {
   verborgen: string;
 }
 
-/** Sleutel `${schooljaar}:${studentId}:${nodeId}` → Notitie (nodeId = badge/cursus/rubric/…). */
+/** Sleutel `${schooljaar}:${studentId}:${nodeId}` → Notitie (nodeId = badge/leerdoel-id). */
 export type Notities = Record<string, Notitie>;
 
 export const notitieSleutel = (

@@ -2,7 +2,6 @@ import {
   cursussenVoorStroom,
   leerdoelenVoorCursus,
   leerdoelenVoorStroom,
-  rubricsVoorCursus,
 } from "./curriculum";
 import { stroomVan } from "./leerlingen";
 import { seedLeerlingen, seedMentoren } from "./seedGebruikers";
@@ -53,9 +52,6 @@ const SEED_CONFIG: Record<string, number> = {
   "2026-2027": 0.5,
 };
 
-/** Kans dat een cursus- of rubric-graadsbadge al gezet is (lager dan de losse badges). */
-const PARENT_DICHTHEID = 0.3;
-
 const GESEEDE_LEERLINGEN = students.slice(0, 16);
 
 /** De badges van elke geseede leerling, volgens zijn/haar eigen stroom (1A, 1B, 2A, 3A). */
@@ -74,19 +70,6 @@ export const doelKleuren: DoelKleuren = (() => {
       for (const doel of DOELEN_PER_LEERLING.get(student.id) ?? []) {
         const bron = `${schooljaar}:${student.id}:${doel.id}`;
         if (misschien(bron, dichtheid)) map[doelSleutel(schooljaar, student.id, doel.id)] = seedKleur(bron);
-      }
-      // Graadsbadges op cursus- en rubric-niveau.
-      for (const cursus of cursussenVoorStroom(stroomVan(student))) {
-        const cBron = `${schooljaar}:${student.id}:${cursus.id}`;
-        if (misschien(cBron, PARENT_DICHTHEID)) {
-          map[doelSleutel(schooljaar, student.id, cursus.id)] = seedKleur(cBron);
-        }
-        for (const rubric of rubricsVoorCursus(cursus.id)) {
-          const rBron = `${schooljaar}:${student.id}:${rubric.id}`;
-          if (misschien(rBron, PARENT_DICHTHEID)) {
-            map[doelSleutel(schooljaar, student.id, rubric.id)] = seedKleur(rBron);
-          }
-        }
       }
     }
   }
@@ -128,7 +111,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     typeId: TYPE_ACTUARONDE_NL,
     titel: "Actuaronde — verkiezingen VS",
     datum: "2026-10-14",
-    leerdoelIds: badgesVan("Actua", 2),
+    leerdoelIds: badgesVan("Actuaronde", 2),
     toelichting: "",
   },
   {
@@ -212,8 +195,8 @@ export const seedMeldingen: Melding[] = (() => {
   const cursussen1A = cursussenVoorStroom("1A");
   const cursus = (naam: string) => cursussen1A.find((c) => c.naam === naam);
   const rijen: [naam: string, llIdx: number, aantal: number, urenGeleden: number][] = [
-    ["Vrije tekst", 0, 2, 3],
-    ["Actua", 0, 1, 27],
+    ["Vrije Tekst", 0, 2, 3],
+    ["Actuaronde", 0, 1, 27],
     ["Onderzoek", 1, 4, 52],
     ["Levende Wiskunde", 2, 1, 6],
   ];
