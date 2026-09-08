@@ -7,6 +7,7 @@
 4. Writing to `/test/{testId}` is denied to prevent resource exhaustion attacks; only `get` is permitted for connection liveness checks.
 5. Deletion of global configuration or school year records is restricted to administrators.
 6. Identity spoofing via fake email claims is prohibited; all writes require `request.auth.token.email_verified == true`.
+7. The editable badge set (`/curriculum/{docId}`) is readable by all verified school staff but **writable only by the administrator** — this is the deliberate access control for who may change badges/courses. The app never writes it except via the admin-only "Badges in de database" action.
 
 ## 2. The Dirty Dozen Payloads (Designed to Fail)
 1. **Unauthenticated Read on Badgeboek**: Read attempt on `/badgeboek/_globaal` without `request.auth` token -> `PERMISSION_DENIED`.
@@ -21,3 +22,4 @@
 10. **Missing Required School Year Field**: Updating `/badgeboek/2025-2026` removing the required `schooljaar` attribute -> `PERMISSION_DENIED`.
 11. **Oversized String Injection**: Injecting a 2MB payload into `schooljaar` -> `PERMISSION_DENIED`.
 12. **Null Resource Manipulation**: Calling write methods while bypassing verification -> `PERMISSION_DENIED`.
+13. **Non-Admin Curriculum Write**: A regular `@keerpuntscholen.be` staff member attempting `set`/`delete` on `/curriculum/actief` -> `PERMISSION_DENIED` (read is allowed).

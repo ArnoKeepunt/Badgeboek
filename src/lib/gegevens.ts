@@ -1,4 +1,4 @@
-import { cursussen, leerdoelen, rubrics } from "./curriculum";
+import { alleCursussen, alleLeerdoelen, alleRubrics } from "./curriculum";
 import { kopIndex, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
@@ -193,9 +193,9 @@ const EVAL_KOP = [
  */
 export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): string {
   const studById = new Map(studenten.map((s) => [s.id, s]));
-  const doelById = new Map(leerdoelen.map((d) => [d.id, d]));
-  const rubById = new Map(rubrics.map((r) => [r.id, r]));
-  const curById = new Map(cursussen.map((c) => [c.id, c]));
+  const doelById = new Map(alleLeerdoelen().map((d) => [d.id, d]));
+  const rubById = new Map(alleRubrics().map((r) => [r.id, r]));
+  const curById = new Map(alleCursussen().map((c) => [c.id, c]));
 
   const rijen: (string | number)[][] = [EVAL_KOP];
   for (const [sleutel, kleur] of Object.entries(kleuren)) {

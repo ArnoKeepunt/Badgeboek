@@ -51,6 +51,15 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    // Bewerkbare badge-set (curriculum + deelbadge-kapstok). Iedereen van het personeel leest;
+    // alleen de beheerder schrijft — dat IS de toegangscontrole (Arno: "niet de bedoeling dat
+    // iedereen hier aanpassingen aan maakt"). Bewerken gebeurt rechtstreeks in de console.
+    match /curriculum/{docId} {
+      allow get: if isValidId(docId) && isSchoolStaff();
+      allow list: if false;
+      allow write: if isValidId(docId) && isAdmin();
+    }
+
     // Badgebook global config and per-year evaluations
     match /badgeboek/{docId} {
       // Lezen mag alleen door geverifieerd Keerpunt-personeel — dit document bevat

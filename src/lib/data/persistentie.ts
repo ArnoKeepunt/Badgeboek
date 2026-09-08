@@ -1,3 +1,4 @@
+import type { CurriculumData } from "../curriculum";
 import type { Minimumdoel } from "../minimumdoelen";
 import type {
   AuditLog,
@@ -42,6 +43,12 @@ export interface PersistedStore {
   doelWijzigingen: Record<string, Partial<Minimumdoel>>;
   doelenImport: Minimumdoel[] | null;
   rubriekWijzigingen: Record<string, Partial<Rubriek>>;
+  /**
+   * De database-versie van de badges (curriculum + deelbadge-kapstok), of `null` = de
+   * ingebouwde bundel. Alleen-lezen vanuit de app: `abonneer()` vult dit vanuit
+   * `curriculum/actief`, alleen `schrijfCurriculum()` (beheerder) schrijft ernaar.
+   */
+  curriculumOverride: CurriculumData | null;
   deelevaluaties: Deelevaluatie[];
   deelKleuren: DeelKleuren;
   deelNotities: DeelNotities;
@@ -70,6 +77,13 @@ export interface BadgeboekPersistentie {
 
   /** De volledige store wegschrijven. Mag asynchroon zijn; de app wacht er niet op. */
   bewaar(store: PersistedStore): void | Promise<void>;
+
+  /**
+   * Optioneel: schrijf de database-versie van de badges weg (of wis ze met `null`). Alleen de
+   * beheerder-actie `zetCurriculumOverride` roept dit aan. Ontbreekt deze methode (localStorage),
+   * dan rijdt `curriculumOverride` gewoon mee in `bewaar()`.
+   */
+  schrijfCurriculum?(data: CurriculumData | null): void | Promise<void>;
 
   /**
    * Optioneel: reageer op data die elders gewijzigd is (andere browsertab, ander toestel, een

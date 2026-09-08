@@ -6,10 +6,13 @@ import {
 } from "firebase/firestore";
 import {
   auth,
+  CURRICULUM_DOC,
   db,
   handleFirestoreError,
   OperationType,
+  schrijfCurriculum as schrijfCurriculumDoc,
 } from "./firebaseApp";
+import type { CurriculumData } from "../curriculum";
 import type {
   BadgeboekPersistentie,
   PersistedStore,
@@ -44,6 +47,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
 
     laadDirect(): RauweStore | null {
       return laadCache();
+    },
+
+    schrijfCurriculum(data: CurriculumData | null): Promise<void> {
+      return schrijfCurriculumDoc(data);
     },
 
     bewaar(store: PersistedStore): void {
@@ -109,13 +116,16 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       let unsubs: Unsubscribe[] = [];
       let globaalData: Partial<PersistedStore> | null = null;
       let evaluatieData: Partial<PersistedStore> | null = null;
+      // `undefined` = nog niet geladen, `null` = geladen maar geen database-versie (= bundel).
+      let curriculumData: CurriculumData | null | undefined = undefined;
 
       const triggerLuister = () => {
-        if (!globaalData && !evaluatieData) return;
+        if (!globaalData && !evaluatieData && curriculumData === undefined) return;
         const samengevoegd: RauweStore = {
           ...(globaalData ?? {}),
           ...(evaluatieData ?? {}),
         };
+        if (curriculumData !== undefined) samengevoegd.curriculumOverride = curriculumData;
         bewaarCache(samengevoegd);
         luister(samengevoegd);
       };
@@ -197,20 +207,41 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         unsubs.push(unsubEval);
       };
 
+      // 3. Luister naar de database-versie van de badges (`curriculum/actief`) — niet
+      //    schooljaar-gebonden, dus één luisteraar voor de sessie.
+      let unsubCurriculum: Unsubscribe | null = null;
+      const startCurriculum = () => {
+        unsubCurriculum?.();
+        unsubCurriculum = onSnapshot(
+          doc(db, CURRICULUM_DOC[0], CURRICULUM_DOC[1]),
+          (snap) => {
+            curriculumData = snap.exists() ? (snap.data() as CurriculumData) : null;
+            triggerLuister();
+          },
+          (err) => {
+            console.warn("Firestore curriculum/actief snapshot melding:", err.message);
+          },
+        );
+      };
+
       // Luister naar auth wijzigingen om Firestore-verbinding te starten
       const unsubAuth = auth.onAuthStateChanged((user) => {
         if (user) {
           const sj = laatsteStore?.schooljaar ?? "2025-2026";
           startLuisteraars(sj);
+          startCurriculum();
         } else {
           unsubs.forEach((u) => u());
           unsubs = [];
+          unsubCurriculum?.();
+          unsubCurriculum = null;
         }
       });
 
       return () => {
         unsubAuth();
         unsubs.forEach((u) => u());
+        unsubCurriculum?.();
       };
     },
   };

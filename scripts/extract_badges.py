@@ -17,6 +17,11 @@ Verplicht Aantal`. Elke rij wordt:
 Uitvoer:
   - src/lib/curriculum{1A,1B,2A,3A}.ts  (Cursus -> 1 Rubric per cursus -> Leerdoel)
   - src/lib/deelevaluatieTypes.ts
+
+Deze bestanden zijn de *gebundelde* set. Staat er een database-versie klaar (Firestore
+`curriculum/actief`), dan gebruikt de app die en negeert ze de bundel. Na een nieuwe xlsx dus:
+dit script draaien EN in de app op /gegevens "Zet de ingebouwde badges in de database" klikken
+(of eerst "Gebruik terug de ingebouwde badges"), anders blijft de database-versie de oude.
 """
 import xml.etree.ElementTree as ET
 import zipfile

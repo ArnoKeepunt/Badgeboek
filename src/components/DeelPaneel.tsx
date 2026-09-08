@@ -4,7 +4,7 @@ import { DeelevaluatieEditor } from "./DeelevaluatieEditor";
 import { Modal } from "./Modal";
 import { NotitieVeld } from "./NotitieVeld";
 import { RatingCell } from "./RatingCell";
-import { cursusVanLeerdoel, leerdoelen } from "../lib/curriculum";
+import { alleLeerdoelen, cursusVanLeerdoel } from "../lib/curriculum";
 import { deelevaluatiesVoorBadge, kapstokCursusVoorBadgeCursus } from "../lib/deelevaluaties";
 import { useAangemeld } from "../lib/sessie";
 import {
@@ -56,7 +56,7 @@ export function DeelPaneel({
   const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
   const [editorOpen, setEditorOpen] = useState(false);
 
-  const doel = leerdoelen.find((l) => l.id === leerdoelId);
+  const doel = alleLeerdoelen().find((l) => l.id === leerdoelId);
   const cursus = cursusVanLeerdoel(leerdoelId);
   const rijen = deelevaluatiesVoorBadge(deelevaluaties, leerdoelId, schooljaar, cursusFilter);
   const alleIds = leerlingen.map((s) => s.id);

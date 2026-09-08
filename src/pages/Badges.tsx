@@ -8,7 +8,7 @@ import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
 import { StroomBalk } from "../components/StroomBalk";
 import {
-  cursussen as alleCursussen,
+  alleCursussen,
   cursussenVoorStroom,
   leerdoelenVoorCursus,
   leerdoelenVoorStroom,
@@ -50,7 +50,7 @@ import type { Deelevaluatie, DoelKleuren, Leerdoel, Notities, Stroom, Student } 
 const FOLD_KEY = "keerpunt-badgeboek:matrix-fold:v2";
 
 /** Standaard: alle cursussen toegeklapt, zodat je niet langs alles moet scrollen. */
-const alleCursusIds = () => alleCursussen.map((c) => c.id);
+const alleCursusIds = () => alleCursussen().map((c) => c.id);
 
 interface Fold {
   /** Ingeklapte cursussen (badges eronder verborgen). */

@@ -1,12 +1,12 @@
-import { cursussenVoorStroom, leerdoelenVoorCursus } from "./curriculum";
-import { type DeelevaluatieType, deelevaluatieTypes } from "./deelevaluatieTypes";
+import { alleDeelevaluatieTypes, cursussenVoorStroom, leerdoelenVoorCursus } from "./curriculum";
+import type { DeelevaluatieType } from "./deelevaluatieTypes";
 import type { Deelevaluatie, Leerdoel, Stroom } from "./types";
 
 export type { DeelevaluatieType } from "./deelevaluatieTypes";
 
 /** Alle deelevaluatie-types van één stroom. */
 export const typesVoorStroom = (stroom: Stroom): DeelevaluatieType[] =>
-  deelevaluatieTypes.filter((t) => t.stroom === stroom);
+  alleDeelevaluatieTypes().filter((t) => t.stroom === stroom);
 
 /** De cursussen (namen) die in de deelevaluatie-kapstok van een stroom voorkomen, op volgorde. */
 export function cursusNamenVoorStroom(stroom: Stroom): string[] {
@@ -25,7 +25,7 @@ export const typesVoorCursus = (stroom: Stroom, cursus: string): DeelevaluatieTy
   typesVoorStroom(stroom).filter((t) => t.cursus === cursus);
 
 export const typeById = (id: string | null | undefined): DeelevaluatieType | undefined =>
-  id ? deelevaluatieTypes.find((t) => t.id === id) : undefined;
+  id ? alleDeelevaluatieTypes().find((t) => t.id === id) : undefined;
 
 /**
  * De deelbadge-types en de badges komen nu uit hetzelfde bestand, dus de cursusnamen zijn

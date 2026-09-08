@@ -8,17 +8,36 @@ import {
   type User,
 } from "firebase/auth";
 import {
+  deleteDoc,
   doc,
   getDocFromServer,
   getFirestore,
+  setDoc,
 } from "firebase/firestore";
-import firebaseConfig from "../../../firebase-applet-config.json";
+import type { CurriculumData } from "../curriculum";
+
+const firebaseConfig = {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+
+/** Firestore-document waarin de bewerkbare badge-set leeft. */
+export const CURRICULUM_DOC = ["curriculum", "actief"] as const;
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Must specify named database ID as provisioned
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// De Firestore-database is een *named* database (bv. "ai-studio-badgeboek-…"), niet "(default)".
+// Is de id niet meegegeven bij het bouwen, dan valt Firebase terug op de default database.
+export const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -73,7 +92,6 @@ export function handleFirestoreError(
     operationType,
     path,
   };
-  console.error("Firestore Error: ", JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -82,7 +100,10 @@ async function testConnection() {
   try {
     await getDocFromServer(doc(db, "test", "connection"));
   } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
+    if (
+      error instanceof Error &&
+      error.message.includes("the client is offline")
+    ) {
       console.error("Please check your Firebase configuration.");
     }
   }
@@ -106,6 +127,32 @@ export async function meldAfVanFirebase(): Promise<void> {
 }
 
 /** Luister naar auth-veranderingen */
-export function abonneerAuth(callback: (user: User | null) => void): () => void {
+export function abonneerAuth(
+  callback: (user: User | null) => void,
+): () => void {
   return onAuthStateChanged(auth, callback);
+}
+
+/**
+ * Schrijf de database-versie van de badges naar `curriculum/actief` (of wis ze met `null`).
+ * De Firestore-regels laten dit enkel toe voor de beheerder (`isAdmin()`).
+ */
+export async function schrijfCurriculum(
+  data: CurriculumData | null,
+): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  const ref = doc(db, CURRICULUM_DOC[0], CURRICULUM_DOC[1]);
+  try {
+    if (data) {
+      await setDoc(ref, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+        updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
+      });
+    } else {
+      await deleteDoc(ref);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, "curriculum/actief");
+  }
 }

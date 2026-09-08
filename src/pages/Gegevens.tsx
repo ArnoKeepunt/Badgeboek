@@ -8,8 +8,17 @@ import {
   importGebruikers,
   importLeerlingen,
 } from "../lib/gegevens";
+import { actiefCurriculum } from "../lib/curriculum";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
-import { importeerGebruikers, upsertStudenten, useStore, zetDoelenImport } from "../lib/store";
+import {
+  gebundeldCurriculum,
+  geldigCurriculum,
+  importeerGebruikers,
+  upsertStudenten,
+  useStore,
+  zetCurriculumOverride,
+  zetDoelenImport,
+} from "../lib/store";
 
 type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | null;
 
@@ -19,7 +28,8 @@ type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | nul
  * (`<AlleenBeheerder>` in de router).
  */
 export function Gegevens() {
-  const { students, mentoren, kleuren, doelWijzigingen, doelenImport } = useStore();
+  const { students, mentoren, kleuren, doelWijzigingen, doelenImport, curriculumOverride } =
+    useStore();
   const [melding, setMelding] = useState<Melding>(null);
 
   const doelen = metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen);
@@ -27,6 +37,7 @@ export function Gegevens() {
   const gebruikerInput = useRef<HTMLInputElement>(null);
   const leerlingInput = useRef<HTMLInputElement>(null);
   const doelInput = useRef<HTMLInputElement>(null);
+  const curriculumInput = useRef<HTMLInputElement>(null);
 
   const lees = (bestand: File, klaar: (tekst: string) => void) => {
     const reader = new FileReader();
@@ -63,6 +74,33 @@ export function Gegevens() {
         soort: "ok",
         tekst: `${rijen.length} leerlingen ingeladen (toegevoegd of bijgewerkt op id).`,
         details: fouten,
+      });
+    });
+  };
+
+  const importeerCurriculum = (bestand: File) => {
+    lees(bestand, (tekst) => {
+      let ruw: unknown;
+      try {
+        ruw = JSON.parse(tekst);
+      } catch {
+        setMelding({ soort: "fout", tekst: "Ongeldige JSON — niets gewijzigd." });
+        return;
+      }
+      const data = geldigCurriculum(ruw);
+      if (!data) {
+        setMelding({
+          soort: "fout",
+          tekst:
+            "De JSON heeft niet de juiste vorm (arrays cursussen, rubrics, leerdoelen, " +
+            "deelevaluatieTypes) — niets gewijzigd.",
+        });
+        return;
+      }
+      zetCurriculumOverride(data);
+      setMelding({
+        soort: "ok",
+        tekst: `Badge-set in de database gezet: ${data.cursussen.length} cursussen, ${data.leerdoelen.length} badges, ${data.deelevaluatieTypes.length} deelbadge-types.`,
       });
     });
   };
@@ -237,6 +275,80 @@ export function Gegevens() {
                 }}
               >
                 Herstel standaardlijst
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 32 }}>Badges in de database</h2>
+      <div className="gegevens-kaarten">
+        <div className="gegevens-kaart">
+          <div className="gegevens-kaart-naam">Bewerkbare badge-set</div>
+          <p>
+            Bron:{" "}
+            <strong>
+              {curriculumOverride ? "database-versie" : "ingebouwde bundel"}
+            </strong>
+            . De badges + de deelbadge-kapstok leven dan in Firestore
+            (<code>curriculum/actief</code>) en worden <strong>rechtstreeks in de
+            Firebase-console</strong> bewerkt — alleen een beheerder mag schrijven. Bewerk je
+            liever offline, gebruik dan de JSON-download/upload hieronder.
+          </p>
+          <input
+            ref={curriculumInput}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importeerCurriculum(f);
+              e.target.value = "";
+            }}
+          />
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="knop-primair"
+              onClick={() => {
+                zetCurriculumOverride(gebundeldCurriculum());
+                setMelding({
+                  soort: "ok",
+                  tekst: "De ingebouwde badges staan nu in de database. Bewerk verder in de console.",
+                });
+              }}
+            >
+              Zet de ingebouwde badges in de database
+            </button>
+            <button
+              type="button"
+              className="linkknop"
+              onClick={() =>
+                downloadTekst(
+                  `keerpunt-badges-${datumStempel()}.json`,
+                  JSON.stringify(actiefCurriculum(), null, 2),
+                )
+              }
+            >
+              Download als JSON
+            </button>
+            <button
+              type="button"
+              className="linkknop"
+              onClick={() => curriculumInput.current?.click()}
+            >
+              Laad JSON in de database
+            </button>
+            {curriculumOverride && (
+              <button
+                type="button"
+                className="linkknop"
+                onClick={() => {
+                  zetCurriculumOverride(null);
+                  setMelding({ soort: "ok", tekst: "Terug naar de ingebouwde badges." });
+                }}
+              >
+                Gebruik terug de ingebouwde badges
               </button>
             )}
           </div>

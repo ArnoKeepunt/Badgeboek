@@ -1,5 +1,13 @@
 import { useSyncExternalStore } from "react";
-import { cursusVanLeerdoel, cursusVanNode, cursussen, leerdoelen } from "./curriculum";
+import {
+  GEBUNDELD,
+  alleCursussen,
+  alleLeerdoelen,
+  type CurriculumData,
+  cursusVanLeerdoel,
+  cursusVanNode,
+  zetCurriculum,
+} from "./curriculum";
 import { type PersistedStore, type RauweStore, maakPersistentie, sessieOpslag } from "./data";
 import {
   deelKleuren as seedDeelKleuren,
@@ -74,6 +82,7 @@ const seed = (): PersistedStore => ({
   doelWijzigingen: {},
   doelenImport: null,
   rubriekWijzigingen: {},
+  curriculumOverride: null,
   deelevaluaties: seedDeelevaluaties,
   deelKleuren: seedDeelKleuren,
   deelNotities: {},
@@ -125,8 +134,24 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   if (!Array.isArray(bewaard.matrixStromen)) {
     basis.matrixStromen = bewaard.matrixStroom ? [bewaard.matrixStroom] : standaard.matrixStromen;
   }
+  // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
+  basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
+  zetCurriculum(basis.curriculumOverride);
   schoonOrphans(basis);
   return basis;
+}
+
+/** Snelle vormcontrole zodat een kapot document de app niet breekt (val dan terug op de bundel). */
+export function geldigCurriculum(d: unknown): CurriculumData | null {
+  if (!d || typeof d !== "object") return null;
+  const c = d as Partial<CurriculumData>;
+  return Array.isArray(c.cursussen) &&
+    Array.isArray(c.rubrics) &&
+    Array.isArray(c.leerdoelen) &&
+    Array.isArray(c.deelevaluatieTypes) &&
+    c.leerdoelen.length > 0
+    ? (c as CurriculumData)
+    : null;
 }
 
 /**
@@ -136,9 +161,21 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
  * hier weggegooid. Idempotent — draait bij elke load.
  */
 function schoonOrphans(basis: PersistedStore): void {
-  const geldigeBadges = new Set(leerdoelen.map((l) => l.id));
-  const geldigeCursusIds = new Set(cursussen.map((c) => c.id));
-  const geldigeCursusNamen = new Set(cursussen.map((c) => c.naam));
+  // Geldig = in de bundel OF in de database-versie. Zo wist het verwijderen van een badge uit
+  // de database níét meteen alle evaluaties ervan (die komen terug als de badge weer opduikt);
+  // enkel wat in geen van beide zit (bv. de oude Basisvaardigheden-badges) wordt opgekuist.
+  const geldigeBadges = new Set([
+    ...GEBUNDELD.leerdoelen.map((l) => l.id),
+    ...alleLeerdoelen().map((l) => l.id),
+  ]);
+  const geldigeCursusIds = new Set([
+    ...GEBUNDELD.cursussen.map((c) => c.id),
+    ...alleCursussen().map((c) => c.id),
+  ]);
+  const geldigeCursusNamen = new Set([
+    ...GEBUNDELD.cursussen.map((c) => c.naam),
+    ...alleCursussen().map((c) => c.naam),
+  ]);
 
   const badgeVanSleutel = (sleutel: string): string => {
     const i1 = sleutel.indexOf(":");
@@ -196,6 +233,7 @@ const listeners = new Set<() => void>();
 
 function commit(next: State) {
   state = next;
+  zetCurriculum(state.curriculumOverride);
   const { sessie, ...rest } = state;
   void opslag.bewaar(rest);
   sessieOpslag.bewaar(sessie);
@@ -560,6 +598,21 @@ export function wijzigDoel(
 export function zetDoelenImport(doelen: Minimumdoel[] | null) {
   commit({ ...state, doelenImport: doelen, doelWijzigingen: {} });
 }
+
+// --- Curriculum (badges) database-versie --------------------------------
+
+/**
+ * Zet (of wis met `null`) de database-versie van de badges. Alleen de beheerder roept dit aan
+ * (via /gegevens). In firebase-modus wordt het ook naar `curriculum/actief` geschreven; daarna
+ * bewerkt de beheerder rechtstreeks in de Firestore-console.
+ */
+export function zetCurriculumOverride(data: CurriculumData | null) {
+  commit({ ...state, curriculumOverride: data });
+  void opslag.schrijfCurriculum?.(data);
+}
+
+/** De ingebouwde (gebundelde) badge-set — bron voor "zet de huidige badges in de database". */
+export const gebundeldCurriculum = (): CurriculumData => GEBUNDELD;
 
 // --- Rubrieken -----------------------------------------------------------
 
