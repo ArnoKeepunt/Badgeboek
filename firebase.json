@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "database": "ai-studio-badgeboek-af2ee9df-cd5d-4667-a2f9-b3c45c821be9",
+    "rules": "firestore.rules"
+  }
+}
