@@ -53,7 +53,10 @@ service cloud.firestore {
 
     // Badgebook global config and per-year evaluations
     match /badgeboek/{docId} {
-      allow get: if isValidId(docId) && isSignedIn();
+      // Lezen mag alleen door geverifieerd Keerpunt-personeel — dit document bevat
+      // leerlingnamen, e-mails en alle evaluaties (persoonsgegevens). Een willekeurig
+      // aangemeld Google-account mag hier NIET bij.
+      allow get: if isValidId(docId) && isSchoolStaff();
       allow list: if false;
       allow create: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());
       allow update: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());

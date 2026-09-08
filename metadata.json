@@ -1,8 +1,5 @@
 {
   "name": "Keerpunt Badgeboek",
   "description": "Badgeboek voor de dagelijkse evaluatie (kleuren per badge) van Keerpunt Freinetscholen. Draait volledig in de browser, zonder ingebouwde AI.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "requestFramePermissions": []
 }

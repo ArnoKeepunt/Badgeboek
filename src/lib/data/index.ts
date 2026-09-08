@@ -21,4 +21,3 @@ export function maakPersistentie(): BadgeboekPersistentie {
       return firebasePersistentie();
   }
 }
-
