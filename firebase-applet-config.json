@@ -1,0 +1,12 @@
+{
+  "projectId": "badgeboek",
+  "appId": "1:242312168141:web:e10abdc0485fcee8841f84",
+  "apiKey": "AIzaSyCAO69VNMhwwXXmOx2zqVDiNpdw2Z7yAJQ",
+  "authDomain": "badgeboek.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-badgeboek-af2ee9df-cd5d-4667-a2f9-b3c45c821be9",
+  "storageBucket": "badgeboek.firebasestorage.app",
+  "messagingSenderId": "242312168141",
+  "measurementId": "",
+  "oAuthClientId": "242312168141-1f6gfmlsdve2jas3dcodq2iq44htv605.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
+}

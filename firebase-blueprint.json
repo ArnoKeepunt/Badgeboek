@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "GlobaalData": {
+      "title": "GlobaalData",
+      "description": "School-wide configuration including students, mentors, groups, and curriculum adjustments",
+      "type": "object",
+      "properties": {
+        "students": {
+          "type": "array",
+          "description": "Lijst van alle leerlingen"
+        },
+        "mentoren": {
+          "type": "array",
+          "description": "Lijst van alle mentoren"
+        },
+        "groepen": {
+          "type": "array",
+          "description": "Samengestelde klas- en leergroepen"
+        },
+        "deelevaluaties": {
+          "type": "array",
+          "description": "Definities van deelbadges en criteria"
+        },
+        "doelWijzigingen": {
+          "type": "object",
+          "description": "Aanpassingen aan leerdoelen"
+        },
+        "doelenImport": {
+          "type": "array",
+          "description": "Geïmporteerde doelen"
+        },
+        "rubriekWijzigingen": {
+          "type": "object",
+          "description": "Aanpassingen aan rubrieken"
+        },
+        "matrixStromen": {
+          "type": "array",
+          "description": "Geselecteerde matrix stromen"
+        },
+        "matrixCursus": {
+          "type": "string",
+          "description": "Filter op cursusnaam",
+          "maxLength": 100
+        },
+        "schooljaar": {
+          "type": "string",
+          "description": "Huidig actief schooljaar",
+          "maxLength": 30
+        },
+        "meldingen": {
+          "type": "array",
+          "description": "Systeem- en evaluatiemeldingen"
+        },
+        "meldingGezien": {
+          "type": "object",
+          "description": "Tijdstippen waarop meldingen gezien zijn"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Laatste wijzigingstijdstip",
+          "maxLength": 50
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID of e-mail van bewerker",
+          "maxLength": 128
+        }
+      },
+      "required": ["schooljaar"]
+    },
+    "EvaluatieData": {
+      "title": "EvaluatieData",
+      "description": "Evaluaties per schooljaar: badgekleuren, notities, deelbadgekleuren, geschiedenis en gewiste items",
+      "type": "object",
+      "properties": {
+        "schooljaar": {
+          "type": "string",
+          "description": "Schooljaar identificatie",
+          "maxLength": 30
+        },
+        "kleuren": {
+          "type": "object",
+          "description": "Kaart van sleutel naar kleurbeoordeling"
+        },
+        "notities": {
+          "type": "object",
+          "description": "Kaart van sleutel naar notitieobjecten"
+        },
+        "deelKleuren": {
+          "type": "object",
+          "description": "Kaart van deelsleutel naar kleurbeoordeling"
+        },
+        "deelNotities": {
+          "type": "object",
+          "description": "Kaart van deelsleutel naar notitieobjecten"
+        },
+        "auditLog": {
+          "type": "object",
+          "description": "Wijzigingsgeschiedenis per cel"
+        },
+        "gewist": {
+          "type": "array",
+          "description": "Lijst van expliciet gewiste sleutels"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Laatste wijzigingstijdstip",
+          "maxLength": 50
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID of e-mail van bewerker",
+          "maxLength": 128
+        }
+      },
+      "required": ["schooljaar"]
+    },
+    "TestConnection": {
+      "title": "TestConnection",
+      "description": "Test document for connection verification",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Connection status",
+          "maxLength": 50
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/badgeboek/{docId}": {
+      "schema": "GlobaalData",
+      "description": "Documenten voor schoolinstellingen (_globaal) en evaluaties per schooljaar"
+    },
+    "/test/{testId}": {
+      "schema": "TestConnection",
+      "description": "Verificatie van Firestore-verbinding"
+    }
+  }
+}

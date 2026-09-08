@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+bun.lock
 
 # Lokale config / secrets (bv. Firebase-sleutels); .env.example wordt wel bijgehouden
 .env

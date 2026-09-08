@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive and hardened helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'arno.boriau@keerpuntscholen.be'
+      );
+    }
+
+    function isSchoolStaff() {
+      return isVerified() && (
+        isAdmin() ||
+        (request.auth.token.email is string && request.auth.token.email.matches('.*@keerpuntscholen\\.be$'))
+      );
+    }
+
+    function isValidBadgeboekDoc(data) {
+      return data.schooljaar is string && data.schooljaar.size() <= 30;
+    }
+
+    // Connection testing endpoint
+    match /test/{testId} {
+      allow get: if isValidId(testId);
+      allow list, write: if false;
+    }
+
+    // Badgebook global config and per-year evaluations
+    match /badgeboek/{docId} {
+      allow get: if isValidId(docId) && isSignedIn();
+      allow list: if false;
+      allow create: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());
+      allow update: if isValidId(docId) && isSchoolStaff() && isValidBadgeboekDoc(incoming());
+      allow delete: if isValidId(docId) && isAdmin();
+    }
+  }
+}
