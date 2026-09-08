@@ -41,7 +41,7 @@ export const router = createHashRouter([
     errorElement: <Foutpagina />,
     children: [
       { index: true, element: <Home /> },
-      { path: "aanmelden", element: <Aanmelden /> },
+      { path: "aanmelden", element: <AlleenBeheerder>{<Aanmelden />}</AlleenBeheerder> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
       { path: "deelevaluaties", element: traag(<Deelevaluaties />) },

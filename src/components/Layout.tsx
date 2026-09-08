@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { meldAfVanFirebase } from "../lib/data";
+import { useFirebaseGebruiker } from "../lib/firebaseAuth";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
 import { meldAf } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Icoon, type IcoonNaam } from "./Icoon";
+import { LogoIcoon } from "./LogoIcoon";
 import { SchooljaarKiezer } from "./SchooljaarKiezer";
 import "./Layout.css";
 
@@ -99,18 +102,6 @@ function UitIcoon() {
   );
 }
 
-/** Het Keerpunt-merkteken (dezelfde vorm als de favicon), links van "Badgeboek". */
-function LogoIcoon() {
-  return (
-    <svg className="brand-mark" viewBox="0 0 48 46" fill="none" aria-hidden="true">
-      <path
-        d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 /** Zijbalk-paneeltje met een chevron erin — leest als "navigatie in-/uitklappen", niet als terug. */
 function PaneelIcoon({ ingeklapt }: { ingeklapt: boolean }) {
   return (
@@ -125,6 +116,27 @@ function PaneelIcoon({ ingeklapt }: { ingeklapt: boolean }) {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** Het Google-account waarmee je de app binnenkwam + afmelden. Toont niets in local-modus. */
+function GoogleAfmelden({ ingeklapt }: { ingeklapt: boolean }) {
+  const { gebruiker } = useFirebaseGebruiker();
+  if (!gebruiker) return null;
+  const email = gebruiker.email ?? gebruiker.displayName ?? "Aangemeld";
+  return (
+    <div className="sidebar-google" title={ingeklapt ? `${email} · Afmelden bij Google` : email}>
+      <span className="sidebar-google-mail">{email}</span>
+      <button
+        type="button"
+        className="sidebar-account-actie sidebar-google-uit"
+        onClick={() => void meldAfVanFirebase()}
+        title={ingeklapt ? "Afmelden bij Google" : undefined}
+      >
+        <span className="sidebar-account-actie-tekst">Afmelden bij Google</span>
+        <UitIcoon />
+      </button>
+    </div>
   );
 }
 
@@ -147,21 +159,22 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
           type="button"
           className="sidebar-account-actie"
           onClick={() => meldAf()}
-          title={ingeklapt ? "Afmelden" : undefined}
+          title={ingeklapt ? "Terug naar beheerder" : undefined}
         >
-          <span className="sidebar-account-actie-tekst">Afmelden</span>
+          <span className="sidebar-account-actie-tekst">Stop bekijken als</span>
           <UitIcoon />
         </button>
       ) : (
         <NavLink
           to="/aanmelden"
           className="sidebar-account-actie"
-          title={ingeklapt ? "Aanmelden" : undefined}
+          title={ingeklapt ? "Bekijk als leerling of mentor" : undefined}
         >
-          <span className="sidebar-account-actie-tekst">Aanmelden</span>
+          <span className="sidebar-account-actie-tekst">Bekijk als…</span>
           <UitIcoon />
         </NavLink>
       )}
+      <GoogleAfmelden ingeklapt={ingeklapt} />
     </div>
   );
 }

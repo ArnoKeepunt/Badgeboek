@@ -262,6 +262,30 @@
   flex: none;
 }
 
+/* Het Google-account waarmee je de app binnenkwam (los van de "bekijk als"-rol erboven). */
+.sidebar-google {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-google-mail {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.sidebar-google-uit {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .content {
   padding: 28px 24px;
   max-width: 960px;
@@ -323,6 +347,10 @@
 
   .sidebar--ingeklapt .sidebar-account-actie {
     padding: 0;
+  }
+
+  .sidebar--ingeklapt .sidebar-google-mail {
+    display: none;
   }
 }
 
