@@ -64,13 +64,21 @@ export function systeemGroepen(students: Student[]): GroepDef[] {
       leerlingIds: students.filter((s) => s.leerjaar === j).map((s) => s.id),
     });
   }
-  for (const v of unieke(students.map((s) => s.vestiging))) {
-    defs.push({
-      id: `vestiging:${v}`,
-      naam: v,
-      soort: "vestiging",
-      leerlingIds: students.filter((s) => s.vestiging === v).map((s) => s.id),
-    });
+  // Zit alles binnen één vestiging (bv. een mentor met een vestiging-scope), dan zijn de
+  // vestiging-categorieën ("Per vestiging", "Graad per vestiging", "Leerjaar per vestiging")
+  // overbodig — ze zeggen dan hetzelfde als "Per graad" / "Per leerjaar".
+  const vestigingSet = unieke(students.map((s) => s.vestiging));
+  const meerdereVestigingen = vestigingSet.length > 1;
+
+  if (meerdereVestigingen) {
+    for (const v of vestigingSet) {
+      defs.push({
+        id: `vestiging:${v}`,
+        naam: v,
+        soort: "vestiging",
+        leerlingIds: students.filter((s) => s.vestiging === v).map((s) => s.id),
+      });
+    }
   }
   for (const k of unieke(students.map((s) => s.klasgroep))) {
     defs.push({
@@ -81,34 +89,36 @@ export function systeemGroepen(students: Student[]): GroepDef[] {
     });
   }
 
-  const vestigingen = unieke(students.map((s) => s.vestiging)).sort((a, b) => a.localeCompare(b));
-  const graden = unieke(students.map((s) => graadVan(s.leerjaar))).sort((a, b) => a - b);
-  const leerjaren = unieke(students.map((s) => s.leerjaar)).sort((a, b) => a - b);
+  if (meerdereVestigingen) {
+    const vestigingen = [...vestigingSet].sort((a, b) => a.localeCompare(b));
+    const graden = unieke(students.map((s) => graadVan(s.leerjaar))).sort((a, b) => a - b);
+    const leerjaren = unieke(students.map((s) => s.leerjaar)).sort((a, b) => a - b);
 
-  for (const v of vestigingen) {
-    for (const g of graden) {
-      const ids = students
-        .filter((s) => s.vestiging === v && graadVan(s.leerjaar) === g)
-        .map((s) => s.id);
-      if (ids.length === 0) continue;
-      defs.push({
-        id: `graad-vestiging:${g}:${v}`,
-        naam: `${GRAAD_LABEL[g] ?? `${g}e graad`} · ${v}`,
-        soort: "graad-vestiging",
-        leerlingIds: ids,
-      });
+    for (const v of vestigingen) {
+      for (const g of graden) {
+        const ids = students
+          .filter((s) => s.vestiging === v && graadVan(s.leerjaar) === g)
+          .map((s) => s.id);
+        if (ids.length === 0) continue;
+        defs.push({
+          id: `graad-vestiging:${g}:${v}`,
+          naam: `${GRAAD_LABEL[g] ?? `${g}e graad`} · ${v}`,
+          soort: "graad-vestiging",
+          leerlingIds: ids,
+        });
+      }
     }
-  }
-  for (const v of vestigingen) {
-    for (const j of leerjaren) {
-      const ids = students.filter((s) => s.vestiging === v && s.leerjaar === j).map((s) => s.id);
-      if (ids.length === 0) continue;
-      defs.push({
-        id: `leerjaar-vestiging:${j}:${v}`,
-        naam: `${j}e jaar · ${v}`,
-        soort: "leerjaar-vestiging",
-        leerlingIds: ids,
-      });
+    for (const v of vestigingen) {
+      for (const j of leerjaren) {
+        const ids = students.filter((s) => s.vestiging === v && s.leerjaar === j).map((s) => s.id);
+        if (ids.length === 0) continue;
+        defs.push({
+          id: `leerjaar-vestiging:${j}:${v}`,
+          naam: `${j}e jaar · ${v}`,
+          soort: "leerjaar-vestiging",
+          leerlingIds: ids,
+        });
+      }
     }
   }
   return defs;

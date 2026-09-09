@@ -45,6 +45,21 @@ export function useBereik(): Bereik {
 /** Is het bereik ingeperkt tot één vestiging? */
 export const bereikBeperkt = (b: Bereik): boolean => b.vestiging !== "";
 
+/**
+ * Stabiele id van wie er nu handelt, voor het "eigenaar"-veld op zelfgemaakte groepen: het
+ * e-mailadres van een echt aangemeld personeelslid, of de mentor-id bij "bekijk als mentor".
+ * `undefined` voor een beheerder/coördinator-overzicht — die zien alle groepen.
+ */
+export function useHuidigeActorId(): string | undefined {
+  const aangemeld = useAangemeld();
+  const { persoon } = useHuidigPersoneelslid();
+  if (aangemeld?.rol === "mentor") return aangemeld.mentor.id;
+  if (persoon?.actief && (persoon.rol === "mentor" || persoon.rol === "coordinator")) {
+    return persoon.email;
+  }
+  return undefined;
+}
+
 /** Mag de huidige kijker (via `bereik`) de gegevens van deze leerling zien? */
 export function magLeerlingZien(bereik: Bereik, leerling: Student): boolean {
   if (bereik.eigenLeerlingId) return leerling.id === bereik.eigenLeerlingId;

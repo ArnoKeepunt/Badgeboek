@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BulkKnop } from "../components/BulkKnop";
 import { DeelevaluatieEditor } from "../components/DeelevaluatieEditor";
+import { GroepEditor } from "../components/GroepEditor";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
 import { Modal } from "../components/Modal";
 import { NotitieVeld } from "../components/NotitieVeld";
@@ -17,7 +18,7 @@ import {
 import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { vestigingKeuzes } from "../lib/vestigingen";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
@@ -118,6 +119,8 @@ export function Deelevaluaties() {
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [openSecties, setOpenSecties] = useState<string[]>(loadOpen);
+  const [nieuweGroep, setNieuweGroep] = useState(false);
+  const actorId = useHuidigeActorId();
 
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
@@ -220,7 +223,18 @@ export function Deelevaluaties() {
         cursusOpties={cursusOpties}
         cursus={cursusFilter}
         onCursusChange={setMatrixCursus}
+        onNieuweGroep={() => setNieuweGroep(true)}
       />
+
+      {nieuweGroep && (
+        <Modal label="Nieuwe groep" onClose={() => setNieuweGroep(false)}>
+          <GroepEditor
+            mentorId={actorId}
+            onGemaakt={(id) => onFilterChange({ ...filter, groepId: `eigen:${id}` })}
+            onSluit={() => setNieuweGroep(false)}
+          />
+        </Modal>
+      )}
 
       <div className="matrix-acties">
         {!vergrendeld && !meerdereStromen && (

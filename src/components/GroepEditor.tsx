@@ -25,11 +25,14 @@ export function GroepEditor({
   groep,
   mentorId,
   onSluit,
+  onGemaakt,
 }: {
   groep?: Groep;
   /** Nieuwe groepen worden aan deze mentor gekoppeld (indien aangemeld als mentor). */
   mentorId?: string;
   onSluit: () => void;
+  /** Bij het aanmaken van een nieuwe groep: de id ervan (bv. om 'm meteen te selecteren). */
+  onGemaakt?: (id: string) => void;
 }) {
   const { groepen } = useStore();
   const students = useZichtbareLeerlingen();
@@ -126,8 +129,11 @@ export function GroepEditor({
   const opslaan = () => {
     const ids = [...gekozen];
     const naamOk = naam.trim() || "Naamloze groep";
-    if (groep) wijzigGroep(groep.id, { naam: naamOk, leerlingIds: ids });
-    else maakGroep(naamOk, ids, mentorId);
+    if (groep) {
+      wijzigGroep(groep.id, { naam: naamOk, leerlingIds: ids });
+    } else {
+      onGemaakt?.(maakGroep(naamOk, ids, mentorId));
+    }
     onSluit();
   };
 

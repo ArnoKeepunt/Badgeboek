@@ -5,8 +5,7 @@ import { GroepOpenen } from "../components/GroepOpenen";
 import { Modal } from "../components/Modal";
 import { SOORT_LABEL, SYSTEEM_SOORTEN, stromenVanGroep, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
-import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
-import { useAangemeld } from "../lib/sessie";
+import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
 
@@ -36,8 +35,7 @@ export function Groepen() {
   const scopeVestiging = useBereik().vestiging;
   const [, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
-  const aangemeld = useAangemeld();
-  const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
+  const mentorId = useHuidigeActorId();
   const [editor, setEditor] = useState<null | { id?: string }>(null);
   const [alleenVanMij, setAlleenVanMij] = useState(false);
 

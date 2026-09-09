@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { BulkKnop } from "../components/BulkKnop";
 import { ColorBar } from "../components/ColorBar";
 import { DeelPaneel } from "../components/DeelPaneel";
+import { GroepEditor } from "../components/GroepEditor";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
+import { Modal } from "../components/Modal";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
 import { StroomBalk } from "../components/StroomBalk";
@@ -17,7 +19,7 @@ import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { useZichtbareLeerlingen } from "../lib/rechten";
+import { useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useScrollSync } from "../lib/useScrollSync";
 import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
@@ -401,6 +403,8 @@ export function Badges() {
   const [filter, setFilter] = useLeerlingFilter();
   const [fold, setFold] = useState<Fold>(loadFold);
   const [gekozenBadge, setGekozenBadge] = useState<string | null>(null);
+  const [nieuweGroep, setNieuweGroep] = useState(false);
+  const actorId = useHuidigeActorId();
   const vergrendeld = isAfgesloten(schooljaar);
   const archief = !vergrendeld && schooljaar !== HUIDIG_SCHOOLJAAR;
 
@@ -511,7 +515,18 @@ export function Badges() {
         cursusOpties={cursusOpties}
         cursus={cursusFilter}
         onCursusChange={setMatrixCursus}
+        onNieuweGroep={() => setNieuweGroep(true)}
       />
+
+      {nieuweGroep && (
+        <Modal label="Nieuwe groep" onClose={() => setNieuweGroep(false)}>
+          <GroepEditor
+            mentorId={actorId}
+            onGemaakt={(id) => onFilterChange({ ...filter, groepId: `eigen:${id}` })}
+            onSluit={() => setNieuweGroep(false)}
+          />
+        </Modal>
+      )}
 
       <div className="matrix-acties">
         <button type="button" className="linkknop" onClick={allesOpen}>

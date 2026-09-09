@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GroepEditor } from "../components/GroepEditor";
 import { LeerlingFilterBar } from "../components/LeerlingFilterBar";
+import { Modal } from "../components/Modal";
 import { leerdoelenVoorStroom } from "../lib/curriculum";
 import { alleGroepDefs, groepLeden } from "../lib/groepen";
 import {
@@ -10,7 +12,7 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
-import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { getDoelKleur, useStore } from "../lib/store";
 
 export function Students() {
@@ -19,6 +21,8 @@ export function Students() {
   const scopeVestiging = useBereik().vestiging;
   const [filter, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
+  const [nieuweGroep, setNieuweGroep] = useState(false);
+  const actorId = useHuidigeActorId();
 
   const groepDefs = useMemo(() => alleGroepDefs(students, groepen), [students, groepen]);
   const zichtbaar = useMemo(() => {
@@ -28,6 +32,15 @@ export function Students() {
 
   return (
     <section>
+      {nieuweGroep && (
+        <Modal label="Nieuwe groep" onClose={() => setNieuweGroep(false)}>
+          <GroepEditor
+            mentorId={actorId}
+            onGemaakt={(id) => setFilter({ ...filter, groepId: `eigen:${id}` })}
+            onSluit={() => setNieuweGroep(false)}
+          />
+        </Modal>
+      )}
       {scopeVestiging && (
         <p className="jaar-melding">
           Je ziet enkel de leerlingen van vestiging <strong>{scopeVestiging}</strong>. Voor
@@ -41,6 +54,7 @@ export function Students() {
         groepen={groepDefs}
         filter={filter}
         onChange={setFilter}
+        onNieuweGroep={() => setNieuweGroep(true)}
       />
 
       {zichtbaar.length === 0 ? (

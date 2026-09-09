@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Genereer de gebundelde badge-data uit `docs/reference/deelevaluaties_alle-graden-2.xlsx`.
+Genereer de gebundelde badge-data uit `docs/reference/deelevaluaties_alle-graden-3.xlsx`.
 
     python3 scripts/extract_badges.py
 
-Per tabblad (stroom) rijen `Cursus | Deelevaluatie(=groep) | Aantal | Verplicht`. Elke rij →
-`Aantal` badges `"<groep> <n>"` (of `"<groep>"` als Aantal = 1), plat onder de cursus.
+Per tabblad (stroom) rijen `Cursus | Deelevaluatie(=groep) | Verplicht Aantal`. Elke rij →
+zoveel badges `"<groep> <n>"` (of `"<groep>"` bij 1), plat onder de cursus. De kolommen worden
+op naam gezocht (`vind_kolommen`), dus een andere volgorde/benaming blijft werken.
 
 Uitvoer per stroom: `src/lib/curriculum{1A,1B,2A,3A}.ts` met twee arrays:
   - `cursussen{stroom}: CursusRuw[]`  ({ id, stroom, naam, volgorde })
@@ -23,7 +24,7 @@ from pathlib import Path
 
 M = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 ROOT = Path(__file__).resolve().parent.parent
-XLSX = ROOT / "docs" / "reference" / "deelevaluaties_alle-graden-2.xlsx"
+XLSX = ROOT / "docs" / "reference" / "deelevaluaties_alle-graden-3.xlsx"
 LIB = ROOT / "src" / "lib"
 
 # xlsx-tabblad -> stroomcode
@@ -104,6 +105,27 @@ def uniek(basis: str, gebruikt: set[str]) -> str:
     return kandidaat
 
 
+def vind_kolommen(rijen: list[dict[int, str]]) -> dict[str, int]:
+    """Kolomindexen uit de kopregel (op naam), met vaste posities als terugval. Zo blijft het
+    script werken als de xlsx van vorm verandert (bv. 'Aantal' → 'Verplicht aantal')."""
+    for cells in rijen:
+        koppen = {i: v.strip().lower() for i, v in cells.items()}
+        if "cursus" not in koppen.values():
+            continue
+
+        def idx(*namen: str, standaard: int) -> int:
+            return next((i for i, v in koppen.items() if v in namen), standaard)
+
+        return {
+            "cursus": idx("cursus", standaard=1),
+            "groep": idx("deelevaluatie", "deelbadge", "groep", standaard=2),
+            # "Aantal" blijft voorrang hebben; een nieuwe xlsx met enkel "Verplicht aantal"
+            # wordt daar dan op teruggevonden.
+            "aantal": idx("aantal", "verplicht aantal", "aantal verplicht", "verplicht", standaard=3),
+        }
+    return {"cursus": 1, "groep": 2, "aantal": 3}
+
+
 def main() -> None:
     z = zipfile.ZipFile(XLSX)
     ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
@@ -117,10 +139,12 @@ def main() -> None:
         badges = []               # [{id, cursusId, groep, omschrijving, volgorde}]
         doel_teller = {}          # cursusId -> laatste d-index
 
-        for cells in load_rows(z, rel[sheet_name], strings):
-            cursus = cells.get(1, "")
-            groep = cells.get(2, "")   # xlsx-kolom "Deelevaluatie" = de badge-groep
-            aantal = num(cells.get(3, ""))
+        rijen = list(load_rows(z, rel[sheet_name], strings))
+        kol = vind_kolommen(rijen)
+        for cells in rijen:
+            cursus = cells.get(kol["cursus"], "")
+            groep = cells.get(kol["groep"], "")   # xlsx-kolom "Deelevaluatie" = de badge-groep
+            aantal = num(cells.get(kol["aantal"], ""))
             if not cursus or not groep:
                 continue
             low = cursus.lower()

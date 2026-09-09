@@ -29,6 +29,7 @@ export function LeerlingFilterBar({
   cursusOpties,
   cursus = "",
   onCursusChange,
+  onNieuweGroep,
 }: {
   alle: Student[];
   zichtbaar: number;
@@ -39,6 +40,8 @@ export function LeerlingFilterBar({
   cursusOpties?: string[];
   cursus?: string;
   onCursusChange?: (cursus: string) => void;
+  /** Open het formulier om een nieuwe groep te maken (onderaan de groep-keuzelijst). */
+  onNieuweGroep?: () => void;
 }) {
   const toon = (veld: "graad" | "klasgroep") => !verbergVelden.includes(veld);
   const toonCursus = Boolean(cursusOpties && onCursusChange);
@@ -95,7 +98,10 @@ export function LeerlingFilterBar({
       <select
         className="filterbar-groep"
         value={filter.groepId}
-        onChange={(e) => zet("groepId", e.target.value)}
+        onChange={(e) => {
+          if (e.target.value === "__nieuw__") onNieuweGroep?.();
+          else zet("groepId", e.target.value);
+        }}
       >
         <option value="">Alle leerlingen</option>
         {soortenMetGroepen.map((soort) => {
@@ -111,6 +117,7 @@ export function LeerlingFilterBar({
             </optgroup>
           );
         })}
+        {onNieuweGroep && <option value="__nieuw__">＋ Nieuwe groep aanmaken…</option>}
       </select>
 
       {toonCursus && (

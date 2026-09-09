@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GroepEditor } from "../components/GroepEditor";
 import { GroepOpenen } from "../components/GroepOpenen";
+import { Modal } from "../components/Modal";
 import {
   type GroepDef,
   type GroepSoort,
@@ -10,7 +12,7 @@ import {
   systeemGroepen,
 } from "../lib/groepen";
 import { LEEG_FILTER, useLeerlingFilter } from "../lib/leerlingen";
-import { useZichtbareLeerlingen } from "../lib/rechten";
+import { useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { useEffectieveRol } from "../lib/sessie";
 import { RATINGS } from "../lib/ratings";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
@@ -47,6 +49,8 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [, setFilter] = useLeerlingFilter();
   const [gekozen, setGekozen] = useState<string[]>(loadOverzicht);
+  const [nieuweGroep, setNieuweGroep] = useState(false);
+  const actorId = useHuidigeActorId();
 
   const studById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const leden = (ids: string[]) =>
@@ -125,33 +129,44 @@ export function Dashboard() {
     <section>
       <div className="pagina-kop">
         <h2>Mijn groepen</h2>
-        {toevoegbaar.length > 0 && (
-          <select
-            className="overzicht-toevoeg"
-            value=""
-            aria-label="Groep aan mijn groepen toevoegen"
-            onChange={(e) => {
-              if (e.target.value) voegToe(e.target.value);
-              e.currentTarget.value = "";
-            }}
-          >
-            <option value="">+ Groep toevoegen…</option>
-            {SOORT_VOLGORDE.map((soort) => {
-              const opts = toevoegbaar.filter((d) => d.soort === soort);
-              if (opts.length === 0) return null;
-              return (
-                <optgroup key={soort} label={SOORT_LABEL[soort]}>
-                  {opts.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.naam} ({d.leerlingIds.length})
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
-        )}
+        <select
+          className="overzicht-toevoeg"
+          value=""
+          aria-label="Groep aan mijn groepen toevoegen"
+          onChange={(e) => {
+            const v = e.target.value;
+            e.currentTarget.value = "";
+            if (v === "__nieuw__") setNieuweGroep(true);
+            else if (v) voegToe(v);
+          }}
+        >
+          <option value="">+ Groep toevoegen…</option>
+          {SOORT_VOLGORDE.map((soort) => {
+            const opts = toevoegbaar.filter((d) => d.soort === soort);
+            if (opts.length === 0) return null;
+            return (
+              <optgroup key={soort} label={SOORT_LABEL[soort]}>
+                {opts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.naam} ({d.leerlingIds.length})
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+          <option value="__nieuw__">＋ Nieuwe groep aanmaken…</option>
+        </select>
       </div>
+
+      {nieuweGroep && (
+        <Modal label="Nieuwe groep" onClose={() => setNieuweGroep(false)}>
+          <GroepEditor
+            mentorId={actorId}
+            onGemaakt={(id) => voegToe(`eigen:${id}`)}
+            onSluit={() => setNieuweGroep(false)}
+          />
+        </Modal>
+      )}
 
       {mijnRijen.length === 0 ? (
         <p className="lege-staat">
