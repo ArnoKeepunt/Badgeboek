@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePopover } from "../lib/popover";
-import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL } from "../lib/ratings";
+import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL, STATUSSEN } from "../lib/ratings";
 import type { Rating } from "../lib/types";
 
 /** Zet in één keer dezelfde kleur voor alle zichtbare leerlingen op deze badge-rij. */
@@ -18,7 +18,7 @@ export function BulkKnop({
   const trigger = useRef<HTMLButtonElement>(null);
   const pos = usePopover(open, trigger, () => setOpen(false), {
     breedte: 214,
-    hoogte: 236,
+    hoogte: 330,
     uitlijn: "rechts",
   });
 
@@ -79,6 +79,20 @@ export function BulkKnop({
                 <span className="rating-dot" />
                 {RATING_EMPTY_LABEL}
               </button>
+
+              <div className="rating-cell-scheiding" role="separator" />
+              {STATUSSEN.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  role="menuitem"
+                  className={`rating-cell-option rating-${r}`}
+                  onClick={() => kies(r)}
+                >
+                  <span className="rating-dot" />
+                  {RATING_LABEL[r]}
+                </button>
+              ))}
             </div>
           </>,
           document.body,

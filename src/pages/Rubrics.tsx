@@ -4,8 +4,7 @@ import { Modal } from "../components/Modal";
 import { RubriekEditor } from "../components/RubriekEditor";
 import { StroomBalk } from "../components/StroomBalk";
 import { usePopover } from "../lib/popover";
-import { RATINGS, RATING_LABEL } from "../lib/ratings";
-import { metRubriekWijzigingen, rubrieken } from "../lib/rubrieken";
+import { RATING_LABEL } from "../lib/ratings";
 import {
   DOEL_SOORTEN,
   type DoelSoort,
@@ -16,8 +15,8 @@ import {
   zoekDoel,
 } from "../lib/rubriekDoelen";
 import { useEffectieveRol } from "../lib/sessie";
-import { setMatrixCursus, useStore } from "../lib/store";
-import { STROOM_LABEL, type Kleurcriteria, type Rating, type Rubriek } from "../lib/types";
+import { rubriekIsBewerkt, rubriekenLijst, setMatrixCursus, useStore } from "../lib/store";
+import { STROOM_LABEL, type Kleurcriteria, type Rubriek } from "../lib/types";
 
 function PotloodIcoon() {
   return (
@@ -32,8 +31,11 @@ function PotloodIcoon() {
   );
 }
 
-/** Kleur (Rating) → sleutel in `Kleurcriteria`. */
-const KLEUR_KEY: Record<Rating, keyof Kleurcriteria> = {
+/** Rubrics beschrijven enkel de vier kleuren (geen witte statussen). */
+const KLEUREN = ["blue", "green", "yellow", "red"] as const;
+
+/** Kleur → sleutel in `Kleurcriteria`. */
+const KLEUR_KEY: Record<(typeof KLEUREN)[number], keyof Kleurcriteria> = {
   red: "rood",
   yellow: "geel",
   green: "groen",
@@ -52,11 +54,13 @@ interface KaartItem {
  * Alleen-lezen, behalve voor de beheerder (potlood → overlay).
  */
 export function Rubrics() {
-  const { rubriekWijzigingen, matrixStromen, matrixCursus } = useStore();
+  const { rubriekWijzigingen, rubriekenOverride, matrixStromen, matrixCursus } = useStore();
   const magBewerken = useEffectieveRol() === "beheerder";
+  // rubriekenLijst() leest de store; herbereken als de bron of de patches wijzigen.
   const alle = useMemo(
-    () => metRubriekWijzigingen(rubrieken, rubriekWijzigingen),
-    [rubriekWijzigingen],
+    () => rubriekenLijst(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rubriekenOverride, rubriekWijzigingen],
   );
 
   const [doelFilter, setDoelFilter] = useState("");
@@ -244,7 +248,7 @@ export function Rubrics() {
                               r={r}
                               treffers={treffers}
                               magBewerken={magBewerken}
-                              bewerkt={Boolean(rubriekWijzigingen[r.id])}
+                              bewerkt={rubriekIsBewerkt(r.id)}
                               doelFilter={doelFilter}
                               leerlijnOpen={leerlijnOpen.has(r.id)}
                               doelOpen={doelOpen}
@@ -373,7 +377,7 @@ function RubriekKaart({
       )}
 
       <dl className="rubriek-criteria">
-        {RATINGS.map((kleur) => (
+        {KLEUREN.map((kleur) => (
           <div key={kleur} className={`rubriek-criterium rating-${kleur}`}>
             <dt className="rubriek-criterium-kleur">{RATING_LABEL[kleur]}</dt>
             <dd className="rubriek-criterium-tekst">{r.criteria[KLEUR_KEY[kleur]] || "—"}</dd>

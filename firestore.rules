@@ -93,6 +93,12 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
+    // --- Uitgeschreven rubrics: iedereen leest, alleen de beheerder wijzigt ---
+    match /rubrieken/{id} {
+      allow get, list: if isPersoneel();
+      allow write: if isBeheerder();
+    }
+
     // --- Roster + inhoud: gedeeld door al het personeel -----------------------
     match /leerlingen/{id}   { allow read, write: if isPersoneel(); }
     match /mentoren/{id}     { allow read, write: if isPersoneel(); }

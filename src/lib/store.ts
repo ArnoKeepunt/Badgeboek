@@ -20,6 +20,7 @@ import {
 } from "./mockData";
 import type { Minimumdoel } from "./minimumdoelen";
 import { stroomVan } from "./leerlingen";
+import { metRubriekWijzigingen, rubrieken as GEBUNDELDE_RUBRIEKEN } from "./rubrieken";
 import {
   AFGESLOTEN_SCHOOLJAREN,
   HUIDIG_SCHOOLJAAR,
@@ -100,6 +101,7 @@ const seed = (): PersistedStore => ({
   doelWijzigingen: {},
   doelenImport: null,
   rubriekWijzigingen: {},
+  rubriekenOverride: null,
   curriculumOverride: null,
   deelevaluaties: seedDeelevaluaties,
   deelKleuren: seedDeelKleuren,
@@ -158,6 +160,8 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   // De database-versie van de vestigingen (`null` = de bundel).
   basis.vestigingen = geldigeVestigingen(bewaard.vestigingen);
   zetVestigingen(basis.vestigingen);
+  // De database-versie van de uitgeschreven rubrics (`null` = de bundel).
+  basis.rubriekenOverride = geldigeRubrieken(bewaard.rubriekenOverride);
   basis.afgeslotenSchooljaren = Array.isArray(bewaard.afgeslotenSchooljaren)
     ? bewaard.afgeslotenSchooljaren.filter((s): s is string => typeof s === "string")
     : null;
@@ -169,6 +173,22 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
 /** Vormcontrole op de opgeslagen vestigingenlijst; `null` = terugvallen op de bundel. */
 function geldigeVestigingen(d: unknown): Vestiging[] | null {
   return Array.isArray(d) && d.length > 0 && d.every(isGeldigeVestiging) ? (d as Vestiging[]) : null;
+}
+
+/** Vormcontrole op de opgeslagen rubriekenlijst; `null` = terugvallen op de bundel. */
+function geldigeRubrieken(d: unknown): Rubriek[] | null {
+  return Array.isArray(d) &&
+    d.length > 0 &&
+    d.every(
+      (r): r is Rubriek =>
+        !!r &&
+        typeof r === "object" &&
+        typeof (r as Rubriek).id === "string" &&
+        typeof (r as Rubriek).naam === "string" &&
+        !!(r as Rubriek).criteria,
+    )
+    ? (d as Rubriek[])
+    : null;
 }
 
 /** Snelle vormcontrole zodat een kapotte database-versie de app niet breekt (val terug op de bundel). */
@@ -306,10 +326,13 @@ opslag.abonneer?.((rauw) => {
       !geldigCurriculum(rauw.curriculumOverride) && Boolean(state.curriculumOverride);
     const behoudVestigingen =
       !geldigeVestigingen(rauw.vestigingen) && Boolean(state.vestigingen);
+    const behoudRubrieken =
+      !geldigeRubrieken(rauw.rubriekenOverride) && Boolean(state.rubriekenOverride);
     const gehydrateerd: RauweStore = {
       ...rauw,
       curriculumOverride: behoudCurriculum ? state.curriculumOverride : rauw.curriculumOverride,
       vestigingen: behoudVestigingen ? state.vestigingen : rauw.vestigingen,
+      rubriekenOverride: behoudRubrieken ? state.rubriekenOverride : rauw.rubriekenOverride,
     };
     state = { ...verwerkRauw(gehydrateerd), sessie: state.sessie };
     listeners.forEach((notify) => notify());
@@ -917,8 +940,51 @@ export function ongekoppeldeVestigingen(): string[] {
 
 // --- Rubrieken -----------------------------------------------------------
 
+/**
+ * De actuele rubriekenlijst: de database-versie als die er is, anders de bundel met de losse
+ * `rubriekWijzigingen`-patches erover.
+ */
+export const rubriekenLijst = (): Rubriek[] =>
+  state.rubriekenOverride ?? metRubriekWijzigingen(GEBUNDELDE_RUBRIEKEN, state.rubriekWijzigingen);
+
+/** Staat de rubriekenlijst in de database, of gebruikt de app nog de ingebouwde bundel? */
+export const rubriekenUitDatabase = (): boolean => state.rubriekenOverride !== null;
+
+/** Is deze rubric afgeweken van de ingebouwde brontekst? */
+export function rubriekIsBewerkt(id: string): boolean {
+  if (state.rubriekenOverride) {
+    const nu = state.rubriekenOverride.find((r) => r.id === id);
+    const bron = GEBUNDELDE_RUBRIEKEN.find((r) => r.id === id);
+    return !!nu && (!bron || JSON.stringify(nu) !== JSON.stringify(bron));
+  }
+  return Boolean(state.rubriekWijzigingen[id]);
+}
+
+/**
+ * Schrijf de huidige rubrieken (bundel + patches) één keer als losse documenten naar de
+ * database. Daarna is de database de bron en bewerkt de beheerder de docs zelf.
+ */
+export function zetRubriekenInDatabase() {
+  commit({ ...state, rubriekenOverride: rubriekenLijst(), rubriekWijzigingen: {} });
+}
+
+/** Ga terug naar de ingebouwde rubrieken-bundel (wist de database-versie). */
+export function wisRubriekenOverride() {
+  if (!state.rubriekenOverride) return;
+  commit({ ...state, rubriekenOverride: null });
+}
+
 /** Bewaar een bewerking aan één uitgeschreven rubric (op basis van zijn id). */
 export function wijzigRubriek(id: string, patch: Partial<Omit<Rubriek, "id" | "cursus" | "stroom">>) {
+  if (state.rubriekenOverride) {
+    commit({
+      ...state,
+      rubriekenOverride: state.rubriekenOverride.map((r) =>
+        r.id === id ? { ...r, ...patch, criteria: { ...r.criteria, ...patch.criteria } } : r,
+      ),
+    });
+    return;
+  }
   commit({
     ...state,
     rubriekWijzigingen: {
@@ -930,6 +996,15 @@ export function wijzigRubriek(id: string, patch: Partial<Omit<Rubriek, "id" | "c
 
 /** Verwijder alle bewerkingen aan één rubric (terug naar de brontekst). */
 export function herstelRubriek(id: string) {
+  if (state.rubriekenOverride) {
+    const bron = GEBUNDELDE_RUBRIEKEN.find((r) => r.id === id);
+    if (!bron) return;
+    commit({
+      ...state,
+      rubriekenOverride: state.rubriekenOverride.map((r) => (r.id === id ? bron : r)),
+    });
+    return;
+  }
   if (!state.rubriekWijzigingen[id]) return;
   const rest = { ...state.rubriekWijzigingen };
   delete rest[id];

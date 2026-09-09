@@ -1,5 +1,5 @@
 import { leerdoelenVoorStroom } from "./curriculum";
-import { type KleurTelling, telKleuren } from "./kleurstats";
+import { type KleurTelling, aantalBuitenBeschouwing, aantalIngevuld, telKleuren } from "./kleurstats";
 import { isIngeschreven, stroomVan } from "./leerlingen";
 import { getDoelKleur } from "./store";
 import type { DoelKleuren, Rating, Student } from "./types";
@@ -27,5 +27,10 @@ export function voortgangVoor(
     }
   }
   const telling = telKleuren(waarden);
-  return { totaal: waarden.length, ingevuld: waarden.length - telling.leeg, telling };
+  // "n.v.t." / vrijgesteld / gewettigd afwezig vallen buiten de noemer.
+  return {
+    totaal: waarden.length - aantalBuitenBeschouwing(telling),
+    ingevuld: aantalIngevuld(telling),
+    telling,
+  };
 }

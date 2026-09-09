@@ -2,7 +2,13 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePopover } from "../lib/popover";
 import type { Rating } from "../lib/types";
-import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL } from "../lib/ratings";
+import {
+  RATINGS,
+  RATING_EMPTY_LABEL,
+  RATING_KORT,
+  RATING_LABEL,
+  STATUSSEN,
+} from "../lib/ratings";
 import type { GeschiedenisRegel } from "../lib/wijzigingslog";
 
 /**
@@ -32,8 +38,8 @@ export function RatingCell({
   const regels = geschiedenis ?? [];
   const heeftGeschiedenis = regels.length > 0;
   const pos = usePopover(open, trigger, () => setOpen(false), {
-    breedte: heeftGeschiedenis ? 264 : 176,
-    hoogte: toonGeschiedenis ? 440 : heeftGeschiedenis ? 300 : 244,
+    breedte: heeftGeschiedenis ? 264 : 188,
+    hoogte: toonGeschiedenis ? 610 : heeftGeschiedenis ? 470 : 420,
     uitlijn: "midden",
   });
 
@@ -49,7 +55,7 @@ export function RatingCell({
         title="Vergrendeld — dit schooljaar is afgesloten"
         aria-label={`${label} — ${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL} (vergrendeld)`}
       >
-        {value ? RATING_LABEL[value] : "–"}
+        {value ? RATING_KORT[value] : "–"}
       </span>
     );
   }
@@ -65,7 +71,7 @@ export function RatingCell({
         aria-label={`${label} — ${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL}`}
         onClick={() => setOpen((o) => !o)}
       >
-        {value ? RATING_LABEL[value] : "–"}
+        {value ? RATING_KORT[value] : "–"}
       </button>
 
       {open &&
@@ -104,6 +110,20 @@ export function RatingCell({
                 <span className="rating-dot" />
                 {RATING_EMPTY_LABEL}
               </button>
+
+              <div className="rating-cell-scheiding" role="separator" />
+              {STATUSSEN.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  role="menuitem"
+                  className={`rating-cell-option rating-${r}${value === r ? " is-current" : ""}`}
+                  onClick={() => kies(r)}
+                >
+                  <span className="rating-dot" />
+                  {RATING_LABEL[r]}
+                </button>
+              ))}
 
               {heeftGeschiedenis && (
                 <div className="rating-cell-historie">

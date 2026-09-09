@@ -54,12 +54,13 @@ type NavGroep = { items: NavItem[] };
 const overzichtGroep: NavGroep = {
   items: [{ to: "/", label: "Overzicht", end: true, icoon: "overzicht" }],
 };
-const klasGroep: NavGroep = {
-  items: [
-    { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" },
-    { to: "/students", label: "Leerlingen", end: false, icoon: "leerlingen" },
-  ],
+const leerlingenItem: NavItem = {
+  to: "/students",
+  label: "Leerlingen",
+  end: false,
+  icoon: "leerlingen",
 };
+const groepenItem: NavItem = { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" };
 const doelenGroep: NavGroep = {
   items: [{ to: "/doelen", label: "Doelen", end: false, icoon: "doelen" }],
 };
@@ -71,18 +72,19 @@ const devItems: NavItem[] = [
   { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
 ];
 
-// Mentor/coördinator: het badgeboek + klasbeheer + naslag.
+// Mentor: badgeboek + leerlingen + naslag. Groepen maak je inline in de keuzelijsten, dus de
+// aparte Groepen-pagina is voor "meer rechten" (beheerder).
 const mentorNav: NavGroep[] = [
   overzichtGroep,
   { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }] },
-  klasGroep,
+  { items: [leerlingenItem] },
   doelenGroep,
 ];
 
 const beheerderNav = (dev: boolean): NavGroep[] => [
   overzichtGroep,
   { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }, ...(dev ? devItems : [])] },
-  klasGroep,
+  { items: [groepenItem, leerlingenItem] },
   doelenGroep,
   {
     items: [

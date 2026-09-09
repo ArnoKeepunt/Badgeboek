@@ -49,6 +49,12 @@ export interface PersistedStore {
   doelenImport: Minimumdoel[] | null;
   rubriekWijzigingen: Record<string, Partial<Rubriek>>;
   /**
+   * De database-versie van de uitgeschreven rubrics, of `null` = de ingebouwde bundel. Staat in
+   * de `rubrieken/{id}`-collectie (beheerder-write). Als die er is, is dat de bron en worden de
+   * losse `rubriekWijzigingen`-patches genegeerd (de beheerder bewerkt de docs zelf).
+   */
+  rubriekenOverride: Rubriek[] | null;
+  /**
    * De database-versie van de badges (de ruwe `{ cursussen, badges }`), of `null` = de
    * ingebouwde bundel. De deelbadge-kapstok wordt hieruit afgeleid. Alleen-lezen vanuit de
    * app: `abonneer()` vult dit vanuit de `curriculum/{stroom}/cursussen/{c}/badges/{b}`

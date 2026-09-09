@@ -1,5 +1,16 @@
-/** De evaluatiekleuren. `null` = nog niet aangeboden / geëvalueerd (de lege staat). */
-export type Rating = 'red' | 'yellow' | 'green' | 'blue'
+/**
+ * De evaluatiewaarde van een badge. `null` = nog niet aangeboden / geëvalueerd (de lege staat).
+ * Vier kleuren (positiefste eerst) + drie witte statussen: die tellen niet mee als "behaald"
+ * en vallen buiten de noemer van de tellers.
+ */
+export type Rating =
+  | 'blue'
+  | 'green'
+  | 'yellow'
+  | 'red'
+  | 'afwezig'
+  | 'vrijgesteld'
+  | 'nvt'
 
 /**
  * Doelcategorie (zie badgeboek):

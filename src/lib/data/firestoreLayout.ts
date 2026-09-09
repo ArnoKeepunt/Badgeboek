@@ -8,6 +8,7 @@ import type {
   Mentor,
   Notitie,
   Rating,
+  Rubriek,
   Stroom,
   Student,
 } from "../types";
@@ -73,6 +74,13 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   if (s.vestigingen) {
     for (const v of s.vestigingen) {
       m.set(`vestigingen/${v.id}`, { naam: v.naam, actief: v.actief, volgorde: v.volgorde });
+    }
+  }
+  // Rubrics: alleen wegschrijven als er een database-versie is (`null` = de bundel).
+  if (s.rubriekenOverride) {
+    for (const r of s.rubriekenOverride) {
+      const { id, ...rest } = r;
+      m.set(`rubrieken/${id}`, { ...rest });
     }
   }
 
@@ -219,6 +227,9 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   const vestigingen: Vestiging[] = [];
   let heeftVestigingen = false;
 
+  const rubriekenArr: Rubriek[] = [];
+  let heeftRubrieken = false;
+
   for (const [pad, data] of docs) {
     const seg = pad.split("/");
     switch (seg[0]) {
@@ -239,6 +250,10 @@ export function docsNaarStore(docs: DocMap): RauweStore {
           actief: data.actief !== false,
           volgorde: (data.volgorde as number) ?? 0,
         });
+        break;
+      case "rubrieken":
+        heeftRubrieken = true;
+        rubriekenArr.push({ id: seg[1], ...(data as Omit<Rubriek, "id">) });
         break;
       case "curriculum": {
         // curriculum/{stroom}  |  .../cursussen/{c}  |  .../cursussen/{c}/badges/{b}
@@ -312,8 +327,9 @@ export function docsNaarStore(docs: DocMap): RauweStore {
       ? { cursussen: currCursussen, badges: currBadges }
       : null;
   r.vestigingen = heeftVestigingen ? vestigingen : null;
+  r.rubriekenOverride = heeftRubrieken ? rubriekenArr : null;
 
-  if (!geinitialiseerd) return r; // enkel de curriculum-/vestiging-override; de rest = seed behouden
+  if (!geinitialiseerd) return r; // enkel de curriculum-/vestiging-/rubriek-override; de rest = seed behouden
 
   r.students = students;
   r.mentoren = mentoren;

@@ -134,6 +134,24 @@ th {
   background: transparent;
 }
 
+/* Witte statussen: gewettigd afwezig / vrijgesteld / n.v.t. — geen kleur,
+   witte achtergrond met een effen grijze rand. */
+.rating-afwezig,
+.rating-vrijgesteld,
+.rating-nvt {
+  --rating-solid: #9ca3af;
+  --rating-bg: #ffffff;
+  --rating-fg: #6b7280;
+  --rating-border: #d1d5db;
+}
+
+/* Scheidingslijn tussen de kleuren en de witte statussen in een keuzemenu. */
+.rating-cell-scheiding {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e5e7eb;
+}
+
 /* ---------------------------------------------------------------------------
    Chips (cursusfilter)
    --------------------------------------------------------------------------- */

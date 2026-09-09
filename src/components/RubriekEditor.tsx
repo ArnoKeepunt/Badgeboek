@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { RATINGS, RATING_LABEL } from "../lib/ratings";
-import { herstelRubriek, useStore, wijzigRubriek } from "../lib/store";
-import type { Kleurcriteria, Rating, Rubriek } from "../lib/types";
+import { RATING_LABEL } from "../lib/ratings";
+import { herstelRubriek, rubriekIsBewerkt, useStore, wijzigRubriek } from "../lib/store";
+import type { Kleurcriteria, Rubriek } from "../lib/types";
 
 const NAAM_MAX = 120;
 
-/** Rating → sleutel in `Kleurcriteria`. */
-const KLEUR_KEY: Record<Rating, keyof Kleurcriteria> = {
+/** Rubrics beschrijven enkel de vier kleuren (geen witte statussen). */
+const KLEUREN = ["blue", "green", "yellow", "red"] as const;
+
+/** Kleur → sleutel in `Kleurcriteria`. */
+const KLEUR_KEY: Record<(typeof KLEUREN)[number], keyof Kleurcriteria> = {
   red: "rood",
   yellow: "geel",
   green: "groen",
@@ -16,12 +19,14 @@ const KLEUR_KEY: Record<Rating, keyof Kleurcriteria> = {
 /**
  * Formulier om één uitgeschreven rubric te bewerken (alleen voor de beheerder). Cursus en
  * stroom liggen vast; naam, doelen, de vier kleurcriteria en de leerlijntekst zijn bewerkbaar.
- * Bewaren gebeurt als patch bovenop de brontekst (`rubriekWijzigingen` in de store), zodat
- * een nieuwe generatie van het bronbestand de bewerking niet wist.
+ * Zonder database-versie gebeurt bewaren als patch bovenop de brontekst (`rubriekWijzigingen`),
+ * zodat een nieuwe generatie van het bronbestand de bewerking niet wist. Staat de rubriekenlijst
+ * wél in de database, dan schrijft `wijzigRubriek` rechtstreeks naar het `rubrieken/{id}`-doc.
  */
 export function RubriekEditor({ rubriek, onSluit }: { rubriek: Rubriek; onSluit: () => void }) {
-  const { rubriekWijzigingen } = useStore();
-  const isBewerkt = Boolean(rubriekWijzigingen[rubriek.id]);
+  // Op de store abonneren zodat de "bewerkt"-status meebeweegt.
+  useStore();
+  const isBewerkt = rubriekIsBewerkt(rubriek.id);
 
   const [naam, setNaam] = useState(rubriek.naam);
   const [doelen, setDoelen] = useState(rubriek.doelen.join(", "));
@@ -71,7 +76,7 @@ export function RubriekEditor({ rubriek, onSluit }: { rubriek: Rubriek; onSluit:
         />
       </label>
 
-      {RATINGS.map((kleur) => (
+      {KLEUREN.map((kleur) => (
         <label key={kleur} className="de-veld">
           <span>
             <span className={`rubriek-editor-kleur rating-${kleur}`}>{RATING_LABEL[kleur]}</span>

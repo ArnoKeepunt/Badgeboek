@@ -43,7 +43,8 @@ function bewaarCache(data: RauweStore): void {
  * (`curriculum/…`, via `schrijfCurriculum`), de accounts (`gebruikers/…`) en legacy-docs vallen
  * er buiten — anders wist de diff ze omdat `storeNaarDocs` ze niet teruggeeft.
  */
-const BEHEERD = /^(leerlingen|mentoren|groepen|deelbadges|meldingen|instellingen|vestigingen)\//;
+const BEHEERD =
+  /^(leerlingen|mentoren|groepen|deelbadges|meldingen|instellingen|vestigingen|rubrieken)\//;
 
 /**
  * Mag `bewaar()` dit pad schrijven/verwijderen? `evaluaties/` alleen voor het actieve
@@ -135,6 +136,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         currBadges: undefined,
         instellingen: undefined,
         vestigingen: undefined,
+        rubrieken: undefined,
         evaluaties: undefined,
         // De twee vorige schooljaren (een graad = 2, soms 3 schooljaren) — voor de
         // kleur-overname. Leeg als er geen is.
@@ -263,6 +265,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
           collectieLuisteraar("meldingen", "meldingen", (id) => `meldingen/${id}`),
           collectieLuisteraar("instellingen", "instellingen", (id) => `instellingen/${id}`),
           collectieLuisteraar("vestigingen", "vestigingen", (id) => `vestigingen/${id}`),
+          collectieLuisteraar("rubrieken", "rubrieken", (id) => `rubrieken/${id}`),
           curriculumGroepLuisteraar("cursussen"),
           curriculumGroepLuisteraar("badges"),
         ];

@@ -21,10 +21,13 @@ import {
   gebundeldCurriculum,
   geldigCurriculum,
   importeerGebruikers,
+  rubriekenLijst,
   upsertStudenten,
   useStore,
+  wisRubriekenOverride,
   zetCurriculumOverride,
   zetDoelenImport,
+  zetRubriekenInDatabase,
   zetSchooljaarAfgesloten,
 } from "../lib/store";
 
@@ -36,8 +39,15 @@ type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | nul
  * (`<AlleenBeheerder>` in de router).
  */
 export function Gegevens() {
-  const { students, mentoren, kleuren, doelWijzigingen, doelenImport, curriculumOverride } =
-    useStore();
+  const {
+    students,
+    mentoren,
+    kleuren,
+    doelWijzigingen,
+    doelenImport,
+    curriculumOverride,
+    rubriekenOverride,
+  } = useStore();
   const magDev = useDevToegang();
   const [melding, setMelding] = useState<Melding>(null);
 
@@ -322,6 +332,59 @@ export function Gegevens() {
                 }}
               >
                 Herstel standaardlijst
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 32 }}>Rubrics in de database</h2>
+      <div className="gegevens-kaarten">
+        <div className="gegevens-kaart">
+          <div className="gegevens-kaart-naam">Uitgeschreven rubrics</div>
+          <p>
+            Bron: <strong>{rubriekenOverride ? "database-versie" : "ingebouwde bundel"}</strong>.
+            In de database is elke rubric een apart document (<code>rubrieken/{"{id}"}</code>) —
+            alleen een beheerder mag schrijven. Bewerkingen via <em>Rubrics</em> gaan dan
+            rechtstreeks naar dat document (in plaats van als losse patch). De criteriateksten
+            zijn nog niet af; de rest kan later gewoon in de app aangevuld worden.
+          </p>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="knop-primair"
+              onClick={() => {
+                zetRubriekenInDatabase();
+                setMelding({
+                  soort: "ok",
+                  tekst: `${rubriekenLijst().length} rubrics staan nu in de database.`,
+                });
+              }}
+            >
+              Zet de rubrics in de database
+            </button>
+            <button
+              type="button"
+              className="linkknop"
+              onClick={() =>
+                downloadTekst(
+                  `keerpunt-rubrics-${datumStempel()}.json`,
+                  JSON.stringify(rubriekenLijst(), null, 2),
+                )
+              }
+            >
+              Download als JSON
+            </button>
+            {rubriekenOverride && (
+              <button
+                type="button"
+                className="linkknop"
+                onClick={() => {
+                  wisRubriekenOverride();
+                  setMelding({ soort: "ok", tekst: "Terug naar de ingebouwde rubrics." });
+                }}
+              >
+                Gebruik terug de ingebouwde rubrics
               </button>
             )}
           </div>

@@ -49,10 +49,14 @@ export function DeelevaluatieEditor({
   );
   const [datum, setDatum] = useState(bestaand?.datum ?? "");
   const [toelichting, setToelichting] = useState(bestaand?.toelichting ?? "");
-  // Vestiging: vast bij het bewerken en voor een mentor (die zit op zijn eigen vestiging);
-  // een keuzelijst voor coördinator/beheerder.
-  const vestigingVast = bestaand?.vestiging ?? (vestiging || null);
-  const [vestigingKeuze, setVestigingKeuze] = useState(vestigingVast ?? "");
+  // Vestiging: alleen-lezen voor een mentor (die zit op zijn eigen vestiging). Een coördinator/
+  // beheerder kiest — ook bij het bewerken kan die de vestiging aanpassen of op "Alle
+  // vestigingen" zetten.
+  const ALLE_VESTIGINGEN = "__alle__";
+  const vestigingVast = vestiging || null;
+  const [vestigingKeuze, setVestigingKeuze] = useState(
+    vestiging || (bestaand ? bestaand.vestiging || ALLE_VESTIGINGEN : ""),
+  );
   const [leerdoelIds, setLeerdoelIds] = useState<Set<string>>(
     () => new Set(bestaand?.leerdoelIds ?? voorinvulling?.leerdoelIds ?? []),
   );
@@ -73,14 +77,14 @@ export function DeelevaluatieEditor({
       return next;
     });
 
-  const kanBewaren = Boolean(vestigingKeuze);
+  const kanBewaren = vestigingKeuze !== "";
 
   const bewaar = () => {
     if (!kanBewaren) return;
     const data: Omit<Deelevaluatie, "id"> = {
       schooljaar,
       stroom,
-      vestiging: vestigingKeuze,
+      vestiging: vestigingKeuze === ALLE_VESTIGINGEN ? "" : vestigingKeuze,
       cursus,
       typeId,
       titel: titel.trim() || gekozenType?.naam || "Naamloze deelbadge",
@@ -109,6 +113,7 @@ export function DeelevaluatieEditor({
             onChange={(e) => setVestigingKeuze(e.target.value)}
           >
             <option value="">— kies een vestiging —</option>
+            <option value={ALLE_VESTIGINGEN}>Alle vestigingen</option>
             {vestigingOpties.map((v) => (
               <option key={v} value={v}>
                 {v}

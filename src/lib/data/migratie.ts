@@ -53,6 +53,7 @@ export async function migreerDatabase(): Promise<MigratieResultaat> {
     doelenImport: (globaal.doelenImport ?? null) as PersistedStore["doelenImport"],
     rubriekWijzigingen: (globaal.rubriekWijzigingen ?? {}) as PersistedStore["rubriekWijzigingen"],
     curriculumOverride: null,
+    rubriekenOverride: null,
     vestigingen: null,
     deelevaluaties: (globaal.deelevaluaties ?? []) as PersistedStore["deelevaluaties"],
     deelKleuren: deelKleuren as PersistedStore["deelKleuren"],
