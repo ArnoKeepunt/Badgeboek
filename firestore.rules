@@ -47,9 +47,10 @@ service cloud.firestore {
       allow list: if isBeheerder();
       allow create, update: if isBeheerder()
         && request.resource.data.keys().hasOnly(
-             ['email', 'naam', 'rol', 'vestiging', 'actief', 'updatedAt', 'updatedBy'])
+             ['email', 'naam', 'rol', 'vestiging', 'actief', 'dev', 'updatedAt', 'updatedBy'])
         && request.resource.data.rol in ['beheerder', 'coordinator', 'mentor']
-        && request.resource.data.actief is bool;
+        && request.resource.data.actief is bool
+        && (!('dev' in request.resource.data) || request.resource.data.dev is bool);
       allow delete: if isBeheerder();
     }
 

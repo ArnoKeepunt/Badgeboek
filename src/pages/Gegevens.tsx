@@ -14,6 +14,7 @@ import {
   migreerDatabase,
   verwijderOudeStructuur,
 } from "../lib/data";
+import { useDevToegang } from "../lib/firebaseAuth";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import {
@@ -37,6 +38,7 @@ type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | nul
 export function Gegevens() {
   const { students, mentoren, kleuren, doelWijzigingen, doelenImport, curriculumOverride } =
     useStore();
+  const magDev = useDevToegang();
   const [melding, setMelding] = useState<Melding>(null);
 
   const doelen = metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen);
@@ -326,6 +328,8 @@ export function Gegevens() {
         </div>
       </div>
 
+      {magDev && (
+        <>
       <h2 style={{ marginTop: 32 }}>Badges in de database</h2>
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
@@ -406,6 +410,8 @@ export function Gegevens() {
         <>
           <h2 style={{ marginTop: 32 }}>Database opruimen</h2>
           <DatabaseOpruimen onMelding={setMelding} />
+        </>
+      )}
         </>
       )}
     </section>

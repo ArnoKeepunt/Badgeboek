@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { PERSISTENTIE_MODUS, abonneerGebruikers, schrijfGebruiker } from "../lib/data";
+import { useDevToegang } from "../lib/firebaseAuth";
 import type { Personeelslid } from "../lib/gebruikers";
 import {
   hernoemVestiging,
@@ -22,6 +23,7 @@ import {
 export function Vestigingen() {
   // useStore() zodat de pagina hertekent bij elke wijziging aan de lijst.
   useStore();
+  const magVerwijderen = useDevToegang();
   const lijst = vestigingenLijst();
   const ongekoppeld = ongekoppeldeVestigingen();
   const [nieuw, setNieuw] = useState("");
@@ -89,7 +91,9 @@ export function Vestigingen() {
         De campussen van Keerpunt. Leerlingen, mentoren en deelbadges worden aan een vestiging
         gekoppeld. Werkt een vestiging niet meer? <strong>Deactiveer</strong> ze — dan verdwijnt
         ze uit de keuzelijsten maar blijft alle bestaande data en geschiedenis kloppen.
-        Verwijderen is bijna nooit nodig en niet omkeerbaar.
+        {magVerwijderen
+          ? " Verwijderen is bijna nooit nodig en niet omkeerbaar."
+          : " Definitief verwijderen kan alleen een ontwikkelaar."}
       </p>
 
       {melding && <div className="gegevens-melding is-ok">{melding}</div>}
@@ -246,13 +250,15 @@ export function Vestigingen() {
                     >
                       {v.actief ? "Deactiveren" : "Heractiveren"}
                     </button>
-                    <button
-                      type="button"
-                      className="linkknop linkknop-gevaar"
-                      onClick={() => setVerwijderId(v.id)}
-                    >
-                      Verwijderen…
-                    </button>
+                    {magVerwijderen && (
+                      <button
+                        type="button"
+                        className="linkknop linkknop-gevaar"
+                        onClick={() => setVerwijderId(v.id)}
+                      >
+                        Verwijderen…
+                      </button>
+                    )}
                   </span>
                 </>
               )}

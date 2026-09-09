@@ -244,6 +244,7 @@ export async function schrijfGebruiker(p: Personeelslid): Promise<void> {
       rol: p.rol,
       vestiging: p.rol === "mentor" ? p.vestiging : "",
       actief: p.actief,
+      dev: p.dev === true,
       updatedAt: new Date().toISOString(),
       updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
     });

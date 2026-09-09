@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { PERSISTENTIE_MODUS, abonneerGebruikers, schrijfGebruiker, verwijderGebruiker } from "../lib/data";
-import { useAuthStatus } from "../lib/firebaseAuth";
+import { useAuthStatus, useDevToegang } from "../lib/firebaseAuth";
 import {
   PERSONEEL_ROLLEN,
   PERSONEEL_ROL_LABEL,
@@ -18,6 +18,7 @@ const leegFormulier = (): Personeelslid => ({
   rol: "mentor",
   vestiging: "",
   actief: true,
+  dev: false,
 });
 
 /**
@@ -28,6 +29,7 @@ const leegFormulier = (): Personeelslid => ({
 export function Gebruikers() {
   useStore(); // hertekenen als de vestigingenlijst wijzigt
   const { gebruiker } = useAuthStatus();
+  const magVerwijderen = useDevToegang();
   const [lijst, setLijst] = useState<Personeelslid[] | null>(null);
   const [bewerk, setBewerk] = useState<Personeelslid | null>(null);
   const [nieuw, setNieuw] = useState(false);
@@ -166,9 +168,11 @@ export function Gebruikers() {
                 >
                   {p.actief ? "Deactiveren" : "Heractiveren"}
                 </button>
-                <button type="button" className="linkknop" onClick={() => void verwijder(p)}>
-                  Verwijderen
-                </button>
+                {magVerwijderen && (
+                  <button type="button" className="linkknop linkknop-gevaar" onClick={() => void verwijder(p)}>
+                    Verwijderen
+                  </button>
+                )}
               </span>
             </li>
           ))}
@@ -180,6 +184,7 @@ export function Gebruikers() {
           waarde={bewerk}
           nieuw={nieuw}
           vestigingen={vestigingen}
+          magDevZetten={isBootstrapAdmin(gebruiker?.email)}
           onBewaar={bewaar}
           onSluit={() => {
             setBewerk(null);
@@ -195,12 +200,14 @@ function GebruikerForm({
   waarde,
   nieuw,
   vestigingen,
+  magDevZetten,
   onBewaar,
   onSluit,
 }: {
   waarde: Personeelslid;
   nieuw: boolean;
   vestigingen: string[];
+  magDevZetten: boolean;
   onBewaar: (p: Personeelslid) => void;
   onSluit: () => void;
 }) {
@@ -261,6 +268,16 @@ function GebruikerForm({
         />
         <span>Account is actief</span>
       </label>
+      {magDevZetten && (
+        <label className="gebruikers-actief">
+          <input
+            type="checkbox"
+            checked={p.dev === true}
+            onChange={(e) => setP({ ...p, dev: e.target.checked })}
+          />
+          <span>Dev-toegang (Deelbadges, Rubrics — pagina's in ontwikkeling)</span>
+        </label>
+      )}
       <div className="gebruikers-form-acties">
         <button type="button" className="knop-primair" onClick={() => onBewaar(p)}>
           Opslaan

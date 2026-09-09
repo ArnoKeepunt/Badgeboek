@@ -23,6 +23,11 @@ export interface Personeelslid {
   /** Enkel betekenisvol bij `rol: "mentor"`; anders `""`. */
   vestiging: string;
   actief: boolean;
+  /**
+   * Extra toegang tot de nog-in-ontwikkeling pagina's (Deelbadges, Rubrics). Alleen een
+   * bootstrap-beheerder kan dit zetten. `undefined`/`false` = geen dev-toegang.
+   */
+  dev?: boolean;
 }
 
 /** Deze mail kan altijd binnen (spiegelt `isBootstrapAdmin()` in firestore.rules). */
@@ -30,3 +35,9 @@ export const BOOTSTRAP_ADMIN = "arno.boriau@keerpuntscholen.be";
 
 export const isBootstrapAdmin = (email: string | null | undefined): boolean =>
   (email ?? "").toLowerCase() === BOOTSTRAP_ADMIN;
+
+/** Mag deze persoon de in-ontwikkeling-pagina's zien? Bootstrap-beheerder, of `dev`-vlag. */
+export const heeftDevToegang = (
+  persoon: Personeelslid | null,
+  email: string | null | undefined,
+): boolean => isBootstrapAdmin(email) || persoon?.dev === true;

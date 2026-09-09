@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
-import { useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
+import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
 import { PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
@@ -51,28 +51,39 @@ type NavGroep = { items: NavItem[] };
 
 // De zijbalk is geordend in blokjes, gescheiden door een lijntje: het overzicht apart, dan
 // de evaluatie-onderdelen, het klasbeheer en de naslag. Beheerder krijgt er "Gegevens" bij.
-const mentorNav: NavGroep[] = [
-  { items: [{ to: "/", label: "Overzicht", end: true, icoon: "overzicht" }] },
-  {
-    items: [
-      { to: "/badges", label: "Badges", end: false, icoon: "badges" },
-      { to: "/deelevaluaties", label: "Deelbadges", end: false, icoon: "deelevaluaties" },
-      { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
-    ],
-  },
-  {
-    items: [
-      { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" },
-      { to: "/students", label: "Leerlingen", end: false, icoon: "leerlingen" },
-    ],
-  },
-  {
-    items: [{ to: "/doelen", label: "Doelen", end: false, icoon: "doelen" }],
-  },
+const overzichtGroep: NavGroep = {
+  items: [{ to: "/", label: "Overzicht", end: true, icoon: "overzicht" }],
+};
+const klasGroep: NavGroep = {
+  items: [
+    { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" },
+    { to: "/students", label: "Leerlingen", end: false, icoon: "leerlingen" },
+  ],
+};
+const doelenGroep: NavGroep = {
+  items: [{ to: "/doelen", label: "Doelen", end: false, icoon: "doelen" }],
+};
+
+// Deelbadges + Rubrics zijn nog niet af / niet de focus → alleen zichtbaar voor de
+// bootstrap-beheerder (Arno), of in local-modus (dev).
+const devItems: NavItem[] = [
+  { to: "/deelevaluaties", label: "Deelbadges", end: false, icoon: "deelevaluaties" },
+  { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
 ];
 
-const beheerderNav: NavGroep[] = [
-  ...mentorNav,
+// Mentor/coördinator: het badgeboek + klasbeheer + naslag.
+const mentorNav: NavGroep[] = [
+  overzichtGroep,
+  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }] },
+  klasGroep,
+  doelenGroep,
+];
+
+const beheerderNav = (dev: boolean): NavGroep[] => [
+  overzichtGroep,
+  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }, ...(dev ? devItems : [])] },
+  klasGroep,
+  doelenGroep,
   {
     items: [
       // Accountbeheer heeft de Firestore-database nodig; in local-modus geen nut.
@@ -129,33 +140,16 @@ function PaneelIcoon({ ingeklapt }: { ingeklapt: boolean }) {
   );
 }
 
-/** Het Google-account waarmee je de app binnenkwam + afmelden. Toont niets in local-modus. */
-function GoogleAfmelden({ ingeklapt }: { ingeklapt: boolean }) {
-  const { gebruiker } = useFirebaseGebruiker();
-  if (!gebruiker) return null;
-  const email = gebruiker.email ?? gebruiker.displayName ?? "Aangemeld";
-  return (
-    <div className="sidebar-google" title={ingeklapt ? `${email} · Afmelden bij Google` : email}>
-      <span className="sidebar-google-mail">{email}</span>
-      <button
-        type="button"
-        className="sidebar-account-actie sidebar-google-uit"
-        onClick={() => void meldAfVanFirebase()}
-        title={ingeklapt ? "Afmelden bij Google" : undefined}
-      >
-        <span className="sidebar-account-actie-tekst">Afmelden bij Google</span>
-        <UitIcoon />
-      </button>
-    </div>
-  );
-}
-
 function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingeklapt: boolean }) {
   const { persoon } = useHuidigPersoneelslid();
+  const { gebruiker } = useFirebaseGebruiker();
+  const effRol = useEffectieveRol();
+  // "Bekijk als" is een beheerderrecht. In bekijk-als-modus (`aangemeld`) is de kijker per
+  // definitie een beheerder; anders telt de echte rol.
+  const magBekijkenAls = aangemeld ? true : effRol === "beheerder";
+  const email = gebruiker?.email ?? gebruiker?.displayName ?? null;
   // Toon de "bekijk als"-identiteit als die actief is, anders het echte personeelsaccount.
-  const naam = aangemeld
-    ? naamVan(aangemeld)
-    : (persoon?.naam ?? "Beheerder");
+  const naam = aangemeld ? naamVan(aangemeld) : (persoon?.naam ?? "Beheerder");
   const rol = aangemeld
     ? aangemeld.rol
     : persoon
@@ -173,7 +167,8 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
           <span className="sidebar-account-rol">{rol}</span>
         </span>
       </div>
-      {aangemeld ? (
+
+      {aangemeld && (
         <button
           type="button"
           className="sidebar-account-actie"
@@ -183,17 +178,37 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
           <span className="sidebar-account-actie-tekst">Stop bekijken als</span>
           <UitIcoon />
         </button>
-      ) : (
+      )}
+
+      {gebruiker && (
+        <button
+          type="button"
+          className="sidebar-account-actie"
+          onClick={() => void meldAfVanFirebase()}
+          title={ingeklapt ? "Afmelden" : undefined}
+        >
+          <span className="sidebar-account-actie-tekst">Afmelden</span>
+          <UitIcoon />
+        </button>
+      )}
+
+      {email && (
+        <span className="sidebar-google-mail" title={email}>
+          {email}
+        </span>
+      )}
+
+      {/* "Bekijk als" is zelden nodig → apart, onderaan, ingetogen. */}
+      {magBekijkenAls && !aangemeld && (
         <NavLink
           to="/aanmelden"
-          className="sidebar-account-actie"
+          className="sidebar-account-actie sidebar-account-actie-subtiel"
           title={ingeklapt ? "Bekijk als leerling of mentor" : undefined}
         >
           <span className="sidebar-account-actie-tekst">Bekijk als…</span>
           <UitIcoon />
         </NavLink>
       )}
-      <GoogleAfmelden ingeklapt={ingeklapt} />
     </div>
   );
 }
@@ -204,7 +219,13 @@ export function Layout() {
   const rol = useEffectieveRol();
   const students = useZichtbareLeerlingen();
   const isLeerling = rol === "leerling";
-  const nav = isLeerling ? leerlingNav : rol === "beheerder" ? beheerderNav : mentorNav;
+  // Deelbadges/Rubrics: bootstrap-beheerder, iemand met de `dev`-vlag, of local-(dev-)modus.
+  const dev = useDevToegang();
+  const nav = isLeerling
+    ? leerlingNav
+    : rol === "beheerder"
+      ? beheerderNav(dev)
+      : mentorNav;
   const breed =
     !isLeerling && (pathname.startsWith("/badges") || pathname.startsWith("/students/"));
   const titel = paginaTitel(pathname, students);

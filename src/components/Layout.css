@@ -262,16 +262,7 @@
   flex: none;
 }
 
-/* Het Google-account waarmee je de app binnenkwam (los van de "bekijk als"-rol erboven). */
-.sidebar-google {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
+/* Het adres waarmee je binnenkwam — compacte regel onder naam/rol. */
 .sidebar-google-mail {
   font-size: 11px;
   color: var(--text-muted);
@@ -281,9 +272,18 @@
   text-align: center;
 }
 
-.sidebar-google-uit {
+/* "Bekijk als…" — secundaire actie, apart en ingetogen. */
+.sidebar-account-actie-subtiel {
+  margin-top: 4px;
+  border-color: transparent;
+  background: transparent;
   font-weight: 500;
   color: var(--text-muted);
+}
+
+.sidebar-account-actie-subtiel:hover {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .content {

@@ -1,6 +1,7 @@
 import { type ReactNode, lazy, Suspense } from "react";
 import { createHashRouter } from "react-router-dom";
 import { AlleenBeheerder } from "./components/AlleenBeheerder";
+import { AlleenDev } from "./components/AlleenDev";
 import { Shell } from "./components/Shell";
 import { Aanmelden } from "./pages/Aanmelden";
 import { Foutpagina } from "./pages/Foutpagina";
@@ -50,8 +51,8 @@ export const router = createHashRouter([
       { path: "aanmelden", element: <AlleenBeheerder>{<Aanmelden />}</AlleenBeheerder> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
-      { path: "deelevaluaties", element: traag(<Deelevaluaties />) },
-      { path: "rubrics", element: traag(<Rubrics />) },
+      { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
+      { path: "rubrics", element: <AlleenDev>{traag(<Rubrics />)}</AlleenDev> },
       { path: "doelen", element: traag(<Doelen />) },
       { path: "groepen", element: <Groepen /> },
       {

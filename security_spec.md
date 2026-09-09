@@ -6,7 +6,7 @@ The data lives in **one collection per concept** (small documents, browsable):
 
 | Collection | Doc id | Contents |
 |---|---|---|
-| `gebruikers/{email}` | e-mail | staff account: `{ naam, rol, vestiging, actief }` — **no passwords** |
+| `gebruikers/{email}` | e-mail | staff account: `{ naam, rol, vestiging, actief, dev? }` — **no passwords** |
 | `leerlingen/{id}` | pupil id | roster: name, vestiging, leerjaar, klasgroep, e-mail |
 | `mentoren/{id}` | mentor id | demo roster (fictional) |
 | `groepen/{id}` | group id | `{ naam, leerlingIds[], mentorId? }` |
@@ -35,7 +35,9 @@ The data lives in **one collection per concept** (small documents, browsable):
 5. **`isBeheerder()`** only may: write the `curriculum` subtree (`curriculum/{stroom}`, its
    `cursussen/{id}` and `badges/{id}` docs) and manage `/gebruikers`
    (create/update/delete + list). `/gebruikers` writes are shape-restricted (`hasOnly` key
-   allow-list, `rol` ∈ the three roles, `actief is bool`) and can never contain a password field.
+   allow-list incl. optional `dev` bool, `rol` ∈ the three roles, `actief is bool`) and can
+   never contain a password field. `dev: true` = extra toegang tot in-ontwikkeling-pagina's
+   (Deelbadges, Rubrics); enkel de bootstrap-beheerder toont het vinkje in de UI.
    (Editing doelen/rubrieken is gated to `beheerder` in the client UI; the `instellingen/overlays`
    doc itself is personeel-writable because it rides along in the batched app-save.)
 6. Any verified user may read **only their own** `/gebruikers/{email}` doc (needed by the gate).

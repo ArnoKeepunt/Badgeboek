@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, abonneerAuth, abonneerGebruiker } from "./data";
 import type { Personeelslid } from "./gebruikers";
-import { isBootstrapAdmin } from "./gebruikers";
+import { heeftDevToegang, isBootstrapAdmin } from "./gebruikers";
 
 /**
  * Eén module-brede bron voor "wie is er aangemeld bij Firebase" + "welk personeelsaccount
@@ -69,6 +69,16 @@ export function useFirebaseGebruiker(): { gebruiker: User | null; laden: boolean
 export function useHuidigPersoneelslid(): { persoon: Personeelslid | null; laden: boolean } {
   const s = useAuthStatus();
   return { persoon: s.persoon, laden: s.laden };
+}
+
+/**
+ * Mag de huidige gebruiker de dev-acties (verwijderen van vestigingen/accounts, curriculum
+ * wissen, database opruimen, …)? = local-modus, de bootstrap-beheerder, of de `dev`-vlag.
+ * Een gewone beheerder kan wél deactiveren, niet verwijderen.
+ */
+export function useDevToegang(): boolean {
+  const s = useAuthStatus();
+  return PERSISTENTIE_MODUS !== "firebase" || heeftDevToegang(s.persoon, s.gebruiker?.email);
 }
 
 /**
