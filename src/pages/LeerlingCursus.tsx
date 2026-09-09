@@ -11,8 +11,16 @@ import { graadKleur, graadNotitie } from "../lib/leerlingVoortgang";
 import { HUIDIG_SCHOOLJAAR } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
 import { RATING_LABEL } from "../lib/ratings";
-import { getDeelKleur, getDeelNotitie, useStore } from "../lib/store";
-import type { Rating } from "../lib/types";
+import { getDeelKleur, getDeelNotitie, rubriekenLijst, useStore } from "../lib/store";
+import type { Kleurcriteria, Rating } from "../lib/types";
+
+/** De vier kleuren, positiefste eerst — met de sleutel in `Kleurcriteria` en de CSS-klasse. */
+const RUBRIEK_KLEUREN: { key: keyof Kleurcriteria; klasse: string; label: string }[] = [
+  { key: "blauw", klasse: "blue", label: "Blauw" },
+  { key: "groen", klasse: "green", label: "Groen" },
+  { key: "geel", klasse: "yellow", label: "Geel" },
+  { key: "rood", klasse: "red", label: "Rood" },
+];
 
 /** Kleurvakje voor de leerling — zelfde stijl (rand + tint) als de cellen in de mentormatrix. */
 function Status({ kleur }: { kleur: Rating | null }) {
@@ -69,6 +77,11 @@ export function LeerlingCursus() {
       </div>
     );
   }
+
+  // De uitgeschreven rubrieken voor deze cursus (nog niet elke cursus heeft er).
+  const rubrieken = rubriekenLijst().filter(
+    (r) => r.stroom === stroom && r.cursus === cursus.naam,
+  );
 
   const doelen = leerdoelenVoorCursus(cursus.id);
   const telling = telKleuren(doelen.map((d) => graadKleur(kleuren, leerling.id, d.id)));
@@ -129,6 +142,30 @@ export function LeerlingCursus() {
               );
             })}
           </div>
+        </section>
+      )}
+
+      {rubrieken.length > 0 && (
+        <section className="ll-deel-sectie ll-rubrieken">
+          <h2>Waar we op letten</h2>
+          <p className="ll-rubrieken-uitleg">
+            Zo ziet elke kleur eruit voor deze cursus. Klik een onderdeel open om het te lezen.
+          </p>
+          {rubrieken.map((r) => (
+            <details key={r.id} className="ll-rubriek-uit">
+              <summary>{r.naam.replace(/^\s*RUBRIC\s*\d*\s*[-–:.]?\s*/i, "") || r.naam}</summary>
+              <dl className="rubriek-criteria">
+                {RUBRIEK_KLEUREN.map(({ key, klasse, label }) =>
+                  r.criteria[key]?.trim() ? (
+                    <div key={key} className={`rubriek-criterium rating-${klasse}`}>
+                      <dt className="rubriek-criterium-kleur">{label}</dt>
+                      <dd className="rubriek-criterium-tekst">{r.criteria[key]}</dd>
+                    </div>
+                  ) : null,
+                )}
+              </dl>
+            </details>
+          ))}
         </section>
       )}
 

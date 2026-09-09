@@ -3562,6 +3562,42 @@ th {
   margin: 0 0 4px;
 }
 
+/* "Waar we op letten" — uitgeschreven rubrieken voor de leerling. */
+.ll-rubrieken-uitleg {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ll-rubriek-uit {
+  border-top: 1px solid var(--border);
+  padding: 8px 0 4px;
+}
+
+.ll-rubriek-uit > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  list-style: none;
+}
+
+.ll-rubriek-uit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ll-rubriek-uit > summary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ll-rubriek-uit[open] > summary::before {
+  content: "▾";
+}
+
 .ll-deel-lijst {
   list-style: none;
   margin: 0;
