@@ -297,7 +297,21 @@ function commit(next: State) {
 // zonder terug te schrijven, anders krijg je een lus.
 opslag.abonneer?.((rauw) => {
   try {
-    state = { ...verwerkRauw(rauw), sessie: state.sessie };
+    // "Hydration": nooit stil terugvallen van de database-versie naar de ingebouwde bundel.
+    // Hadden we een geldig DB-curriculum / een DB-vestigingenlijst, en komt die nu niet mee
+    // (netwerkhapering, permissiefout, half gesynchroniseerd), dan houden we de laatst geziene
+    // versie. De bundel geldt enkel bij de eerste start of na een bewuste keuze van de beheerder
+    // (die loopt via `commit`, niet hierlangs).
+    const behoudCurriculum =
+      !geldigCurriculum(rauw.curriculumOverride) && Boolean(state.curriculumOverride);
+    const behoudVestigingen =
+      !geldigeVestigingen(rauw.vestigingen) && Boolean(state.vestigingen);
+    const gehydrateerd: RauweStore = {
+      ...rauw,
+      curriculumOverride: behoudCurriculum ? state.curriculumOverride : rauw.curriculumOverride,
+      vestigingen: behoudVestigingen ? state.vestigingen : rauw.vestigingen,
+    };
+    state = { ...verwerkRauw(gehydrateerd), sessie: state.sessie };
     listeners.forEach((notify) => notify());
   } catch {
     // onbruikbare payload van elders — huidige state behouden
@@ -825,6 +839,14 @@ export function vestigingInGebruik(naam: string): {
 
 const bewaarVestigingen = (lijst: Vestiging[]) =>
   commit({ ...state, vestigingen: [...lijst].sort((a, b) => a.volgorde - b.volgorde) });
+
+/** Staat de vestigingenlijst in de opslag (database), of gebruikt de app nog de ingebouwde bundel? */
+export const vestigingenUitDatabase = (): boolean => state.vestigingen !== null;
+
+/** Schrijf de huidige (ingebouwde) vestigingenlijst één keer naar de database. */
+export function zetVestigingenInDatabase() {
+  bewaarVestigingen(vestigingenLijst());
+}
 
 /** Voeg een vestiging toe. Geeft `false` terug als de naam al bestaat. */
 export function voegVestigingToe(naam: string): boolean {

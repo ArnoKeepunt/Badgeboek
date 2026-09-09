@@ -21,6 +21,9 @@ bun.lock
 # Door Google AI Studio gegenereerd; de app leest de config uit VITE_FIREBASE_* in .env
 firebase-applet-config.json
 
+# Bevat echte e-mailadressen / eenmalige admin-scripts
+scripts/add-testteam.mjs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

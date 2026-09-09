@@ -8,8 +8,10 @@ import {
   verwijderVestiging,
   vestigingInGebruik,
   vestigingenLijst,
+  vestigingenUitDatabase,
   voegVestigingToe,
   zetVestigingActief,
+  zetVestigingenInDatabase,
 } from "../lib/store";
 
 /**
@@ -91,6 +93,23 @@ export function Vestigingen() {
       </p>
 
       {melding && <div className="gegevens-melding is-ok">{melding}</div>}
+
+      {!vestigingenUitDatabase() && (
+        <div className="gegevens-melding">
+          Deze lijst staat nog niet in de database — de app gebruikt de ingebouwde lijst. Zodra je
+          hieronder iets wijzigt, wordt ze weggeschreven.{" "}
+          <button
+            type="button"
+            className="linkknop"
+            onClick={() => {
+              zetVestigingenInDatabase();
+              setMelding("De vestigingenlijst staat nu in de database.");
+            }}
+          >
+            Nu in de database zetten
+          </button>
+        </div>
+      )}
 
       <div className="vestiging-nieuw">
         <input
