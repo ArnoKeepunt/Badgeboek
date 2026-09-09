@@ -30,6 +30,7 @@ const PAGINA_TITELS: Record<string, string> = {
   "/groepen": "Groepen",
   "/students": "Leerlingen",
   "/gebruikers": "Gebruikers",
+  "/vestigingen": "Vestigingen",
   "/gegevens": "Gegevens",
   "/aanmelden": "Bekijk als",
 };
@@ -78,6 +79,7 @@ const beheerderNav: NavGroep[] = [
       ...(PERSISTENTIE_MODUS === "firebase"
         ? [{ to: "/gebruikers", label: "Gebruikers", end: false, icoon: "gebruikers" as const }]
         : []),
+      { to: "/vestigingen", label: "Vestigingen", end: false, icoon: "vestigingen" },
       { to: "/gegevens", label: "Gegevens", end: false, icoon: "gegevens" },
     ],
   },

@@ -1,15 +1,34 @@
 import { useEffect, useState } from "react";
+import { HUIDIG_SCHOOLJAAR, schooljaarAfstand } from "./schooljaar";
 import type { Stroom, Student } from "./types";
 
 /** 1-2 → 1e graad, 3-4 → 2e graad, 5-6 → 3e graad. */
 export const graadVan = (leerjaar: number): number => Math.ceil(leerjaar / 2);
 
 /**
- * De stroom (badgeboek) van een leerling. In de 1e graad bestaat A én B; vanaf de 2e graad
- * werken we (voorlopig) enkel met de A-stroom.
+ * Het leerjaar van een leerling in een bepaald schooljaar. Eerst uit `leerjaarHistoriek`;
+ * ontbreekt dat jaar, dan lineair teruggerekend vanaf het huidige `leerjaar` (elke schooljaar
+ * terug = één leerjaar minder). Kan < 1 zijn → de leerling zat er toen (nog) niet.
  */
-export const stroomVan = (s: Student): Stroom => {
-  const g = graadVan(s.leerjaar);
+export function leerjaarInSchooljaar(s: Student, schooljaar: string): number {
+  const uitHistoriek = s.leerjaarHistoriek?.[schooljaar];
+  if (typeof uitHistoriek === "number") return uitHistoriek;
+  const stap = schooljaarAfstand(schooljaar, HUIDIG_SCHOOLJAAR);
+  return stap === null ? s.leerjaar : s.leerjaar - stap;
+}
+
+/** Zat deze leerling in dat schooljaar al op school (leerjaar ≥ 1)? */
+export const isIngeschreven = (s: Student, schooljaar: string): boolean =>
+  leerjaarInSchooljaar(s, schooljaar) >= 1;
+
+/**
+ * De stroom (badgeboek) van een leerling. In de 1e graad bestaat A én B; vanaf de 2e graad
+ * werken we (voorlopig) enkel met de A-stroom. Geef `schooljaar` mee om de stroom van *toen*
+ * te krijgen (voor het bekijken van een vorig schooljaar / een vorige graad).
+ */
+export const stroomVan = (s: Student, schooljaar?: string): Stroom => {
+  const lj = schooljaar ? leerjaarInSchooljaar(s, schooljaar) : s.leerjaar;
+  const g = graadVan(Math.min(6, Math.max(1, lj)));
   if (g === 1) return s.klasgroep === "B" ? "1B" : "1A";
   if (g === 2) return "2A";
   return "3A";

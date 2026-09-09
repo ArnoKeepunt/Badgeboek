@@ -102,7 +102,8 @@ zetten zodat mentoren kunnen testen — hangt niet van de DB af.
 ## Verderop (heeft de DB / echte data / meer wel nodig)
 
 - Echte Google-auth + DB-implementatie achter de seams van punt 1 en 3
-- Smartschool / OneRoster-koppeling
+- Smartschool / OneRoster-koppeling — **plan uitgeschreven in `smartschool-sync-plan.md`**
+  (mentoren synchroniseren + automatisch toegang; wacht op de Smartschool API-sleutel)
 - Rapportmodule, badgewiel, huisstijl
 - 3A-doelen + resterende rubric-criteria (Cultuur/Vrije Tekst zijn er, de rest niet)
 - De twee badgeboek-evaluatiemodi echt uitwerken (deelstapjes→badge; kleur per rapport per

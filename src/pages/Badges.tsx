@@ -8,7 +8,6 @@ import { NotitieVeld } from "../components/NotitieVeld";
 import { RatingCell } from "../components/RatingCell";
 import { StroomBalk } from "../components/StroomBalk";
 import {
-  alleCursussen,
   cursussenVoorStroom,
   leerdoelenVoorCursus,
   leerdoelenVoorStroom,
@@ -16,13 +15,14 @@ import {
 import { deelevaluatiesVoorBadge } from "../lib/deelevaluaties";
 import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { aantalBehaald, telKleuren } from "../lib/kleurstats";
-import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useScrollSync } from "../lib/useScrollSync";
 import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
 import {
+  doelKleurEnBron,
   getDoelKleur,
   getNotitie,
   setDoelKleur,
@@ -47,14 +47,11 @@ import type { Deelevaluatie, DoelKleuren, Leerdoel, Notities, Stroom, Student } 
  * (In de code heten de badges nog `leerdoel` — enkel de labels zijn "badge".)
  */
 
-const FOLD_KEY = "keerpunt-badgeboek:matrix-fold:v2";
-
-/** Standaard: alle cursussen toegeklapt, zodat je niet langs alles moet scrollen. */
-const alleCursusIds = () => alleCursussen().map((c) => c.id);
+const FOLD_KEY = "keerpunt-badgeboek:matrix-fold:v3";
 
 interface Fold {
-  /** Ingeklapte cursussen (badges eronder verborgen). */
-  cursus: string[];
+  /** Uitgeklapte cursussen — al de rest (én onbekende cursussen) staat toe. */
+  open: string[];
 }
 
 function loadFold(): Fold {
@@ -62,12 +59,12 @@ function loadFold(): Fold {
     const raw = localStorage.getItem(FOLD_KEY);
     if (raw) {
       const p = JSON.parse(raw) as Partial<Fold>;
-      return { cursus: p.cursus ?? alleCursusIds() };
+      if (Array.isArray(p.open)) return { open: p.open };
     }
   } catch {
     // geen opgeslagen stand
   }
-  return { cursus: alleCursusIds() };
+  return { open: [] }; // standaard: alles ingeklapt (scheelt véél render-werk)
 }
 
 const zonder = (arr: string[], id: string) => arr.filter((x) => x !== id);
@@ -112,13 +109,19 @@ function StroomMatrix({
 }: StroomMatrixProps) {
   const wijzigingLabel = useWijzigingLabel();
   const geschiedenis = useGeschiedenis();
-  const cursussen = cursussenVoorStroom(stroom).filter(
-    (c) => !cursusFilter || c.naam === cursusFilter,
+  const cursussen = useMemo(
+    () => cursussenVoorStroom(stroom).filter((c) => !cursusFilter || c.naam === cursusFilter),
+    [stroom, cursusFilter],
   );
-  const stroomDeelevaluaties = useMemo(
-    () => deelevaluaties.filter((d) => d.schooljaar === schooljaar && d.stroom === stroom),
-    [deelevaluaties, schooljaar, stroom],
-  );
+  const stroomDeelevaluaties = useMemo(() => {
+    const vestigingen = new Set(leerlingen.map((s) => s.vestiging));
+    return deelevaluaties.filter(
+      (d) =>
+        d.schooljaar === schooljaar &&
+        d.stroom === stroom &&
+        (d.vestiging === "" || vestigingen.has(d.vestiging)),
+    );
+  }, [deelevaluaties, schooljaar, stroom, leerlingen]);
   // De samenvatting onderaan telt de badges van de getoonde cursussen (dus mee gefilterd).
   const stroomLeerdoelen = useMemo(
     () =>
@@ -134,13 +137,21 @@ function StroomMatrix({
   /** De kleurcellen (RatingCell + notitie-vierkantje per leerling) voor één node. */
   const kleurCellen = (nodeId: string, naam: string) =>
     leerlingen.map((s) => {
-      const kleur = getDoelKleur(kleuren, schooljaar, s.id, nodeId);
+      const { kleur, overgenomen } = doelKleurEnBron(kleuren, schooljaar, s.id, nodeId);
       const sleutel = doelSleutel(schooljaar, s.id, nodeId);
       const wLabel = wijzigingLabel(sleutel) ?? undefined;
       return (
-        <td key={s.id} className="grid-cel" title={wLabel}>
+        <td
+          key={s.id}
+          className="grid-cel"
+          title={overgenomen ? "Kleur overgenomen uit vorig schooljaar" : wLabel}
+        >
           {/* rating-klasse op de wrapper: het notitie-vierkantje pikt die kleur op */}
-          <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
+          <div
+            className={`grid-cel-inhoud rating-${kleur ?? "empty"}${
+              overgenomen ? " is-overgenomen" : ""
+            }`}
+          >
             <RatingCell
               label={`${s.firstName} — ${naam}`}
               readonly={vergrendeld}
@@ -192,7 +203,14 @@ function StroomMatrix({
     const gekozen = gekozenBadge === doel.id;
     return (
       <tr key={doel.id} className={gekozen ? "is-gekozen" : undefined}>
-        <td className="grid-col-doel grid-doel grid-doel-n1">
+        <td
+          className="grid-col-doel grid-doel grid-doel-n1 grid-doel-klikbaar"
+          onClick={(e) => {
+            // Niet openen als je op de bulk-knop of z'n menu klikt.
+            if ((e.target as HTMLElement).closest(".bulk-knop")) return;
+            onKiesBadge(doel.id);
+          }}
+        >
           <div className="grid-doel-rij">
             <span className="grid-doel-tekst">{doel.omschrijving}</span>
             <button
@@ -211,7 +229,10 @@ function StroomMatrix({
                   : "Deelbadges bij deze badge"
               }
               aria-pressed={gekozen}
-              onClick={() => onKiesBadge(doel.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onKiesBadge(doel.id);
+              }}
             >
               <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path
@@ -236,9 +257,29 @@ function StroomMatrix({
     );
   };
 
-  const kolomTotalen = leerlingen.map((s) =>
-    telKleuren(stroomLeerdoelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id))),
+  const kolomTotalen = useMemo(
+    () =>
+      leerlingen.map((s) =>
+        telKleuren(stroomLeerdoelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id))),
+      ),
+    [leerlingen, stroomLeerdoelen, kleuren, schooljaar],
   );
+
+  // Per cursus × leerling de "x/y behaald + kleurverdeling"-samenvatting (getoond ook als de
+  // cursus ingeklapt is). Eén keer berekenen i.p.v. bij elke render van de matrix.
+  const cursusSamenvatting = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof telKleuren>[]>();
+    for (const c of cursussen) {
+      const doelen = leerdoelenVoorCursus(c.id);
+      m.set(
+        c.id,
+        leerlingen.map((s) =>
+          telKleuren(doelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id))),
+        ),
+      );
+    }
+    return m;
+  }, [cursussen, leerlingen, kleuren, schooljaar]);
 
   const titel = toonTitel ? (
     <h2 className="stroom-matrix-titel">
@@ -296,7 +337,7 @@ function StroomMatrix({
 
           {cursussen.map((cursus) => {
             // Filter je op één cursus, dan staat die sowieso open.
-            const cursusDicht = !cursusFilter && fold.cursus.includes(cursus.id);
+            const cursusDicht = !cursusFilter && !fold.open.includes(cursus.id);
             const cursusDoelen = leerdoelenVoorCursus(cursus.id);
             return (
               <tbody key={cursus.id}>
@@ -310,10 +351,8 @@ function StroomMatrix({
                   )}
                   {/* Geen evaluatie op cursusniveau, wel een leesbare samenvatting per leerling:
                       hoeveel badges van deze cursus al behaald + de kleurverdeling. */}
-                  {leerlingen.map((s) => {
-                    const t = telKleuren(
-                      cursusDoelen.map((d) => getDoelKleur(kleuren, schooljaar, s.id, d.id)),
-                    );
+                  {leerlingen.map((s, i) => {
+                    const t = cursusSamenvatting.get(cursus.id)?.[i] ?? telKleuren([]);
                     return (
                       <td
                         key={s.id}
@@ -390,9 +429,14 @@ export function Badges() {
 
   // De stroomchips bepalen al de graad/klasgroep-as, dus die velden in de filterbalk laten
   // we weg en negeren we hier — geen dubbel systeem.
+  // Stroom = die van het *bekeken* schooljaar (voor een doorgestroomde/zittengebleven leerling
+  // kan die verschillen van nu). Wie er dat jaar nog niet was, valt weg.
   const stroomLeerlingen = useMemo(
-    () => students.filter((s) => matrixStromen.includes(stroomVan(s))),
-    [students, matrixStromen],
+    () =>
+      students.filter(
+        (s) => isIngeschreven(s, schooljaar) && matrixStromen.includes(stroomVan(s, schooljaar)),
+      ),
+    [students, matrixStromen, schooljaar],
   );
   const zichtbaar = useMemo(() => {
     const leden = groepLeden(filter.groepId, students, groepen);
@@ -404,9 +448,9 @@ export function Badges() {
     () =>
       matrixStromen.map((s) => ({
         stroom: s,
-        leerlingen: zichtbaar.filter((l) => stroomVan(l) === s),
+        leerlingen: zichtbaar.filter((l) => stroomVan(l, schooljaar) === s),
       })),
-    [matrixStromen, zichtbaar],
+    [matrixStromen, zichtbaar, schooljaar],
   );
 
   // Het zijpaneel toont de deelevaluaties van de gekozen badge, met de leerlingen van díé
@@ -431,14 +475,14 @@ export function Badges() {
 
   const toggleCursus = (id: string) =>
     setFold((f) => ({
-      cursus: f.cursus.includes(id) ? zonder(f.cursus, id) : met(f.cursus, id),
+      open: f.open.includes(id) ? zonder(f.open, id) : met(f.open, id),
     }));
 
-  const allesDicht = () => {
+  const allesOpen = () => {
     const cursusIds = matrixStromen.flatMap((s) => cursussenVoorStroom(s).map((c) => c.id));
-    setFold({ cursus: cursusIds });
+    setFold({ open: cursusIds });
   };
-  const allesOpen = () => setFold({ cursus: [] });
+  const allesDicht = () => setFold({ open: [] });
 
   return (
     <section>

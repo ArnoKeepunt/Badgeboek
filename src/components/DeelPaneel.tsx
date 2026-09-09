@@ -16,12 +16,25 @@ import {
   zetDeelNotitie,
 } from "../lib/store";
 import { deelSleutel } from "../lib/types";
-import type { Student } from "../lib/types";
+import type { Deelevaluatie, Student } from "../lib/types";
 import {
   useDeelevaluatieWijzigingLabel,
   useGeschiedenis,
   useWijzigingLabel,
 } from "../lib/wijzigingslog";
+
+function PotloodIcoon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
  * Zijpaneel bij de badgematrix: de deelevaluaties die aan de gekozen badge gekoppeld zijn, als
@@ -54,11 +67,22 @@ export function DeelPaneel({
   const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
   const aangemeld = useAangemeld();
   const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
-  const [editorOpen, setEditorOpen] = useState(false);
+  // `null` = dicht; `{}` = nieuwe deelbadge; `{ bestaand }` = die deelbadge bewerken.
+  const [editor, setEditor] = useState<{ bestaand?: Deelevaluatie } | null>(null);
 
   const doel = alleLeerdoelen().find((l) => l.id === leerdoelId);
   const cursus = cursusVanLeerdoel(leerdoelId);
-  const rijen = deelevaluatiesVoorBadge(deelevaluaties, leerdoelId, schooljaar, cursusFilter);
+  // Deelbadges zijn vestiging-gebonden: toon enkel die van de vestiging(en) van de zichtbare
+  // leerlingen (+ overkoepelende). Zijn er meerdere vestigingen in beeld (bv. beheerder), dan
+  // kiest de editor-overlay er zelf één (verplicht veld).
+  const vestigingen = [...new Set(leerlingen.map((s) => s.vestiging))].filter(Boolean);
+  const paneelVestiging = vestigingen.length === 1 ? vestigingen[0] : "";
+  const rijen = deelevaluatiesVoorBadge(
+    deelevaluaties,
+    leerdoelId,
+    schooljaar,
+    cursusFilter,
+  ).filter((d) => d.vestiging === "" || vestigingen.includes(d.vestiging));
   const alleIds = leerlingen.map((s) => s.id);
 
   return (
@@ -82,11 +106,11 @@ export function DeelPaneel({
         </button>
       </div>
 
-      {!vergrendeld && cursus && (
+      {!vergrendeld && cursus && vestigingen.length > 0 && (
         <button
           type="button"
           className="knop-secundair badges-deelpaneel-nieuw"
-          onClick={() => setEditorOpen(true)}
+          onClick={() => setEditor({})}
         >
           + Nieuwe deelbadge voor deze badge
         </button>
@@ -135,18 +159,34 @@ export function DeelPaneel({
                         disabled={vergrendeld}
                         onKies={(kleur) => setDeelKleurBulk(d.id, alleIds, kleur)}
                       />
+                      {!vergrendeld && (
+                        <button
+                          type="button"
+                          className="knop-icoon knop-icoon-klein deelpaneel-bewerk-knop"
+                          title="Deelbadge bewerken"
+                          aria-label={`"${d.titel}" bewerken`}
+                          onClick={() => setEditor({ bestaand: d })}
+                        >
+                          <PotloodIcoon />
+                        </button>
+                      )}
                     </div>
                   </td>
                   {leerlingen.map((s) => {
                     const kleur = getDeelKleur(deelKleuren, d.id, s.id);
                     const sleutel = deelSleutel(d.id, s.id);
                     const wLabel = wijzigingLabel(sleutel) ?? undefined;
+                    const anderVestiging = d.vestiging !== "" && s.vestiging !== d.vestiging;
                     return (
-                      <td key={s.id} className="grid-cel" title={wLabel}>
+                      <td
+                        key={s.id}
+                        className="grid-cel"
+                        title={anderVestiging ? `Deelbadge van vestiging ${d.vestiging}` : wLabel}
+                      >
                         <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
                           <RatingCell
                             label={`${s.firstName} — ${d.titel}`}
-                            readonly={vergrendeld}
+                            readonly={vergrendeld || anderVestiging}
                             value={kleur}
                             geschiedenis={geschiedenis(sleutel)}
                             onChange={(next) => setDeelKleur(d.id, s.id, next)}
@@ -167,18 +207,28 @@ export function DeelPaneel({
         </div>
       )}
 
-      {editorOpen && cursus && (
-        <Modal label="Nieuwe deelbadge" onClose={() => setEditorOpen(false)}>
+      {editor && cursus && (
+        <Modal
+          label={editor.bestaand ? "Deelbadge bewerken" : "Nieuwe deelbadge"}
+          onClose={() => setEditor(null)}
+        >
           <DeelevaluatieEditor
-            stroom={cursus.stroom}
+            stroom={editor.bestaand?.stroom ?? cursus.stroom}
             schooljaar={schooljaar}
+            vestiging={paneelVestiging}
+            vestigingOpties={vestigingen}
             mentorId={mentorId}
-            voorinvulling={{
-              cursus: kapstokCursusVoorBadgeCursus(cursus.stroom, cursus.naam),
-              typeId: null,
-              leerdoelIds: [leerdoelId],
-            }}
-            onSluit={() => setEditorOpen(false)}
+            bestaand={editor.bestaand}
+            voorinvulling={
+              editor.bestaand
+                ? undefined
+                : {
+                    cursus: kapstokCursusVoorBadgeCursus(cursus.stroom, cursus.naam),
+                    typeId: null,
+                    leerdoelIds: [leerdoelId],
+                  }
+            }
+            onSluit={() => setEditor(null)}
           />
         </Modal>
       )}

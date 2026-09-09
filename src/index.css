@@ -884,6 +884,25 @@ th {
   border: 0;
 }
 
+/* Kleur overgenomen uit vorig schooljaar (zelfde graad): klein hoekje-teken, en de
+   rating-knop krijgt een gestippelde rand zodat "nog niet dit jaar bevestigd" leesbaar is. */
+.grid-cel-inhoud.is-overgenomen {
+  position: relative;
+}
+.grid-cel-inhoud.is-overgenomen .rating-cell-btn {
+  border-style: dashed;
+}
+.grid-cel-inhoud.is-overgenomen::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rating-border, var(--text-muted));
+}
+
 .grid th,
 .grid td {
   border-bottom: 1px solid var(--border);
@@ -1004,6 +1023,28 @@ th {
   flex: 1;
 }
 
+/* Het hele badge-veld (de eerste-kolom-cel) opent het deelbadge-zijpaneel. De badgenaam zelf
+   krijgt geen eigen highlight — het deelbadge-chipje licht op zodra je in de cel staat. */
+.grid-doel-klikbaar {
+  cursor: pointer;
+}
+
+.grid-doel-klikbaar:hover .grid-deel-chip {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.grid-doel-klikbaar:hover .grid-deel-chip.is-leeg {
+  opacity: 1;
+}
+
+.grid-doel-klikbaar:hover .grid-deel-chip.is-actief,
+.grid-doel-klikbaar:hover .grid-deel-chip.is-leeg.is-actief {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
 /* Cursusrij: de inklaptoggle vult de kolom, de bulk-knop staat rechts. */
 .grid-doel-rij > .grid-toggle {
   flex: 1;
@@ -1065,6 +1106,17 @@ th {
 .grid tbody tr:hover .bulk-knop-trigger,
 .bulk-knop-trigger:focus-visible,
 .bulk-knop-trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+/* Potlood-bewerkknop in het deelbadge-zijpaneel: enkel op rij-hover (of toetsenbordfocus). */
+.deelpaneel-bewerk-knop {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.grid tbody tr:hover .deelpaneel-bewerk-knop,
+.deelpaneel-bewerk-knop:focus-visible {
   opacity: 1;
 }
 
@@ -1610,6 +1662,43 @@ th {
   display: flex;
   gap: 10px;
   white-space: nowrap;
+}
+
+/* Vestigingenbeheer: 4 kolommen (naam · gekoppelde data · status · acties). */
+.vestiging-lijst .gebruikers-rij {
+  grid-template-columns: 1.2fr 2fr 0.7fr auto;
+}
+
+.vestiging-nieuw {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.vestiging-nieuw input {
+  flex: 1;
+  max-width: 320px;
+}
+
+.vestiging-bewerk-veld {
+  grid-column: 1 / 4;
+}
+
+.vestiging-gevaar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid #b91c1c;
+  background: #fef2f2;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.vestiging-gevaar p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .gebruikers-form {
@@ -2883,6 +2972,12 @@ th {
   color: var(--text-muted);
 }
 
+.de-editor-vestiging {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .de-veld {
   display: flex;
   flex-direction: column;
@@ -2939,6 +3034,14 @@ th {
   background: var(--accent-soft);
   border-radius: 8px;
   padding: 8px 10px;
+}
+
+.de-editor-info {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
 }
 
 .de-badges {

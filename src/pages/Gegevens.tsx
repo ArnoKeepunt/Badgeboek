@@ -15,6 +15,7 @@ import {
   verwijderOudeStructuur,
 } from "../lib/data";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
+import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import {
   gebundeldCurriculum,
   geldigCurriculum,
@@ -23,6 +24,7 @@ import {
   useStore,
   zetCurriculumOverride,
   zetDoelenImport,
+  zetSchooljaarAfgesloten,
 } from "../lib/store";
 
 type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | null;
@@ -140,7 +142,47 @@ export function Gegevens() {
         </div>
       )}
 
-      <h2>Exporteren</h2>
+      <h2>Schooljaren vastzetten</h2>
+      <p style={{ color: "var(--text-muted)", marginTop: 4 }}>
+        Sluit een voorbij schooljaar af (in september) zodat de evaluaties ervan alleen-lezen
+        worden. De data blijft raadpleegbaar; heropenen kan indien er nog iets rechtgezet moet
+        worden.
+      </p>
+      <ul className="gebruikers-lijst vestiging-lijst">
+        {[...SCHOOLJAREN].reverse().map((sj) => {
+          const dicht = isAfgesloten(sj);
+          const lopend = sj === HUIDIG_SCHOOLJAAR;
+          return (
+            <li key={sj} className={`gebruikers-rij${dicht ? " is-inactief" : ""}`}>
+              <span className="gebruikers-naam">{sj}</span>
+              <span className="gebruikers-mail">
+                {lopend ? "lopend schooljaar" : dicht ? "afgesloten — alleen-lezen" : "open"}
+              </span>
+              <span className="gebruikers-status">{dicht ? "🔒" : ""}</span>
+              <span className="gebruikers-acties">
+                <button
+                  type="button"
+                  className="linkknop"
+                  onClick={() => {
+                    if (
+                      dicht ||
+                      confirm(
+                        `Schooljaar ${sj} afsluiten? De evaluaties worden alleen-lezen (heropenen kan later).`,
+                      )
+                    ) {
+                      zetSchooljaarAfgesloten(sj, !dicht);
+                    }
+                  }}
+                >
+                  {dicht ? "Heropenen" : "Afsluiten"}
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h2 style={{ marginTop: 32 }}>Exporteren</h2>
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Evaluaties (back-up)</div>

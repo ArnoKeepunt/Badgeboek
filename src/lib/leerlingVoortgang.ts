@@ -3,10 +3,9 @@ import { getDoelKleur, getNotitie } from "./store";
 import type { DoelKleuren, Notities, Rating } from "./types";
 
 /**
- * De kleur van een badge zoals de leerling ze ziet: de kleur van het **lopende schooljaar**.
- * Dat is precies wat de mentor in het badgeboek heeft staan — haalt de mentor de kleur weg,
- * dan ziet de leerling ze ook niet meer. (Eerdere schooljaren blijven in de
- * leerlingdetailpagina zichtbaar, niet in dit overzicht.)
+ * De kleur van een badge zoals de leerling ze ziet in het **lopende schooljaar** — inclusief
+ * de kleuren die overgenomen zijn uit vorig schooljaar binnen dezelfde graad (`getDoelKleur`
+ * doet die overname). Haalt de mentor een kleur bewust weg, dan ziet de leerling ze niet meer.
  */
 export function graadKleur(
   kleuren: DoelKleuren,

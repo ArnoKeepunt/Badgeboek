@@ -13,7 +13,15 @@ import type { DoelKleuren, Mentor, Rating, Stroom, Student } from "./types";
 
 // --- Leerlingen ------------------------------------------------------------
 
-const LEERLING_KOP = ["id", "voornaam", "achternaam", "vestiging", "leerjaar", "klasgroep"];
+const LEERLING_KOP = [
+  "id",
+  "voornaam",
+  "achternaam",
+  "vestiging",
+  "leerjaar",
+  "klasgroep",
+  "leerjaarhistoriek",
+];
 
 export function exportLeerlingen(studenten: Student[]): string {
   return toCsv([
@@ -25,6 +33,7 @@ export function exportLeerlingen(studenten: Student[]): string {
       s.vestiging,
       s.leerjaar,
       s.klasgroep,
+      s.leerjaarHistoriek ? JSON.stringify(s.leerjaarHistoriek) : "",
     ]),
   ]);
 }
@@ -138,6 +147,7 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
   const iVest = kol(["vestiging", "campus", "school"]);
   const iJaar = kol(["leerjaar", "jaar", "grade"]);
   const iGroep = kol(["klasgroep", "groep", "klas", "class"]);
+  const iHist = kol(["leerjaarhistoriek", "leerjaar_historiek"]);
 
   if (iVn < 0 || iAn < 0) {
     return { rijen: [], fouten: ["Kolommen 'voornaam' en 'achternaam' zijn verplicht."] };
@@ -161,12 +171,24 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
     }
     gezien.add(id);
     const leerjaar = iJaar >= 0 ? parseInt((r[iJaar] ?? "").trim(), 10) : NaN;
+    let leerjaarHistoriek: Record<string, number> | undefined;
+    if (iHist >= 0 && (r[iHist] ?? "").trim()) {
+      try {
+        const p = JSON.parse(r[iHist]) as Record<string, unknown>;
+        const schoon: Record<string, number> = {};
+        for (const [sj, v] of Object.entries(p)) if (typeof v === "number") schoon[sj] = v;
+        if (Object.keys(schoon).length > 0) leerjaarHistoriek = schoon;
+      } catch {
+        fouten.push(`Rij ${nr}: 'leerjaarhistoriek' is geen geldige JSON — genegeerd.`);
+      }
+    }
     studenten.push({
       id,
       firstName: voornaam,
       lastName: achternaam,
       vestiging: iVest >= 0 ? (r[iVest] ?? "").trim() : "",
       leerjaar: Number.isFinite(leerjaar) ? leerjaar : 1,
+      leerjaarHistoriek,
       klasgroep: iGroep >= 0 ? (r[iGroep] ?? "").trim().toUpperCase() : "A",
     });
   });

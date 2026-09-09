@@ -67,7 +67,7 @@ export function Students() {
             </thead>
             <tbody>
               {zichtbaar.map((s) => {
-                const doelen = leerdoelenVoorStroom(stroomVan(s));
+                const doelen = leerdoelenVoorStroom(stroomVan(s, schooljaar));
                 const ingevuld = doelen.filter(
                   (d) => getDoelKleur(kleuren, schooljaar, s.id, d.id) !== null,
                 ).length;

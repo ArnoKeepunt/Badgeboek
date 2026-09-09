@@ -10,12 +10,19 @@ import {
   leerdoelenVoorStroom,
 } from "../lib/curriculum";
 import { deelevaluatiesVoor, typeById } from "../lib/deelevaluaties";
-import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
+import {
+  GRAAD_LABEL,
+  graadVan,
+  isIngeschreven,
+  leerjaarInSchooljaar,
+  stroomVan,
+} from "../lib/leerlingen";
 import { magLeerlingZien, useBereik } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import {
   getDeelKleur,
   getDeelNotitie,
+  doelKleurEnBron,
   getDoelKleur,
   getNotitie,
   setDeelKleur,
@@ -84,7 +91,15 @@ export function StudentDetail() {
   const terug = () => (kanTerug ? navigate(-1) : navigate("/students"));
 
   const mijnDeel = useMemo(
-    () => (student ? deelevaluatiesVoor(deelevaluaties, stroomVan(student), schooljaar) : []),
+    () =>
+      student
+        ? deelevaluatiesVoor(
+            deelevaluaties,
+            stroomVan(student, schooljaar),
+            schooljaar,
+            student.vestiging,
+          )
+        : [],
     [deelevaluaties, student, schooljaar],
   );
 
@@ -129,7 +144,9 @@ export function StudentDetail() {
     );
   }
 
-  const stroom = stroomVan(student);
+  const ingeschreven = isIngeschreven(student, schooljaar);
+  const stroom = stroomVan(student, schooljaar);
+  const graadDitJaar = graadVan(leerjaarInSchooljaar(student, schooljaar));
   const cursussen = cursussenVoorStroom(stroom);
   const badgeTekst = new Map(leerdoelenVoorStroom(stroom).map((d) => [d.id, d.omschrijving]));
 
@@ -143,12 +160,19 @@ export function StudentDetail() {
 
   /** De ene kleurcel voor één badge. */
   const kleurCel = (nodeId: string, naam: string) => {
-    const kleur = getDoelKleur(kleuren, schooljaar, student.id, nodeId);
+    const { kleur, overgenomen } = doelKleurEnBron(kleuren, schooljaar, student.id, nodeId);
     const sleutel = doelSleutel(schooljaar, student.id, nodeId);
     const wLabel = wijzigingLabel(sleutel) ?? undefined;
     return (
-      <td className="grid-cel" title={wLabel}>
-        <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
+      <td
+        className="grid-cel"
+        title={overgenomen ? "Kleur overgenomen uit vorig schooljaar" : wLabel}
+      >
+        <div
+          className={`grid-cel-inhoud rating-${kleur ?? "empty"}${
+            overgenomen ? " is-overgenomen" : ""
+          }`}
+        >
           <RatingCell
             label={naam}
             readonly={vergrendeld}
@@ -221,7 +245,17 @@ export function StudentDetail() {
         <Link to="/students">Alle leerlingen</Link>
       </div>
       <p style={{ color: "var(--text-muted)", marginTop: 8 }}>
-        {student.vestiging} · {GRAAD_LABEL[graadVan(student.leerjaar)]} · {student.leerjaar}e jaar
+        {student.vestiging} ·{" "}
+        {archief && ingeschreven ? (
+          <>
+            {GRAAD_LABEL[graadDitJaar]} · {leerjaarInSchooljaar(student, schooljaar)}e jaar in{" "}
+            {schooljaar}
+          </>
+        ) : (
+          <>
+            {GRAAD_LABEL[graadVan(student.leerjaar)]} · {student.leerjaar}e jaar
+          </>
+        )}{" "}
         · groep {student.klasgroep} · badgeboek {stroom}
       </p>
 
@@ -230,12 +264,19 @@ export function StudentDetail() {
           🔒 Schooljaar <strong>{schooljaar}</strong> is afgesloten — de evaluaties staan vast.
         </p>
       )}
-      {archief && (
+      {archief && ingeschreven && (
         <p className="jaar-melding">
-          Je bekijkt schooljaar <strong>{schooljaar}</strong> (niet het lopende schooljaar).
+          Je bekijkt schooljaar <strong>{schooljaar}</strong> — de badges van de graad waarin
+          deze leerling <strong>toen</strong> zat.
         </p>
       )}
 
+      {!ingeschreven ? (
+        <p className="lege-staat" style={{ marginTop: 16 }}>
+          Deze leerling zat in <strong>{schooljaar}</strong> nog niet op school (volgens de
+          klaslijsten). Kies een later schooljaar bovenaan.
+        </p>
+      ) : (
       <div className="sd-split">
         <div className="sd-badges">
           <div className="matrix-acties">
@@ -374,6 +415,7 @@ export function StudentDetail() {
           )}
         </aside>
       </div>
+      )}
     </section>
   );
 }

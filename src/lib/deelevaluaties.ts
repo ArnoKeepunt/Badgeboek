@@ -83,14 +83,27 @@ const opDatumDanTitel = (a: Deelevaluatie, b: Deelevaluatie): number => {
   return a.titel.localeCompare(b.titel, "nl");
 };
 
-/** Deelevaluaties van een stroom + schooljaar, op datum en titel. */
+/**
+ * Hoort een deelbadge bij deze vestiging? `d.vestiging === ""` = overkoepelend (alle
+ * vestigingen). `vestiging === ""` (geen vestiging gekozen) = geen vestigingfilter.
+ */
+export const deelbadgeOpVestiging = (d: Deelevaluatie, vestiging: string): boolean =>
+  vestiging === "" || d.vestiging === "" || d.vestiging === vestiging;
+
+/** Deelevaluaties van een stroom + schooljaar (+ optioneel vestiging), op datum en titel. */
 export function deelevaluatiesVoor(
   alle: Deelevaluatie[],
   stroom: Stroom,
   schooljaar: string,
+  vestiging = "",
 ): Deelevaluatie[] {
   return alle
-    .filter((d) => d.stroom === stroom && d.schooljaar === schooljaar)
+    .filter(
+      (d) =>
+        d.stroom === stroom &&
+        d.schooljaar === schooljaar &&
+        deelbadgeOpVestiging(d, vestiging),
+    )
     .sort(opDatumDanTitel);
 }
 
@@ -105,10 +118,16 @@ export function deelevaluatiesVoorBadge(
   leerdoelId: string,
   schooljaar: string,
   cursusFilter?: string,
+  vestiging = "",
 ): Deelevaluatie[] {
   const doel = cursusFilter ? (CURSUS_ALIAS[norm(cursusFilter)] ?? norm(cursusFilter)) : "";
   return alle
-    .filter((d) => d.schooljaar === schooljaar && d.leerdoelIds.includes(leerdoelId))
+    .filter(
+      (d) =>
+        d.schooljaar === schooljaar &&
+        d.leerdoelIds.includes(leerdoelId) &&
+        deelbadgeOpVestiging(d, vestiging),
+    )
     .filter((d) => {
       if (!doel) return true;
       const n = norm(d.cursus);

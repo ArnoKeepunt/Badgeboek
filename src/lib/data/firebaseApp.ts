@@ -34,10 +34,7 @@ const firebaseConfig = {
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
-
-/** Collectie waarin de bewerkbare badge-set leeft, één doc per stroom (`curriculum/1A` …). */
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);

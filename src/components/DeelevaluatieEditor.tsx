@@ -14,6 +14,8 @@ const TOELICHTING_MAX = 200;
 export function DeelevaluatieEditor({
   stroom,
   schooljaar,
+  vestiging,
+  vestigingOpties,
   mentorId,
   bestaand,
   voorinvulling,
@@ -21,6 +23,14 @@ export function DeelevaluatieEditor({
 }: {
   stroom: Stroom;
   schooljaar: string;
+  /**
+   * De vestiging waarvoor de deelbadge geldt. `""` = de gebruiker mag/moet er zelf één kiezen
+   * (coördinator/beheerder). Een gewone mentor krijgt hier zijn eigen vestiging en ziet het veld
+   * niet — het is dan al ingevuld.
+   */
+  vestiging: string;
+  /** Alle vestigingen om uit te kiezen wanneer `vestiging === ""`. */
+  vestigingOpties: string[];
   mentorId?: string;
   bestaand?: Deelevaluatie;
   voorinvulling?: { cursus: string; typeId: string | null; leerdoelIds?: string[] };
@@ -39,6 +49,10 @@ export function DeelevaluatieEditor({
   );
   const [datum, setDatum] = useState(bestaand?.datum ?? "");
   const [toelichting, setToelichting] = useState(bestaand?.toelichting ?? "");
+  // Vestiging: vast bij het bewerken en voor een mentor (die zit op zijn eigen vestiging);
+  // een keuzelijst voor coördinator/beheerder.
+  const vestigingVast = bestaand?.vestiging ?? (vestiging || null);
+  const [vestigingKeuze, setVestigingKeuze] = useState(vestigingVast ?? "");
   const [leerdoelIds, setLeerdoelIds] = useState<Set<string>>(
     () => new Set(bestaand?.leerdoelIds ?? voorinvulling?.leerdoelIds ?? []),
   );
@@ -59,10 +73,14 @@ export function DeelevaluatieEditor({
       return next;
     });
 
+  const kanBewaren = Boolean(vestigingKeuze);
+
   const bewaar = () => {
+    if (!kanBewaren) return;
     const data: Omit<Deelevaluatie, "id"> = {
       schooljaar,
       stroom,
+      vestiging: vestigingKeuze,
       cursus,
       typeId,
       titel: titel.trim() || gekozenType?.naam || "Naamloze deelbadge",
@@ -79,6 +97,26 @@ export function DeelevaluatieEditor({
   return (
     <div className="de-editor">
       <h2>{bestaand ? "Deelbadge bewerken" : "Nieuwe deelbadge"}</h2>
+      {vestigingVast ? (
+        <p className="de-editor-vestiging">
+          Vestiging: <strong>{vestigingVast}</strong>
+        </p>
+      ) : (
+        <label className="de-veld">
+          <span>Vestiging *</span>
+          <select
+            value={vestigingKeuze}
+            onChange={(e) => setVestigingKeuze(e.target.value)}
+          >
+            <option value="">— kies een vestiging —</option>
+            {vestigingOpties.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {wijzigingTekst && <p className="de-editor-wijziging">{wijzigingTekst}</p>}
 
       <label className="de-veld">
@@ -140,6 +178,11 @@ export function DeelevaluatieEditor({
         </p>
       )}
 
+      <p className="de-editor-info">
+        Wil je verschillende cursussen apart als evaluatie beoordelen? Maak dan telkens een
+        nieuwe deelbadge aan.
+      </p>
+
       <div className="de-veld">
         <span>Gekoppelde badges · {leerdoelIds.size} gekozen</span>
         <div className="de-badges">
@@ -200,7 +243,13 @@ export function DeelevaluatieEditor({
       </label>
 
       <div className="de-editor-acties">
-        <button type="button" className="knop-primair" onClick={bewaar}>
+        <button
+          type="button"
+          className="knop-primair"
+          onClick={bewaar}
+          disabled={!kanBewaren}
+          title={kanBewaren ? undefined : "Kies eerst een vestiging"}
+        >
           {bestaand ? "Opslaan" : "Aanmaken"}
         </button>
         <button type="button" className="linkknop" onClick={onSluit}>

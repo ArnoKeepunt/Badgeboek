@@ -3,7 +3,7 @@ import {
   leerdoelenVoorCursus,
   leerdoelenVoorStroom,
 } from "./curriculum";
-import { stroomVan } from "./leerlingen";
+import { isIngeschreven, stroomVan } from "./leerlingen";
 import { seedLeerlingen, seedMentoren } from "./seedGebruikers";
 import type {
   DeelKleuren,
@@ -19,8 +19,18 @@ import { STROMEN, deelSleutel, doelSleutel } from "./types";
 const HUIDIG = "2026-2027";
 const [JAAR1, JAAR2] = HUIDIG.split("-");
 
-/** Seed-data uit de fictieve-gebruikerslijst. Vervangbaar via CSV-import op /gegevens. */
-export const students: Student[] = seedLeerlingen;
+/**
+ * Seed-data uit de fictieve-gebruikerslijst. Vervangbaar via CSV-import op /gegevens.
+ * Twee leerlingen krijgen een expliciete `leerjaarHistoriek` (zittenblijver: zelfde leerjaar
+ * twee jaar op rij) zodat "vorige graad bekijken" ook dat randgeval demonstreert. De rest
+ * wordt lineair teruggerekend.
+ */
+const ZITTENBLIJVERS = new Set(["cilou.aerts", "hamza.claes"]);
+export const students: Student[] = seedLeerlingen.map((s) =>
+  ZITTENBLIJVERS.has(s.id) && s.leerjaar >= 2
+    ? { ...s, leerjaarHistoriek: { "2024-2025": s.leerjaar - 1, "2025-2026": s.leerjaar, "2026-2027": s.leerjaar } }
+    : s,
+);
 export const mentoren: Mentor[] = seedMentoren;
 
 /** Deterministische "hash" van een string → niet-negatief getal. */
@@ -54,11 +64,6 @@ const SEED_CONFIG: Record<string, number> = {
 
 const GESEEDE_LEERLINGEN = students.slice(0, 16);
 
-/** De badges van elke geseede leerling, volgens zijn/haar eigen stroom (1A, 1B, 2A, 3A). */
-const DOELEN_PER_LEERLING = new Map(
-  GESEEDE_LEERLINGEN.map((s) => [s.id, leerdoelenVoorStroom(stroomVan(s))]),
-);
-
 export const doelKleuren: DoelKleuren = (() => {
   const map: DoelKleuren = {};
   const misschien = (bron: string, dichtheid: number) =>
@@ -66,8 +71,11 @@ export const doelKleuren: DoelKleuren = (() => {
 
   for (const [schooljaar, dichtheid] of Object.entries(SEED_CONFIG)) {
     for (const student of GESEEDE_LEERLINGEN) {
-      // Losse badges (leerdoelen).
-      for (const doel of DOELEN_PER_LEERLING.get(student.id) ?? []) {
+      if (!isIngeschreven(student, schooljaar)) continue;
+      // De badges van de graad waarin de leerling dat schooljaar zat (lineair teruggerekend
+      // vanaf het huidige leerjaar — zo krijgt een 3e-graadsleerling voor een vorig schooljaar
+      // 2e-graadsbadges).
+      for (const doel of leerdoelenVoorStroom(stroomVan(student, schooljaar))) {
         const bron = `${schooljaar}:${student.id}:${doel.id}`;
         if (misschien(bron, dichtheid)) map[doelSleutel(schooljaar, student.id, doel.id)] = seedKleur(bron);
       }
@@ -91,6 +99,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     id: "seed-de-1",
     schooljaar: HUIDIG,
     stroom: "1A",
+    vestiging: "",
     cursus: "Planning en reflectie",
     typeId: null,
     titel: "Coachinggesprek 1 — startgesprek",
@@ -102,6 +111,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     id: "seed-de-2",
     schooljaar: HUIDIG,
     stroom: "1A",
+    vestiging: "",
     cursus: "Actuaronde",
     typeId: null,
     titel: "Actuaronde — verkiezingen VS",
@@ -113,6 +123,7 @@ const voorbeeldDeelevaluaties1A: Deelevaluatie[] = [
     id: "seed-de-3",
     schooljaar: HUIDIG,
     stroom: "1A",
+    vestiging: "",
     cursus: "Levende Wiskunde",
     typeId: null,
     titel: "Toets breuken en kommagetallen",
@@ -153,6 +164,7 @@ const perGraadDeelevaluaties: Deelevaluatie[] = STROMEN.flatMap((stroom) => {
     id: `seed-de-${stroom}-${i + 1}`,
     schooljaar: HUIDIG,
     stroom,
+    vestiging: "",
     cursus: cursus.naam,
     typeId: null,
     titel: `${cursus.naam} — ${r.titel}`,

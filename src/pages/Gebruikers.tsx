@@ -10,6 +10,7 @@ import {
   isBootstrapAdmin,
 } from "../lib/gebruikers";
 import { useStore } from "../lib/store";
+import { vestigingKeuzes } from "../lib/vestigingen";
 
 const leegFormulier = (): Personeelslid => ({
   email: "",
@@ -25,7 +26,7 @@ const leegFormulier = (): Personeelslid => ({
  * enkel wie binnen mag en met welke rechten. Schrijft naar Firestore `gebruikers/{email}`.
  */
 export function Gebruikers() {
-  const { students } = useStore();
+  useStore(); // hertekenen als de vestigingenlijst wijzigt
   const { gebruiker } = useAuthStatus();
   const [lijst, setLijst] = useState<Personeelslid[] | null>(null);
   const [bewerk, setBewerk] = useState<Personeelslid | null>(null);
@@ -38,8 +39,8 @@ export function Gebruikers() {
   }, []);
 
   const vestigingen = useMemo(
-    () => [...new Set(students.map((s) => s.vestiging))].sort((a, b) => a.localeCompare(b, "nl")),
-    [students],
+    () => vestigingKeuzes((lijst ?? []).map((p) => p.vestiging)),
+    [lijst],
   );
 
   const gesorteerd = useMemo(

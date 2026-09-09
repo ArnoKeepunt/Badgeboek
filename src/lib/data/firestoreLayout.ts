@@ -1,4 +1,5 @@
 import type { BadgeRuw, CursusRuw, CurriculumRuw } from "../curriculum";
+import type { Vestiging } from "../vestigingen";
 import type {
   AuditRegel,
   Deelevaluatie,
@@ -68,6 +69,12 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   for (const l of s.students) m.set(`leerlingen/${l.id}`, { ...l });
   for (const mn of s.mentoren) m.set(`mentoren/${mn.id}`, { ...mn });
   for (const g of s.groepen) m.set(`groepen/${g.id}`, { ...g });
+  // Vestigingen: alleen wegschrijven als er een database-versie is (`null` = de bundel).
+  if (s.vestigingen) {
+    for (const v of s.vestigingen) {
+      m.set(`vestigingen/${v.id}`, { naam: v.naam, actief: v.actief, volgorde: v.volgorde });
+    }
+  }
 
   // deelbadges: definitie + per-leerling scores
   for (const d of s.deelevaluaties) {
@@ -139,6 +146,7 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     schooljaar: s.schooljaar,
     matrixStromen: s.matrixStromen,
     matrixCursus: s.matrixCursus,
+    afgeslotenSchooljaren: s.afgeslotenSchooljaren ?? null,
   });
   m.set("instellingen/overlays", {
     doelWijzigingen: s.doelWijzigingen,
@@ -208,6 +216,9 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   const currBadges: BadgeRuw[] = [];
   let heeftCurriculum = false;
 
+  const vestigingen: Vestiging[] = [];
+  let heeftVestigingen = false;
+
   for (const [pad, data] of docs) {
     const seg = pad.split("/");
     switch (seg[0]) {
@@ -219,6 +230,15 @@ export function docsNaarStore(docs: DocMap): RauweStore {
         break;
       case "groepen":
         groepen.push(data as unknown as Groep);
+        break;
+      case "vestigingen":
+        heeftVestigingen = true;
+        vestigingen.push({
+          id: seg[1],
+          naam: (data.naam as string) ?? seg[1],
+          actief: data.actief !== false,
+          volgorde: (data.volgorde as number) ?? 0,
+        });
         break;
       case "curriculum": {
         // curriculum/{stroom}  |  .../cursussen/{c}  |  .../cursussen/{c}/badges/{b}
@@ -276,6 +296,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
           r.schooljaar = data.schooljaar as string;
           r.matrixStromen = data.matrixStromen as Stroom[];
           r.matrixCursus = data.matrixCursus as string;
+          r.afgeslotenSchooljaren = (data.afgeslotenSchooljaren as string[] | null) ?? null;
         } else if (seg[1] === "overlays") {
           r.doelWijzigingen = data.doelWijzigingen as RauweStore["doelWijzigingen"];
           r.doelenImport = data.doelenImport as RauweStore["doelenImport"];
@@ -290,8 +311,9 @@ export function docsNaarStore(docs: DocMap): RauweStore {
     heeftCurriculum && currBadges.length > 0
       ? { cursussen: currCursussen, badges: currBadges }
       : null;
+  r.vestigingen = heeftVestigingen ? vestigingen : null;
 
-  if (!geinitialiseerd) return r; // enkel de curriculum-override; de rest = seed behouden
+  if (!geinitialiseerd) return r; // enkel de curriculum-/vestiging-override; de rest = seed behouden
 
   r.students = students;
   r.mentoren = mentoren;
@@ -310,7 +332,24 @@ export function docsNaarStore(docs: DocMap): RauweStore {
 
 // --- diff -------------------------------------------------------------------
 
-const zelfde = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Stabiele JSON: objectsleutels gesorteerd. Firestore geeft map-sleutels in een andere volgorde
+ * terug dan wij ze schrijven; zonder deze normalisatie ziet de diff dat als een wijziging (→
+ * overbodige writes bij `bewaar`, en de app herbouwt bij elke echo-snapshot).
+ */
+function stabielJson(x: unknown): string {
+  if (Array.isArray(x)) return `[${x.map(stabielJson).join(",")}]`;
+  if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stabielJson(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(x) ?? "null";
+}
+
+const zelfde = (a: unknown, b: unknown) => stabielJson(a) === stabielJson(b);
 
 /** De documenten die veranderd/nieuw zijn, en de paden die verdwenen. */
 export function diffDocs(oud: DocMap, nieuw: DocMap): { schrijf: DocMap; verwijder: string[] } {

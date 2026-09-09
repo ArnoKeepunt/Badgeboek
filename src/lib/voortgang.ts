@@ -1,6 +1,6 @@
 import { leerdoelenVoorStroom } from "./curriculum";
 import { type KleurTelling, telKleuren } from "./kleurstats";
-import { stroomVan } from "./leerlingen";
+import { isIngeschreven, stroomVan } from "./leerlingen";
 import { getDoelKleur } from "./store";
 import type { DoelKleuren, Rating, Student } from "./types";
 
@@ -21,7 +21,8 @@ export function voortgangVoor(
 ): Voortgang {
   const waarden: (Rating | null)[] = [];
   for (const s of leerlingen) {
-    for (const d of leerdoelenVoorStroom(stroomVan(s))) {
+    if (!isIngeschreven(s, schooljaar)) continue;
+    for (const d of leerdoelenVoorStroom(stroomVan(s, schooljaar))) {
       waarden.push(getDoelKleur(kleuren, schooljaar, s.id, d.id));
     }
   }

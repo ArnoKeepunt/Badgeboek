@@ -18,6 +18,9 @@ bun.lock
 .env.*
 !.env.example
 
+# Door Google AI Studio gegenereerd; de app leest de config uit VITE_FIREBASE_* in .env
+firebase-applet-config.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

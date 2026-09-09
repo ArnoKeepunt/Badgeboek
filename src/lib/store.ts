@@ -19,7 +19,22 @@ import {
   students as seedStudents,
 } from "./mockData";
 import type { Minimumdoel } from "./minimumdoelen";
-import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "./schooljaar";
+import { stroomVan } from "./leerlingen";
+import {
+  AFGESLOTEN_SCHOOLJAREN,
+  HUIDIG_SCHOOLJAAR,
+  SCHOOLJAREN,
+  eerdereSchooljaren,
+  isAfgesloten,
+  zetAfgeslotenSchooljaren,
+} from "./schooljaar";
+import {
+  GEBUNDELDE_VESTIGINGEN,
+  type Vestiging,
+  isGeldigeVestiging,
+  vestigingSlug,
+  zetVestigingen,
+} from "./vestigingen";
 import type {
   AuditLog,
   AuditRegel,
@@ -74,10 +89,12 @@ const MAX_GEWIST = 1000;
 const seed = (): PersistedStore => ({
   students: seedStudents,
   mentoren: seedMentoren,
+  vestigingen: null,
   kleuren: seedKleuren,
   notities: {},
   groepen: [],
   schooljaar: HUIDIG_SCHOOLJAAR,
+  afgeslotenSchooljaren: null,
   matrixStromen: ["1A"],
   matrixCursus: "",
   doelWijzigingen: {},
@@ -138,8 +155,20 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
   basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
   zetCurriculum(basis.curriculumOverride);
+  // De database-versie van de vestigingen (`null` = de bundel).
+  basis.vestigingen = geldigeVestigingen(bewaard.vestigingen);
+  zetVestigingen(basis.vestigingen);
+  basis.afgeslotenSchooljaren = Array.isArray(bewaard.afgeslotenSchooljaren)
+    ? bewaard.afgeslotenSchooljaren.filter((s): s is string => typeof s === "string")
+    : null;
+  zetAfgeslotenSchooljaren(basis.afgeslotenSchooljaren);
   schoonOrphans(basis);
   return basis;
+}
+
+/** Vormcontrole op de opgeslagen vestigingenlijst; `null` = terugvallen op de bundel. */
+function geldigeVestigingen(d: unknown): Vestiging[] | null {
+  return Array.isArray(d) && d.length > 0 && d.every(isGeldigeVestiging) ? (d as Vestiging[]) : null;
 }
 
 /** Snelle vormcontrole zodat een kapotte database-versie de app niet breekt (val terug op de bundel). */
@@ -160,22 +189,42 @@ export function geldigCurriculum(d: unknown): CurriculumRuw | null {
  * hernummerd) wijzen oude opgeslagen sleutels naar badges die niet meer bestaan. Die worden
  * hier weggegooid. Idempotent — draait bij elke load.
  */
+/**
+ * Gememoïseerde "geldige id/naam"-sets voor `schoonOrphans`. Rebuild alleen als het actieve
+ * curriculum wisselt (`alleLeerdoelen()` geeft dan een andere array-ref terug) — anders bouwden
+ * we ~2000-entry Sets bij élke live-update.
+ */
+let _geldigCache: {
+  leerdoelen: unknown;
+  badges: Set<string>;
+  cursusIds: Set<string>;
+  cursusNamen: Set<string>;
+} | null = null;
+function geldigeSets() {
+  const leerdoelen = alleLeerdoelen();
+  if (_geldigCache?.leerdoelen !== leerdoelen) {
+    _geldigCache = {
+      leerdoelen,
+      badges: new Set([...GEBUNDELD.leerdoelen.map((l) => l.id), ...leerdoelen.map((l) => l.id)]),
+      cursusIds: new Set([
+        ...GEBUNDELD.cursussen.map((c) => c.id),
+        ...alleCursussen().map((c) => c.id),
+      ]),
+      cursusNamen: new Set([
+        ...GEBUNDELD.cursussen.map((c) => c.naam),
+        ...alleCursussen().map((c) => c.naam),
+      ]),
+    };
+  }
+  return _geldigCache;
+}
+
 function schoonOrphans(basis: PersistedStore): void {
   // Geldig = in de bundel OF in de database-versie. Zo wist het verwijderen van een badge uit
   // de database níét meteen alle evaluaties ervan (die komen terug als de badge weer opduikt);
   // enkel wat in geen van beide zit (bv. de oude Basisvaardigheden-badges) wordt opgekuist.
-  const geldigeBadges = new Set([
-    ...GEBUNDELD.leerdoelen.map((l) => l.id),
-    ...alleLeerdoelen().map((l) => l.id),
-  ]);
-  const geldigeCursusIds = new Set([
-    ...GEBUNDELD.cursussen.map((c) => c.id),
-    ...alleCursussen().map((c) => c.id),
-  ]);
-  const geldigeCursusNamen = new Set([
-    ...GEBUNDELD.cursussen.map((c) => c.naam),
-    ...alleCursussen().map((c) => c.naam),
-  ]);
+  const { badges: geldigeBadges, cursusIds: geldigeCursusIds, cursusNamen: geldigeCursusNamen } =
+    geldigeSets();
 
   const badgeVanSleutel = (sleutel: string): string => {
     const i1 = sleutel.indexOf(":");
@@ -196,6 +245,8 @@ function schoonOrphans(basis: PersistedStore): void {
 
   basis.deelevaluaties = basis.deelevaluaties.map((d) => ({
     ...d,
+    // Migratie: deelbadges van vóór de vestiging-scoping → "" (alle vestigingen).
+    vestiging: d.vestiging ?? "",
     leerdoelIds: d.leerdoelIds.filter((id) => geldigeBadges.has(id)),
   }));
   const deIds = new Set(basis.deelevaluaties.map((d) => d.id));
@@ -234,6 +285,8 @@ const listeners = new Set<() => void>();
 function commit(next: State) {
   state = next;
   zetCurriculum(state.curriculumOverride);
+  zetVestigingen(state.vestigingen);
+  zetAfgeslotenSchooljaren(state.afgeslotenSchooljaren);
   const { sessie, ...rest } = state;
   void opslag.bewaar(rest);
   sessieOpslag.bewaar(sessie);
@@ -403,14 +456,118 @@ export function setDoelKleur(
   });
 }
 
-/** Lees de kleur van een node voor één leerling in een schooljaar (`null` = niet aangeboden). */
+// --- Overname van kleuren binnen dezelfde graad -------------------------
+//
+// Een graad loopt over twee schooljaren. Een leerling die aan het 2e jaar van zijn graad
+// begint, heeft nog niet al zijn badges behaald — de stand van vorig schooljaar telt gewoon
+// verder. Een leerling die van graad wisselt krijgt nieuwe badges en start blanco.
+//
+// Er is geen historiek van "leerjaar per schooljaar", dus leiden we "zat vorig jaar in
+// dezelfde graad" data-gedreven af: heeft de leerling voor dat schooljaar minstens één
+// opgeslagen kleur voor een badge van zijn *huidige* stroom? (Badge-id's beginnen met de
+// stroomcode, bv. `2A-…`.) Zo ja → overnemen; zo nee → graadgrens, blanco.
+
+const stroomVanBadge = (badgeId: string): string => {
+  const i = badgeId.indexOf("-");
+  return i > 0 ? badgeId.slice(0, i) : "";
+};
+
+/** Gememoïseerde set `"${schooljaar}:${leerlingId}:${stroom}"` — welke leerling in welk jaar in welke stroom kleuren heeft. */
+let _stroomPresentie: { kleuren: DoelKleuren; set: Set<string> } | null = null;
+function stroomPresentie(kleuren: DoelKleuren): Set<string> {
+  if (_stroomPresentie?.kleuren === kleuren) return _stroomPresentie.set;
+  const set = new Set<string>();
+  for (const k of Object.keys(kleuren)) {
+    const [sj, sid, ...rest] = k.split(":");
+    const stroom = stroomVanBadge(rest.join(":"));
+    if (stroom) set.add(`${sj}:${sid}:${stroom}`);
+  }
+  _stroomPresentie = { kleuren, set };
+  return set;
+}
+
+/** Gememoïseerde set van bewust gewiste sleutels (die erven geen kleur van vorig jaar). */
+let _gewistSet: { arr: string[]; set: Set<string> } | null = null;
+function gewistSet(): Set<string> {
+  if (_gewistSet?.arr === state.gewist) return _gewistSet.set;
+  const set = new Set(state.gewist);
+  _gewistSet = { arr: state.gewist, set };
+  return set;
+}
+
+/** Gememoïseerde `id → leerling`-lookup (was een O(n)-`find` per matrixcel). */
+let _studentById: { arr: Student[]; map: Map<string, Student> } | null = null;
+function studentById(id: string): Student | undefined {
+  if (_studentById?.arr !== state.students) {
+    _studentById = { arr: state.students, map: new Map(state.students.map((s) => [s.id, s])) };
+  }
+  return _studentById.map.get(id);
+}
+
+/**
+ * De kleur van een badge zoals ze **nu telt** voor een leerling: de eigen kleur van dit
+ * schooljaar, of anders de overgenomen kleur uit een vorig schooljaar binnen dezelfde graad.
+ * `null` = (nog) niet aangeboden.
+ */
 export function getDoelKleur(
   kleuren: DoelKleuren,
   schooljaar: string,
   studentId: string,
   nodeId: string,
 ): Rating | null {
-  return kleuren[doelSleutel(schooljaar, studentId, nodeId)] ?? null;
+  const eigen = kleuren[doelSleutel(schooljaar, studentId, nodeId)] ?? null;
+  if (eigen) return eigen;
+  return overgenomenKleur(kleuren, schooljaar, studentId, nodeId);
+}
+
+/** Enkel de overgenomen kleur (uit een vorig schooljaar, zelfde graad), zonder de eigen kleur. */
+function overgenomenKleur(
+  kleuren: DoelKleuren,
+  schooljaar: string,
+  studentId: string,
+  nodeId: string,
+): Rating | null {
+  const stroom = stroomVanBadge(nodeId);
+  if (!stroom) return null;
+  if (gewistSet().has(doelSleutel(schooljaar, studentId, nodeId))) return null;
+  const student = studentById(studentId);
+  // De badge moet bij de graad horen waarin de leerling *dat schooljaar* zat.
+  if (!student || stroomVan(student, schooljaar) !== stroom) return null;
+
+  const presentie = stroomPresentie(kleuren);
+  for (const sj of eerdereSchooljaren(schooljaar)) {
+    if (!presentie.has(`${sj}:${studentId}:${stroom}`)) break; // graadgrens / niet aanwezig
+    const kleur = kleuren[doelSleutel(sj, studentId, nodeId)];
+    if (kleur) return kleur;
+  }
+  return null;
+}
+
+/** Waar de getoonde kleur vandaan komt: `"eigen"` (dit jaar gezet), `"overgenomen"` (vorig jaar) of `null`. */
+export function kleurBron(
+  kleuren: DoelKleuren,
+  schooljaar: string,
+  studentId: string,
+  nodeId: string,
+): "eigen" | "overgenomen" | null {
+  if (kleuren[doelSleutel(schooljaar, studentId, nodeId)]) return "eigen";
+  return overgenomenKleur(kleuren, schooljaar, studentId, nodeId) ? "overgenomen" : null;
+}
+
+/**
+ * Kleur + herkomst in één keer — voor de matrixcellen, zodat `getDoelKleur` en `kleurBron` niet
+ * allebei (los) de overname-berekening doen.
+ */
+export function doelKleurEnBron(
+  kleuren: DoelKleuren,
+  schooljaar: string,
+  studentId: string,
+  nodeId: string,
+): { kleur: Rating | null; overgenomen: boolean } {
+  const eigen = kleuren[doelSleutel(schooljaar, studentId, nodeId)] ?? null;
+  if (eigen) return { kleur: eigen, overgenomen: false };
+  const over = overgenomenKleur(kleuren, schooljaar, studentId, nodeId);
+  return { kleur: over, overgenomen: over !== null };
 }
 
 /** Zet dezelfde kleur voor meerdere leerlingen tegelijk op één node (één opslagbeurt). */
@@ -494,6 +651,20 @@ export function setSchooljaar(schooljaar: string) {
   commit({ ...state, schooljaar });
 }
 
+/**
+ * Sluit een schooljaar af (alleen-lezen) of heropen het. Beheerder-actie (via /gegevens).
+ * "Vastzetten in september" = het voorbije schooljaar afsluiten.
+ */
+export function zetSchooljaarAfgesloten(schooljaar: string, afgesloten: boolean) {
+  const huidig = new Set(state.afgeslotenSchooljaren ?? AFGESLOTEN_SCHOOLJAREN);
+  if (afgesloten) huidig.add(schooljaar);
+  else huidig.delete(schooljaar);
+  commit({
+    ...state,
+    afgeslotenSchooljaren: SCHOOLJAREN.filter((s) => huidig.has(s)),
+  });
+}
+
 /** Zet de getoonde stromen van de matrix-pagina's (in vaste volgorde, minstens één). */
 export function setMatrixStromen(stromen: Stroom[]) {
   const uniek = STROMEN.filter((s) => stromen.includes(s));
@@ -533,24 +704,43 @@ export function meldAf() {
 // --- Gebruikers (CSV-import) --------------------------------------------
 
 /**
+ * Voeg een ingelezen leerling samen met de bestaande: het huidige leerjaar wordt in de
+ * `leerjaarHistoriek` van het **actieve schooljaar** vastgelegd (voor "toen zat die in graad
+ * X"), en de historiek van andere jaren blijft behouden.
+ */
+function samengevoegdeLeerling(bestaand: Student | undefined, nieuw: Student): Student {
+  const samen: Student = { ...bestaand, ...nieuw };
+  const lj = samen.leerjaar;
+  if (typeof lj === "number") {
+    samen.leerjaarHistoriek = {
+      ...bestaand?.leerjaarHistoriek,
+      ...nieuw.leerjaarHistoriek,
+      [state.schooljaar]: lj,
+    };
+  }
+  return samen;
+}
+
+/**
  * Voeg leerlingen toe of werk ze bij op basis van hun `id`. Bestaande leerlingen die niet in
  * de lijst zitten, blijven staan — zo gaan bij een jaarovergang geen evaluaties verloren.
  */
 export function upsertStudenten(nieuwe: Student[]) {
   const perId = new Map(state.students.map((s) => [s.id, s]));
-  for (const s of nieuwe) perId.set(s.id, { ...perId.get(s.id), ...s });
+  for (const s of nieuwe) perId.set(s.id, samengevoegdeLeerling(perId.get(s.id), s));
   commit({ ...state, students: [...perId.values()] });
 }
 
 /** Vervang de volledige leerlingenlijst (evaluaties van verdwenen id's blijven wel bewaard). */
 export function vervangStudenten(nieuwe: Student[]) {
-  commit({ ...state, students: nieuwe });
+  const oud = new Map(state.students.map((s) => [s.id, s]));
+  commit({ ...state, students: nieuwe.map((s) => samengevoegdeLeerling(oud.get(s.id), s)) });
 }
 
 /** Voeg leerlingen én mentoren toe/bij op basis van hun `id`. */
 export function importeerGebruikers(leerlingen: Student[], mentoren: Mentor[]) {
   const perLl = new Map(state.students.map((s) => [s.id, s]));
-  for (const s of leerlingen) perLl.set(s.id, { ...perLl.get(s.id), ...s });
+  for (const s of leerlingen) perLl.set(s.id, samengevoegdeLeerling(perLl.get(s.id), s));
   const perMe = new Map(state.mentoren.map((m) => [m.id, m]));
   for (const m of mentoren) perMe.set(m.id, { ...perMe.get(m.id), ...m });
   commit({ ...state, students: [...perLl.values()], mentoren: [...perMe.values()] });
@@ -614,6 +804,94 @@ export function zetCurriculumOverride(ruw: CurriculumRuw | null) {
 
 /** De ingebouwde (gebundelde) badge-set, ruw — bron voor "zet de huidige badges in de database". */
 export const gebundeldCurriculum = (): CurriculumRuw => GEBUNDELD_RUW;
+
+// --- Vestigingen (beheerder) -------------------------------------------
+
+/** De actuele vestigingenlijst — de database-versie, of anders de bundel. */
+export const vestigingenLijst = (): Vestiging[] => state.vestigingen ?? GEBUNDELDE_VESTIGINGEN;
+
+/** Hoeveel leerlingen / mentoren / deelbadges hangen aan een vestiging (op naam)? */
+export function vestigingInGebruik(naam: string): {
+  leerlingen: number;
+  mentoren: number;
+  deelbadges: number;
+} {
+  return {
+    leerlingen: state.students.filter((s) => s.vestiging === naam).length,
+    mentoren: state.mentoren.filter((m) => m.vestiging === naam).length,
+    deelbadges: state.deelevaluaties.filter((d) => d.vestiging === naam).length,
+  };
+}
+
+const bewaarVestigingen = (lijst: Vestiging[]) =>
+  commit({ ...state, vestigingen: [...lijst].sort((a, b) => a.volgorde - b.volgorde) });
+
+/** Voeg een vestiging toe. Geeft `false` terug als de naam al bestaat. */
+export function voegVestigingToe(naam: string): boolean {
+  const schoon = naam.trim();
+  if (!schoon) return false;
+  const lijst = vestigingenLijst();
+  if (lijst.some((v) => v.naam.toLowerCase() === schoon.toLowerCase())) return false;
+  let id = vestigingSlug(schoon);
+  while (lijst.some((v) => v.id === id)) id = `${id}-2`;
+  bewaarVestigingen([
+    ...lijst,
+    { id, naam: schoon, actief: true, volgorde: Math.max(-1, ...lijst.map((v) => v.volgorde)) + 1 },
+  ]);
+  return true;
+}
+
+/**
+ * Hernoem een vestiging. De id blijft; de naam verandert op het vestiging-doc én — via een
+ * cascade — op alle leerlingen/mentoren/deelbadges die die vestiging op naam bewaren.
+ * Personeelsaccounts (`gebruikers/`) staan buiten de store; die werkt de /vestigingen-pagina bij.
+ */
+export function hernoemVestiging(id: string, nieuweNaam: string): boolean {
+  const schoon = nieuweNaam.trim();
+  const lijst = vestigingenLijst();
+  const huidig = lijst.find((v) => v.id === id);
+  if (!schoon || !huidig || huidig.naam === schoon) return false;
+  if (lijst.some((v) => v.id !== id && v.naam.toLowerCase() === schoon.toLowerCase())) return false;
+  const oud = huidig.naam;
+  commit({
+    ...state,
+    vestigingen: lijst.map((v) => (v.id === id ? { ...v, naam: schoon } : v)),
+    students: state.students.map((s) => (s.vestiging === oud ? { ...s, vestiging: schoon } : s)),
+    mentoren: state.mentoren.map((m) => (m.vestiging === oud ? { ...m, vestiging: schoon } : m)),
+    deelevaluaties: state.deelevaluaties.map((d) =>
+      d.vestiging === oud ? { ...d, vestiging: schoon } : d,
+    ),
+  });
+  return true;
+}
+
+/** Zet een vestiging actief/inactief (inactief = verdwijnt uit keuzelijsten, data blijft). */
+export function zetVestigingActief(id: string, actief: boolean) {
+  bewaarVestigingen(vestigingenLijst().map((v) => (v.id === id ? { ...v, actief } : v)));
+}
+
+/** Verwijder een vestiging — alleen als er geen leerlingen/mentoren/deelbadges aan hangen. */
+export function verwijderVestiging(id: string): boolean {
+  const v = vestigingenLijst().find((x) => x.id === id);
+  if (!v) return false;
+  const g = vestigingInGebruik(v.naam);
+  if (g.leerlingen + g.mentoren + g.deelbadges > 0) return false;
+  bewaarVestigingen(vestigingenLijst().filter((x) => x.id !== id));
+  return true;
+}
+
+/** Vestigingnamen die in de data voorkomen (leerling/mentor/deelbadge) maar niet in de lijst staan. */
+export function ongekoppeldeVestigingen(): string[] {
+  const bekend = new Set(vestigingenLijst().map((v) => v.naam));
+  const namen = new Set<string>();
+  const kijk = (n: string | undefined) => {
+    if (n && !bekend.has(n)) namen.add(n);
+  };
+  for (const s of state.students) kijk(s.vestiging);
+  for (const m of state.mentoren) kijk(m.vestiging);
+  for (const d of state.deelevaluaties) kijk(d.vestiging);
+  return [...namen].sort();
+}
 
 // --- Rubrieken -----------------------------------------------------------
 

@@ -15,9 +15,10 @@ import {
   typesVoorCursus,
 } from "../lib/deelevaluaties";
 import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
-import { filterLeerlingen, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
+import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { useZichtbareLeerlingen } from "../lib/rechten";
+import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { vestigingKeuzes } from "../lib/vestigingen";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
 import {
@@ -104,6 +105,16 @@ export function Deelevaluaties() {
   const [filter, setFilter] = useLeerlingFilter();
   const aangemeld = useAangemeld();
   const mentorId = aangemeld?.rol === "mentor" ? aangemeld.mentor.id : undefined;
+  const bereik = useBereik();
+  // Deelbadges zijn vestiging-gebonden. Een mentor zit vast op zijn eigen vestiging (en ziet
+  // het veld niet); een coördinator/beheerder kiest de vestiging in de editor (verplicht).
+  // `vestiging` hier = de vaste keuze (mentor, of een gekozen vestigingfilter) waarmee de
+  // matrix gefilterd wordt; `""` = alle vestigingen tonen.
+  const vestiging = bereik.vestiging || filter.vestiging;
+  const vestigingOpties = useMemo(
+    () => vestigingKeuzes(students.map((s) => s.vestiging)),
+    [students],
+  );
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [openSecties, setOpenSecties] = useState<string[]>(loadOpen);
@@ -126,9 +137,13 @@ export function Deelevaluaties() {
   };
 
   // De stroomkeuze bepaalt al de graad/klasgroep-as: die velden weglaten en negeren.
+  // Stroom = die van het bekeken schooljaar (kan verschillen voor doorgestroomde leerlingen).
   const stroomLeerlingen = useMemo(
-    () => students.filter((s) => matrixStromen.includes(stroomVan(s))),
-    [students, matrixStromen],
+    () =>
+      students.filter(
+        (s) => isIngeschreven(s, schooljaar) && matrixStromen.includes(stroomVan(s, schooljaar)),
+      ),
+    [students, matrixStromen, schooljaar],
   );
   const zichtbaar = useMemo(() => {
     const leden = groepLeden(filter.groepId, students, groepen);
@@ -139,19 +154,19 @@ export function Deelevaluaties() {
     const uit: string[] = [];
     for (const stroom of matrixStromen) {
       for (const c of cursusNamenVoorStroom(stroom)) if (!uit.includes(c)) uit.push(c);
-      for (const d of deelevaluatiesVoor(deelevaluaties, stroom, schooljaar)) {
+      for (const d of deelevaluatiesVoor(deelevaluaties, stroom, schooljaar, vestiging)) {
         if (!uit.includes(d.cursus)) uit.push(d.cursus);
       }
     }
     return uit;
-  }, [matrixStromen, deelevaluaties, schooljaar]);
+  }, [matrixStromen, deelevaluaties, schooljaar, vestiging]);
   const cursusFilter = cursusOpties.includes(matrixCursus) ? matrixCursus : "";
 
   const perStroom = useMemo(
     () =>
       matrixStromen.map((stroom) => {
-        const leerlingen = zichtbaar.filter((s) => stroomVan(s) === stroom);
-        const mijn = deelevaluatiesVoor(deelevaluaties, stroom, schooljaar);
+        const leerlingen = zichtbaar.filter((s) => stroomVan(s, schooljaar) === stroom);
+        const mijn = deelevaluatiesVoor(deelevaluaties, stroom, schooljaar, vestiging);
         let cursussen = cursusNamenVoorStroom(stroom);
         for (const d of mijn) if (!cursussen.includes(d.cursus)) cursussen.push(d.cursus);
         if (cursusFilter) cursussen = cursussen.filter((c) => c === cursusFilter);
@@ -159,7 +174,7 @@ export function Deelevaluaties() {
         for (const d of leerdoelenVoorStroom(stroom)) badgeTekst.set(d.id, d.omschrijving);
         return { stroom, leerlingen, mijn, cursussen, badgeTekst };
       }),
-    [matrixStromen, zichtbaar, deelevaluaties, schooljaar, cursusFilter],
+    [matrixStromen, zichtbaar, deelevaluaties, schooljaar, cursusFilter, vestiging],
   );
 
   const alleSectieKeys = useMemo(
@@ -237,6 +252,8 @@ export function Deelevaluaties() {
           <DeelevaluatieEditor
             stroom={editor.stroom}
             schooljaar={schooljaar}
+            vestiging={vestiging}
+            vestigingOpties={vestigingOpties}
             mentorId={mentorId}
             bestaand={editor.bestaand}
             voorinvulling={editor.voorinvulling}
@@ -429,6 +446,11 @@ function DeelCursusSectie({
                 <tbody>
                   {rijen.map((d) => {
                     const type = typeById(d.typeId);
+                    // Een deelbadge van een specifieke vestiging raakt alleen leerlingen van
+                    // díe vestiging; andere kolommen staan vast.
+                    const rijLeerlingen = d.vestiging
+                      ? leerlingen.filter((s) => s.vestiging === d.vestiging)
+                      : leerlingen;
                     return (
                       <tr key={d.id}>
                         <td
@@ -465,12 +487,12 @@ function DeelCursusSectie({
                             {!vergrendeld && (
                               <div className="de-rij-hoek">
                                 <BulkKnop
-                                  aantal={leerlingen.length}
+                                  aantal={rijLeerlingen.length}
                                   disabled={vergrendeld}
                                   onKies={(kleur) =>
                                     setDeelKleurBulk(
                                       d.id,
-                                      leerlingen.map((s) => s.id),
+                                      rijLeerlingen.map((s) => s.id),
                                       kleur,
                                     )
                                   }
@@ -492,12 +514,22 @@ function DeelCursusSectie({
                           const kleur = getDeelKleur(deelKleuren, d.id, s.id);
                           const sleutel = deelSleutel(d.id, s.id);
                           const wLabel = wijzigingLabel(sleutel) ?? undefined;
+                          const anderVestiging =
+                            d.vestiging !== "" && s.vestiging !== d.vestiging;
                           return (
-                            <td key={s.id} className="grid-cel" title={wLabel}>
+                            <td
+                              key={s.id}
+                              className="grid-cel"
+                              title={
+                                anderVestiging
+                                  ? `Deelbadge van vestiging ${d.vestiging}`
+                                  : wLabel
+                              }
+                            >
                               <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
                                 <RatingCell
                                   label={`${s.firstName} — ${d.titel}`}
-                                  readonly={vergrendeld}
+                                  readonly={vergrendeld || anderVestiging}
                                   value={kleur}
                                   geschiedenis={geschiedenis(sleutel)}
                                   onChange={(next) => setDeelKleur(d.id, s.id, next)}
@@ -505,7 +537,7 @@ function DeelCursusSectie({
                                 <NotitieVeld
                                   notitie={getDeelNotitie(deelNotities, d.id, s.id)}
                                   onSave={(patch) => zetDeelNotitie(d.id, s.id, patch)}
-                                  readonly={vergrendeld}
+                                  readonly={vergrendeld || anderVestiging}
                                 />
                               </div>
                             </td>

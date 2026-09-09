@@ -82,6 +82,13 @@ export interface Student {
   vestiging: string;
   /** 1 t/m 6. De graad is hieruit afgeleid (1-2 = 1e graad, 3-4 = 2e, 5-6 = 3e). */
   leerjaar: number;
+  /**
+   * Het leerjaar per schooljaar (`{ "2025-2026": 3, "2026-2027": 4 }`) — gevuld door de
+   * jaarlijkse klaslijst-import. Zo weet de app in welke graad/stroom een leerling in een
+   * vorig schooljaar zat (voor een zittenblijver of een doorgestroomde leerling). Ontbreekt
+   * een jaar, dan wordt het lineair teruggerekend vanaf `leerjaar`.
+   */
+  leerjaarHistoriek?: Record<string, number>;
   /** Klasgroep binnen het leerjaar, bv. "A" of "B". */
   klasgroep: string;
   email?: string;
@@ -155,6 +162,12 @@ export interface Deelevaluatie {
   id: string;
   schooljaar: string;
   stroom: Stroom;
+  /**
+   * De vestiging waar deze deelbadge gegeven wordt. Alleen leerlingen van die vestiging zien
+   * ze — een toets op de ene vestiging hoort niet bij een andere. `""` = alle vestigingen
+   * (voorbeeld-/overkoepelende data).
+   */
+  vestiging: string;
   /** Cursusnaam (uit de deelevaluatie-kapstok), bv. "Actuaronde". */
   cursus: string;
   /** Optionele koppeling aan een type uit de kapstok (`deelevaluatieTypes`). */

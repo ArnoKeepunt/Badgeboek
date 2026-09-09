@@ -86,6 +86,12 @@ service cloud.firestore {
       allow get, list, write: if isPersoneel();
     }
 
+    // --- Vestigingen (campussen): iedereen leest, alleen de beheerder wijzigt ---
+    match /vestigingen/{id} {
+      allow get, list: if isPersoneel();
+      allow write: if isBeheerder();
+    }
+
     // --- Roster + inhoud: gedeeld door al het personeel -----------------------
     match /leerlingen/{id}   { allow read, write: if isPersoneel(); }
     match /mentoren/{id}     { allow read, write: if isPersoneel(); }

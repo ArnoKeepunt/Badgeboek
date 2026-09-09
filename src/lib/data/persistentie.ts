@@ -1,5 +1,6 @@
 import type { CurriculumRuw } from "../curriculum";
 import type { Minimumdoel } from "../minimumdoelen";
+import type { Vestiging } from "../vestigingen";
 import type {
   AuditLog,
   DeelKleuren,
@@ -33,10 +34,14 @@ import type {
 export interface PersistedStore {
   students: Student[];
   mentoren: Mentor[];
+  /** De vestigingen (campussen). `null` = de ingebouwde bundel; anders de database-versie. */
+  vestigingen: Vestiging[] | null;
   kleuren: DoelKleuren;
   notities: Notities;
   groepen: Groep[];
   schooljaar: string;
+  /** Schooljaren die de beheerder heeft vastgezet (alleen-lezen). `null` = de standaardlijst. */
+  afgeslotenSchooljaren: string[] | null;
   matrixStromen: Stroom[];
   /** Cursusfilter (op naam) voor de matrix-pagina's; `""` = alle. */
   matrixCursus: string;
