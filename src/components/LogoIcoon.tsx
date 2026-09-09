@@ -1,4 +1,4 @@
-/** Het Keerpunt-merkteken (dezelfde vorm als de favicon). */
+/** Een gestileerd Keerpunt-merkteken (vectorvorm, currentColor) — gebruikt op de toegangspoort. */
 export function LogoIcoon({ className = "brand-mark" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 46" fill="none" aria-hidden="true">

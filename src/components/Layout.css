@@ -21,23 +21,25 @@
   overflow-y: auto;
 }
 
-/* Vaste plek bovenaan de zijbalk — merkteken + "Badgeboek". Vaste hoogte en géén verticale
-   padding, zodat de positie identiek is in beide standen en er niks verspringt bij togglen. */
+/* Vaste plek bovenaan de zijbalk — het Keerpunt-logo. Uitgeklapt het volledige logo,
+   ingeklapt enkel het merkteken. */
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 10px;
-  font-weight: 700;
-  font-size: 16px;
+  min-height: 40px;
+  padding: 0 8px;
 }
 
-.brand-mark {
-  flex: none;
-  width: 22px;
-  height: 21px;
-  color: var(--accent);
+.brand-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+}
+
+.brand-merk {
+  display: none;
+  width: 30px;
+  height: 30px;
 }
 
 /* Voet: de in-/uitklapknop boven het account + af-/aanmelden. */
@@ -315,8 +317,12 @@
     padding: 0;
   }
 
-  .sidebar--ingeklapt .brand-tekst {
+  .sidebar--ingeklapt .brand-logo {
     display: none;
+  }
+
+  .sidebar--ingeklapt .brand-merk {
+    display: block;
   }
 
   .sidebar--ingeklapt .nav-link,

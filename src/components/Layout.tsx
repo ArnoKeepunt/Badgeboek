@@ -8,8 +8,9 @@ import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/
 import { meldAf } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Icoon, type IcoonNaam } from "./Icoon";
-import { LogoIcoon } from "./LogoIcoon";
 import { SchooljaarKiezer } from "./SchooljaarKiezer";
+import keerpuntLogo from "../assets/keerpunt-logo.png";
+import keerpuntMerk from "../assets/keerpunt-merk.png";
 import "./Layout.css";
 
 const NAV_INGEKLAPT_KEY = "keerpunt-badgeboek:nav-ingeklapt";
@@ -245,8 +246,14 @@ export function Layout() {
     <div className={`layout${ingeklapt ? " layout--ingeklapt" : ""}`}>
       <aside className={`sidebar${ingeklapt ? " sidebar--ingeklapt" : ""}`}>
         <div className="brand">
-          <LogoIcoon />
-          <span className="brand-tekst">Badgeboek</span>
+          <img
+            className="brand-logo"
+            src={keerpuntLogo}
+            alt="Keerpunt freinetscholen"
+            width={640}
+            height={241}
+          />
+          <img className="brand-merk" src={keerpuntMerk} alt="Keerpunt" width={128} height={128} />
         </div>
         <nav>
           {nav.map((groep, i) => (

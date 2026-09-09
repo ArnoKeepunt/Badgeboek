@@ -1,5 +1,6 @@
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import { setSchooljaar, useStore } from "../lib/store";
+import { SlotIcoon } from "./SlotIcoon";
 
 /**
  * Schooljaarkeuze in de topbar. Bepaalt welk schooljaar overal getoond en bewerkt wordt,
@@ -20,8 +21,12 @@ export function SchooljaarKiezer() {
         ))}
       </select>
       {isAfgesloten(schooljaar) && (
-        <span className="schooljaar-slot" title="Dit schooljaar is afgesloten">
-          🔒
+        <span
+          className="schooljaar-slot"
+          title="Dit schooljaar is afgesloten"
+          style={{ display: "inline-flex", alignItems: "center" }}
+        >
+          <SlotIcoon />
         </span>
       )}
     </label>

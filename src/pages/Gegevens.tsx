@@ -1,142 +1,39 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { SlotIcoon } from "../components/SlotIcoon";
 import { datumStempel, downloadTekst } from "../lib/download";
-import {
-  exportDoelen,
-  exportEvaluaties,
-  exportLeerlingen,
-  importDoelen,
-  importGebruikers,
-  importLeerlingen,
-} from "../lib/gegevens";
-import {
-  PERSISTENTIE_MODUS,
-  type MigratieResultaat,
-  migreerDatabase,
-  verwijderOudeStructuur,
-} from "../lib/data";
-import { useDevToegang } from "../lib/firebaseAuth";
+import { exportDoelen, exportEvaluaties, exportLeerlingen } from "../lib/gegevens";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import {
   gebundeldCurriculum,
-  geldigCurriculum,
-  importeerGebruikers,
   rubriekenLijst,
-  upsertStudenten,
   useStore,
-  wisRubriekenOverride,
+  vestigingenLijst,
   zetCurriculumOverride,
-  zetDoelenImport,
   zetRubriekenInDatabase,
   zetSchooljaarAfgesloten,
+  zetVestigingenInDatabase,
 } from "../lib/store";
 
 type Melding = { soort: "ok" | "fout"; tekst: string; details?: string[] } | null;
 
 /**
- * Gegevens: alles in en uit de app via CSV. Geen backend — de export is meteen de
- * "download op elk moment"-back-up van de evaluaties. Alleen voor de beheerder
- * (`<AlleenBeheerder>` in de router).
+ * Gegevens (beheerder-only, `<AlleenBeheerder>`): schooljaren vastzetten, CSV-back-ups
+ * downloaden, en de database-versie van badges / rubrics / vestigingen beheren en herstellen.
  */
 export function Gegevens() {
   const {
     students,
-    mentoren,
     kleuren,
     doelWijzigingen,
     doelenImport,
     curriculumOverride,
     rubriekenOverride,
+    vestigingen,
   } = useStore();
-  const magDev = useDevToegang();
   const [melding, setMelding] = useState<Melding>(null);
 
   const doelen = metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen);
-
-  const gebruikerInput = useRef<HTMLInputElement>(null);
-  const leerlingInput = useRef<HTMLInputElement>(null);
-  const doelInput = useRef<HTMLInputElement>(null);
-  const curriculumInput = useRef<HTMLInputElement>(null);
-
-  const lees = (bestand: File, klaar: (tekst: string) => void) => {
-    const reader = new FileReader();
-    reader.onload = () => klaar(String(reader.result ?? ""));
-    reader.onerror = () => setMelding({ soort: "fout", tekst: "Kon het bestand niet lezen." });
-    reader.readAsText(bestand, "utf-8");
-  };
-
-  const importeerGebruikersBestand = (bestand: File) => {
-    lees(bestand, (tekst) => {
-      const { leerlingen, mentoren: nieuweMentoren, fouten } = importGebruikers(tekst);
-      if (leerlingen.length === 0 && nieuweMentoren.length === 0) {
-        setMelding({ soort: "fout", tekst: "Geen gebruikers ingeladen.", details: fouten });
-        return;
-      }
-      importeerGebruikers(leerlingen, nieuweMentoren);
-      setMelding({
-        soort: "ok",
-        tekst: `${leerlingen.length} leerlingen en ${nieuweMentoren.length} mentoren ingeladen (op id).`,
-        details: fouten,
-      });
-    });
-  };
-
-  const importeerLeerlingen = (bestand: File) => {
-    lees(bestand, (tekst) => {
-      const { rijen, fouten } = importLeerlingen(tekst);
-      if (rijen.length === 0) {
-        setMelding({ soort: "fout", tekst: "Geen leerlingen ingeladen.", details: fouten });
-        return;
-      }
-      upsertStudenten(rijen);
-      setMelding({
-        soort: "ok",
-        tekst: `${rijen.length} leerlingen ingeladen (toegevoegd of bijgewerkt op id).`,
-        details: fouten,
-      });
-    });
-  };
-
-  const importeerCurriculum = (bestand: File) => {
-    lees(bestand, (tekst) => {
-      let ruw: unknown;
-      try {
-        ruw = JSON.parse(tekst);
-      } catch {
-        setMelding({ soort: "fout", tekst: "Ongeldige JSON — niets gewijzigd." });
-        return;
-      }
-      const data = geldigCurriculum(ruw);
-      if (!data) {
-        setMelding({
-          soort: "fout",
-          tekst: "De JSON heeft niet de juiste vorm (arrays `cursussen` en `badges`) — niets gewijzigd.",
-        });
-        return;
-      }
-      zetCurriculumOverride(data);
-      setMelding({
-        soort: "ok",
-        tekst: `Badge-set in de database gezet: ${data.cursussen.length} cursussen, ${data.badges.length} badges.`,
-      });
-    });
-  };
-
-  const importeerDoelen = (bestand: File) => {
-    lees(bestand, (tekst) => {
-      const { rijen, fouten } = importDoelen(tekst);
-      if (rijen.length === 0) {
-        setMelding({ soort: "fout", tekst: "Geen doelen ingeladen.", details: fouten });
-        return;
-      }
-      zetDoelenImport(rijen);
-      setMelding({
-        soort: "ok",
-        tekst: `${rijen.length} doelen ingeladen. De vorige doelenlijst is vervangen.`,
-        details: fouten,
-      });
-    });
-  };
 
   return (
     <section>
@@ -170,7 +67,7 @@ export function Gegevens() {
               <span className="gebruikers-mail">
                 {lopend ? "lopend schooljaar" : dicht ? "afgesloten — alleen-lezen" : "open"}
               </span>
-              <span className="gebruikers-status">{dicht ? "🔒" : ""}</span>
+              <span className="gebruikers-status">{dicht && <SlotIcoon />}</span>
               <span className="gebruikers-acties">
                 <button
                   type="button"
@@ -242,114 +139,43 @@ export function Gegevens() {
         </div>
       </div>
 
-      <h2 style={{ marginTop: 32 }}>Importeren</h2>
+      <h2 style={{ marginTop: 32 }}>Badges, rubrics en vestigingen in de database</h2>
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
-          <div className="gegevens-kaart-naam">Gebruikers (leerlingen + mentoren)</div>
+          <div className="gegevens-kaart-naam">Database-versie wegschrijven</div>
           <p>
-            Kolommen: <code>gebruikersnaam, voornaam, naam, basisrol, vestiging, leerjaar,
-            e-mail, wachtwoord</code>. <code>basisrol</code> = leerling of mentor; <code>leerjaar</code>
-            zoals <code>4A</code>. Nu: {students.length} leerlingen, {mentoren.length} mentoren.
+            De badges (<code>curriculum/…</code>), rubrics (<code>rubrieken/…</code>) en
+            vestigingen (<code>vestigingen/…</code>) staan als losse documenten in Firestore en
+            worden daar of in de app bewerkt. De app houdt de laatst ontvangen versie vast — bij
+            een storing blijft ze daarmee werken in plaats van terug te vallen op de ingebouwde
+            bundel.
           </p>
-          <input
-            ref={gebruikerInput}
-            type="file"
-            accept=".csv,text/csv"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importeerGebruikersBestand(f);
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            className="knop-primair"
-            onClick={() => gebruikerInput.current?.click()}
-          >
-            Kies CSV-bestand
-          </button>
-        </div>
-
-        <div className="gegevens-kaart">
-          <div className="gegevens-kaart-naam">Leerlingen</div>
           <p>
-            Kolommen: <code>id, voornaam, achternaam, vestiging, leerjaar, klasgroep</code>.
-            Bestaande id's worden bijgewerkt, nieuwe toegevoegd, de rest blijft staan.
+            Een knop hieronder schrijft de versie die de app nu heeft naar de database: de laatst
+            ontvangen database-versie, of de ingebouwde bundel als er nog geen database-versie is.
+            Gebruik dit om ze de eerste keer klaar te zetten, of om na een probleem te herstellen.
+            Staat de database al in orde, dan verandert er niets.
           </p>
-          <input
-            ref={leerlingInput}
-            type="file"
-            accept=".csv,text/csv"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importeerLeerlingen(f);
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            className="knop-primair"
-            onClick={() => leerlingInput.current?.click()}
-          >
-            Kies CSV-bestand
-          </button>
-        </div>
-
-        <div className="gegevens-kaart">
-          <div className="gegevens-kaart-naam">Doelen</div>
-          <p>
-            Kolommen: <code>code, omschrijving</code> verplicht; <code>stroom, competentie,
-            nummer, soort, uitleg, opmerking</code> optioneel. Vervangt de volledige doelenlijst.
+          <p style={{ color: "var(--text-muted)" }}>
+            Nu: badges <strong>{curriculumOverride ? "database" : "bundel"}</strong> · rubrics{" "}
+            <strong>{rubriekenOverride ? "database" : "bundel"}</strong> · vestigingen{" "}
+            <strong>{vestigingen ? "database" : "bundel"}</strong>
           </p>
-          <input
-            ref={doelInput}
-            type="file"
-            accept=".csv,text/csv"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importeerDoelen(f);
-              e.target.value = "";
-            }}
-          />
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button
               type="button"
               className="knop-primair"
-              onClick={() => doelInput.current?.click()}
+              onClick={() => {
+                const set = curriculumOverride ?? gebundeldCurriculum();
+                zetCurriculumOverride(set);
+                setMelding({
+                  soort: "ok",
+                  tekst: `Badges weggeschreven: ${set.cursussen.length} cursussen, ${set.badges.length} badges.`,
+                });
+              }}
             >
-              Kies CSV-bestand
+              Badges wegschrijven
             </button>
-            {doelenImport && (
-              <button
-                type="button"
-                className="linkknop"
-                onClick={() => {
-                  zetDoelenImport(null);
-                  setMelding({ soort: "ok", tekst: "Terug naar de standaard doelenlijst." });
-                }}
-              >
-                Herstel standaardlijst
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <h2 style={{ marginTop: 32 }}>Rubrics in de database</h2>
-      <div className="gegevens-kaarten">
-        <div className="gegevens-kaart">
-          <div className="gegevens-kaart-naam">Uitgeschreven rubrics</div>
-          <p>
-            Bron: <strong>{rubriekenOverride ? "database-versie" : "ingebouwde bundel"}</strong>.
-            In de database is elke rubric een apart document (<code>rubrieken/{"{id}"}</code>) —
-            alleen een beheerder mag schrijven. Bewerkingen via <em>Rubrics</em> gaan dan
-            rechtstreeks naar dat document (in plaats van als losse patch). De criteriateksten
-            zijn nog niet af; de rest kan later gewoon in de app aangevuld worden.
-          </p>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <button
               type="button"
               className="knop-primair"
@@ -357,202 +183,28 @@ export function Gegevens() {
                 zetRubriekenInDatabase();
                 setMelding({
                   soort: "ok",
-                  tekst: `${rubriekenLijst().length} rubrics staan nu in de database.`,
+                  tekst: `Rubrics weggeschreven: ${rubriekenLijst().length} stuks.`,
                 });
               }}
             >
-              Zet de rubrics in de database
+              Rubrics wegschrijven
             </button>
-            <button
-              type="button"
-              className="linkknop"
-              onClick={() =>
-                downloadTekst(
-                  `keerpunt-rubrics-${datumStempel()}.json`,
-                  JSON.stringify(rubriekenLijst(), null, 2),
-                )
-              }
-            >
-              Download als JSON
-            </button>
-            {rubriekenOverride && (
-              <button
-                type="button"
-                className="linkknop"
-                onClick={() => {
-                  wisRubriekenOverride();
-                  setMelding({ soort: "ok", tekst: "Terug naar de ingebouwde rubrics." });
-                }}
-              >
-                Gebruik terug de ingebouwde rubrics
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {magDev && (
-        <>
-      <h2 style={{ marginTop: 32 }}>Badges in de database</h2>
-      <div className="gegevens-kaarten">
-        <div className="gegevens-kaart">
-          <div className="gegevens-kaart-naam">Bewerkbare badge-set</div>
-          <p>
-            Bron:{" "}
-            <strong>
-              {curriculumOverride ? "database-versie" : "ingebouwde bundel"}
-            </strong>
-            . Elke badge is dan een apart document in Firestore
-            (<code>curriculum/{"{stroom}"}/cursussen/{"{cursus}"}/badges/{"{badge}"}</code>) en
-            wordt <strong>rechtstreeks in de Firebase-console</strong> bewerkt — alleen een
-            beheerder mag schrijven. De deelbadge-kapstok op <em>Deelevaluaties</em> volgt
-            automatisch (badges met dezelfde groep = één type). Bewerk je liever offline,
-            gebruik dan de JSON-download/upload hieronder.
-          </p>
-          <input
-            ref={curriculumInput}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importeerCurriculum(f);
-              e.target.value = "";
-            }}
-          />
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <button
               type="button"
               className="knop-primair"
               onClick={() => {
-                zetCurriculumOverride(gebundeldCurriculum());
+                zetVestigingenInDatabase();
                 setMelding({
                   soort: "ok",
-                  tekst: "De ingebouwde badges staan nu in de database. Bewerk verder in de console.",
+                  tekst: `Vestigingen weggeschreven: ${vestigingenLijst().length} stuks.`,
                 });
               }}
             >
-              Zet de ingebouwde badges in de database
+              Vestigingen wegschrijven
             </button>
-            <button
-              type="button"
-              className="linkknop"
-              onClick={() =>
-                downloadTekst(
-                  `keerpunt-badges-${datumStempel()}.json`,
-                  JSON.stringify(curriculumOverride ?? gebundeldCurriculum(), null, 2),
-                )
-              }
-            >
-              Download als JSON
-            </button>
-            <button
-              type="button"
-              className="linkknop"
-              onClick={() => curriculumInput.current?.click()}
-            >
-              Laad JSON in de database
-            </button>
-            {curriculumOverride && (
-              <button
-                type="button"
-                className="linkknop"
-                onClick={() => {
-                  zetCurriculumOverride(null);
-                  setMelding({ soort: "ok", tekst: "Terug naar de ingebouwde badges." });
-                }}
-              >
-                Gebruik terug de ingebouwde badges
-              </button>
-            )}
           </div>
         </div>
       </div>
-
-      {PERSISTENTIE_MODUS === "firebase" && (
-        <>
-          <h2 style={{ marginTop: 32 }}>Database opruimen</h2>
-          <DatabaseOpruimen onMelding={setMelding} />
-        </>
-      )}
-        </>
-      )}
     </section>
-  );
-}
-
-/** Eenmalige migratie van de oude 3-documenten-structuur naar de nette collecties. */
-function DatabaseOpruimen({ onMelding }: { onMelding: (m: Melding) => void }) {
-  const [bezig, setBezig] = useState<"" | "migreren" | "wissen">("");
-  const [resultaat, setResultaat] = useState<MigratieResultaat | null>(null);
-
-  const migreer = async () => {
-    setBezig("migreren");
-    try {
-      const r = await migreerDatabase();
-      setResultaat(r);
-      onMelding({
-        soort: "ok",
-        tekst: `Gemigreerd: ${r.leerlingen} leerlingen, ${r.mentoren} mentoren, ${r.groepen} groepen, ${r.deelbadges} deelbadges, ${r.evaluatieDocs} evaluatie-documenten.`,
-      });
-    } catch (e) {
-      onMelding({ soort: "fout", tekst: e instanceof Error ? e.message : "Migratie mislukt." });
-    } finally {
-      setBezig("");
-    }
-  };
-
-  const wis = async () => {
-    if (
-      !confirm(
-        "De oude documenten (badgeboek/*, curriculum/actief, test/*) definitief verwijderen? " +
-          "Doe dit pas nadat je de nieuwe structuur in de console gecontroleerd hebt.",
-      )
-    ) {
-      return;
-    }
-    setBezig("wissen");
-    try {
-      await verwijderOudeStructuur();
-      onMelding({ soort: "ok", tekst: "Oude documenten verwijderd." });
-    } catch (e) {
-      onMelding({ soort: "fout", tekst: e instanceof Error ? e.message : "Verwijderen mislukt." });
-    } finally {
-      setBezig("");
-    }
-  };
-
-  return (
-    <div className="gegevens-kaarten">
-      <div className="gegevens-kaart">
-        <div className="gegevens-kaart-naam">Structuur migreren</div>
-        <p>
-          Zet de oude <code>badgeboek/_globaal</code>, <code>badgeboek/{"{schooljaar}"}</code> en{" "}
-          <code>curriculum/actief</code> om naar de nette collecties (<code>leerlingen/</code>,{" "}
-          <code>deelbadges/</code>, <code>evaluaties/{"{jaar}"}/leerlingen/</code>,{" "}
-          <code>instellingen/</code>…). Eenmalig; overschrijft bestaande docs met dezelfde id.
-        </p>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="knop-primair"
-            disabled={bezig !== ""}
-            onClick={migreer}
-          >
-            {bezig === "migreren" ? "Bezig…" : "Migreer naar de nieuwe structuur"}
-          </button>
-          {resultaat && (
-            <button
-              type="button"
-              className="linkknop"
-              disabled={bezig !== ""}
-              onClick={wis}
-            >
-              {bezig === "wissen" ? "Bezig…" : "Verwijder de oude documenten"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
