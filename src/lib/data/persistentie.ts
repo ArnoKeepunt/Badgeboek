@@ -30,6 +30,13 @@ import type {
  * (laadstates overal) is **stap 2** van de roadmap, niet deze stap.
  */
 
+/** De doelen-/rubriek-overlays (subset van `PersistedStore`). Aparte, beheerder-only schrijfweg. */
+export interface Overlays {
+  doelWijzigingen: PersistedStore["doelWijzigingen"];
+  doelenImport: PersistedStore["doelenImport"];
+  rubriekWijzigingen: PersistedStore["rubriekWijzigingen"];
+}
+
 /** Alles wat bewaard wordt — de State uit store.ts, zonder de per-tab `sessie`. */
 export interface PersistedStore {
   students: Student[];
@@ -96,6 +103,14 @@ export interface BadgeboekPersistentie {
    * dan rijdt `curriculumOverride` gewoon mee in `bewaar()`.
    */
   schrijfCurriculum?(data: CurriculumRuw | null): void | Promise<void>;
+
+  /**
+   * Optioneel: schrijf de doelen-/rubriek-overlays weg. Firebase-modus routeert dit apart (het
+   * `instellingen/overlays`-doc is beheerder-only in de regels) — `commit()` roept het aan bij
+   * elke wijziging aan `doelWijzigingen` / `doelenImport` / `rubriekWijzigingen`. Ontbreekt de
+   * methode (localStorage), dan rijden de overlays mee in `bewaar()`.
+   */
+  schrijfOverlays?(overlays: Overlays): void | Promise<void>;
 
   /**
    * Optioneel: reageer op data die elders gewijzigd is (andere browsertab, ander toestel, een

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { OogIcoon, OogUitIcoon, PotloodIcoon, PrullenbakIcoon } from "../components/RijIcoontjes";
 import { PERSISTENTIE_MODUS, abonneerGebruikers, schrijfGebruiker } from "../lib/data";
 import { useDevToegang } from "../lib/firebaseAuth";
 import type { Personeelslid } from "../lib/gebruikers";
@@ -242,28 +243,34 @@ export function Vestigingen() {
                   <span className="gebruikers-acties">
                     <button
                       type="button"
-                      className="linkknop"
+                      className="knop-icoon knop-icoon-klein knop-icoon--plat"
+                      title="Hernoemen"
+                      aria-label={`"${v.naam}" hernoemen`}
                       onClick={() => {
                         setBewerkId(v.id);
                         setBewerkNaam(v.naam);
                       }}
                     >
-                      Hernoemen
+                      <PotloodIcoon />
                     </button>
                     <button
                       type="button"
-                      className="linkknop"
+                      className="knop-icoon knop-icoon-klein knop-icoon--plat"
+                      title={v.actief ? "Deactiveren" : "Heractiveren"}
+                      aria-label={`"${v.naam}" ${v.actief ? "deactiveren" : "heractiveren"}`}
                       onClick={() => zetVestigingActief(v.id, !v.actief)}
                     >
-                      {v.actief ? "Deactiveren" : "Heractiveren"}
+                      {v.actief ? <OogUitIcoon /> : <OogIcoon />}
                     </button>
                     {magVerwijderen && (
                       <button
                         type="button"
-                        className="linkknop linkknop-gevaar"
+                        className="knop-icoon knop-icoon-klein knop-icoon--plat is-gevaar"
+                        title="Verwijderen…"
+                        aria-label={`"${v.naam}" verwijderen`}
                         onClick={() => setVerwijderId(v.id)}
                       >
-                        Verwijderen…
+                        <PrullenbakIcoon />
                       </button>
                     )}
                   </span>

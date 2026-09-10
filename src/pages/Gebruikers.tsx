@@ -12,45 +12,7 @@ import {
 } from "../lib/gebruikers";
 import { useStore } from "../lib/store";
 import { vestigingKeuzes } from "../lib/vestigingen";
-
-const svgBasis = {
-  viewBox: "0 0 16 16",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.4,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-const PotloodIcoon = () => (
-  <svg {...svgBasis}>
-    <path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z" />
-  </svg>
-);
-
-/** Deactiveren — "uit de keuzelijsten halen". */
-const OogUitIcoon = () => (
-  <svg {...svgBasis}>
-    <path d="M2 8s2.4-4.3 6-4.3S14 8 14 8s-2.4 4.3-6 4.3S2 8 2 8z" />
-    <circle cx="8" cy="8" r="1.7" />
-    <path d="M2.5 2.5l11 11" />
-  </svg>
-);
-
-/** Heractiveren. */
-const OogIcoon = () => (
-  <svg {...svgBasis}>
-    <path d="M2 8s2.4-4.3 6-4.3S14 8 14 8s-2.4 4.3-6 4.3S2 8 2 8z" />
-    <circle cx="8" cy="8" r="1.7" />
-  </svg>
-);
-
-const PrullenbakIcoon = () => (
-  <svg {...svgBasis}>
-    <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.6 4.5l.5 8.1a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.5-8.1M6.8 6.8v4.4M9.2 6.8v4.4" />
-  </svg>
-);
+import { OogIcoon, OogUitIcoon, PotloodIcoon, PrullenbakIcoon } from "../components/RijIcoontjes";
 
 const leegFormulier = (): Personeelslid => ({
   email: "",
@@ -74,6 +36,9 @@ export function Gebruikers() {
   const [bewerk, setBewerk] = useState<Personeelslid | null>(null);
   const [nieuw, setNieuw] = useState(false);
   const [melding, setMelding] = useState<string>("");
+  const [zoek, setZoek] = useState("");
+  const [filterRol, setFilterRol] = useState<PersoneelRol | "">("");
+  const [filterVestiging, setFilterVestiging] = useState("");
 
   useEffect(() => {
     if (PERSISTENTIE_MODUS !== "firebase") return;
@@ -89,6 +54,16 @@ export function Gebruikers() {
     () => [...(lijst ?? [])].sort((a, b) => a.naam.localeCompare(b.naam, "nl")),
     [lijst],
   );
+
+  const zichtbaar = useMemo(() => {
+    const q = zoek.trim().toLowerCase();
+    return gesorteerd.filter((p) => {
+      if (q && !`${p.naam} ${p.email}`.toLowerCase().includes(q)) return false;
+      if (filterRol && p.rol !== filterRol) return false;
+      if (filterVestiging && !p.vestigingen.includes(filterVestiging)) return false;
+      return true;
+    });
+  }, [gesorteerd, zoek, filterRol, filterVestiging]);
 
   const bewaar = async (p: Personeelslid) => {
     const email = p.email.trim().toLowerCase();
@@ -186,13 +161,46 @@ export function Gebruikers() {
         </div>
       )}
 
+      {lijst !== null && gesorteerd.length > 0 && (
+        <div className="filterbar">
+          <input
+            className="filterbar-zoek"
+            type="search"
+            placeholder="Zoek op naam of e-mail…"
+            value={zoek}
+            onChange={(e) => setZoek(e.target.value)}
+          />
+          <select value={filterRol} onChange={(e) => setFilterRol(e.target.value as PersoneelRol | "")}>
+            <option value="">Alle rollen</option>
+            {PERSONEEL_ROLLEN.map((r) => (
+              <option key={r} value={r}>
+                {PERSONEEL_ROL_LABEL[r]}
+              </option>
+            ))}
+          </select>
+          <select value={filterVestiging} onChange={(e) => setFilterVestiging(e.target.value)}>
+            <option value="">Alle vestigingen</option>
+            {vestigingen.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <span className="filterbar-telling">
+            {zichtbaar.length} van {gesorteerd.length}
+          </span>
+        </div>
+      )}
+
       {lijst === null ? (
         <p className="lege-staat">Laden…</p>
       ) : gesorteerd.length === 0 ? (
         <p className="lege-staat">Nog geen personeelsaccounts.</p>
+      ) : zichtbaar.length === 0 ? (
+        <p className="lege-staat">Geen personeelsleden voor deze filter.</p>
       ) : (
         <ul className="gebruikers-lijst">
-          {gesorteerd.map((p) => (
+          {zichtbaar.map((p) => (
             <li key={p.email} className={`gebruikers-rij${p.actief ? "" : " is-inactief"}`}>
               <span className="gebruikers-naam">{p.naam}</span>
               <span className="gebruikers-mail">{p.email}</span>

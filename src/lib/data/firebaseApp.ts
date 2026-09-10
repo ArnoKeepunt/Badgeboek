@@ -23,7 +23,8 @@ import {
 } from "firebase/firestore";
 import type { CurriculumRuw } from "../curriculum";
 import { STROMEN } from "../types";
-import { type DocData, type DocMap, curriculumNaarDocs } from "./firestoreLayout";
+import { type DocData, type DocMap, curriculumNaarDocs, overlaysNaarDoc } from "./firestoreLayout";
+import type { Overlays } from "./persistentie";
 import { type Personeelslid, normaliseerGebruiker } from "../gebruikers";
 
 const firebaseConfig = {
@@ -149,6 +150,20 @@ export async function schrijfCurriculum(ruw: CurriculumRuw | null): Promise<void
     await schrijfDocMap(nieuw, verwijder);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, "curriculum");
+  }
+}
+
+/**
+ * Schrijf de doelen-/rubriek-overlays naar `instellingen/overlays`. Dit doc is beheerder-only in
+ * de regels, dus het rijdt NIET mee in `bewaar()` (dat is personeel-breed) — `commit()` in de
+ * store roept dit apart aan bij een overlay-wijziging.
+ */
+export async function schrijfOverlays(overlays: Overlays): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  try {
+    await schrijfDocMap(new Map([["instellingen/overlays", overlaysNaarDoc(overlays)]]));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, "instellingen/overlays");
   }
 }
 

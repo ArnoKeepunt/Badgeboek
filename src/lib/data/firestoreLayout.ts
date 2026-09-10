@@ -41,6 +41,8 @@ interface EvalDoc {
   notities: Record<string, Notitie>;
   gewist: string[];
   auditLog: Record<string, AuditRegel[]>;
+  /** Gedenormaliseerd van de leerling — nodig om de regels per vestiging te laten afschermen. */
+  vestiging: string;
 }
 
 interface DeelbadgeDoc extends Deelevaluatie {
@@ -102,12 +104,19 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   }
 
   // evaluaties per (schooljaar, leerling)
+  const vestigingVanLeerling = new Map(s.students.map((l) => [l.id, l.vestiging ?? ""]));
   const evalDocs = new Map<string, EvalDoc>();
   const evalDoc = (sj: string, sid: string): EvalDoc => {
     const p = EVAL_PAD(sj, sid);
     let d = evalDocs.get(p);
     if (!d) {
-      d = { kleuren: {}, notities: {}, gewist: [], auditLog: {} };
+      d = {
+        kleuren: {},
+        notities: {},
+        gewist: [],
+        auditLog: {},
+        vestiging: vestigingVanLeerling.get(sid) ?? "",
+      };
       evalDocs.set(p, d);
     }
     return d;
@@ -156,13 +165,22 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     matrixCursus: s.matrixCursus,
     afgeslotenSchooljaren: s.afgeslotenSchooljaren ?? null,
   });
-  m.set("instellingen/overlays", {
+  m.set("instellingen/overlays", overlaysNaarDoc(s));
+
+  return m;
+}
+
+/** De doelen-/rubriek-overlays als los document. Beheerder-only, aparte schrijfweg in firebase-modus. */
+export function overlaysNaarDoc(s: {
+  doelWijzigingen: PersistedStore["doelWijzigingen"];
+  doelenImport: PersistedStore["doelenImport"];
+  rubriekWijzigingen: PersistedStore["rubriekWijzigingen"];
+}): DocData {
+  return {
     doelWijzigingen: s.doelWijzigingen,
     doelenImport: s.doelenImport,
     rubriekWijzigingen: s.rubriekWijzigingen,
-  });
-
-  return m;
+  };
 }
 
 /**

@@ -303,12 +303,26 @@ let state: State = load();
 const listeners = new Set<() => void>();
 
 function commit(next: State) {
+  const vorige = state;
   state = next;
   zetCurriculum(state.curriculumOverride);
   zetVestigingen(state.vestigingen);
   zetAfgeslotenSchooljaren(state.afgeslotenSchooljaren);
   const { sessie, ...rest } = state;
   void opslag.bewaar(rest);
+  // De doelen-/rubriek-overlays (`instellingen/overlays`) rijden in firebase-modus NIET mee in
+  // `bewaar()` (beheerder-only doc) — apart wegschrijven zodra ze wijzigen.
+  if (
+    vorige.doelWijzigingen !== state.doelWijzigingen ||
+    vorige.doelenImport !== state.doelenImport ||
+    vorige.rubriekWijzigingen !== state.rubriekWijzigingen
+  ) {
+    void opslag.schrijfOverlays?.({
+      doelWijzigingen: state.doelWijzigingen,
+      doelenImport: state.doelenImport,
+      rubriekWijzigingen: state.rubriekWijzigingen,
+    });
+  }
   sessieOpslag.bewaar(sessie);
   listeners.forEach((notify) => notify());
 }

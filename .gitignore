@@ -21,8 +21,22 @@ bun.lock
 # Door Google AI Studio gegenereerd; de app leest de config uit VITE_FIREBASE_* in .env
 firebase-applet-config.json
 
-# Bevat echte e-mailadressen / eenmalige admin-scripts
-scripts/add-testteam.mjs
+# Firebase/GCP service-account sleutels — nooit committen (private key erin)
+*serviceaccount*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+gcp-key*.json
+*.pem
+
+# Firebase-emulator (regels-tests): cache + debug-logs + data-exports
+.firebase/
+firebase-debug.*
+firestore-debug.*
+ui-debug.*
+firebase-export-*/
+
+# Test-coverage
+coverage/
 
 # Editor directories and files
 .vscode/*

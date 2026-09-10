@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, abonneerAuth, abonneerGebruiker } from "./data";
+import { zetFirebaseBereik } from "./data/firebaseBereik";
 import type { Personeelslid } from "./gebruikers";
 import { heeftDevToegang, isBootstrapAdmin } from "./gebruikers";
 import { zetFirebaseActor } from "./store";
@@ -35,6 +36,7 @@ if (PERSISTENTIE_MODUS === "firebase") {
     stopPersoon?.();
     stopPersoon = null;
     zetFirebaseActor(null);
+    zetFirebaseBereik(null);
 
     if (u?.email) {
       status = { gebruiker: u, persoon: null, laden: true };
@@ -44,6 +46,18 @@ if (PERSISTENTIE_MODUS === "firebase") {
         // Zo weet de wijzigingsgeschiedenis wie de evaluatie ingaf (id = e-mailadres).
         zetFirebaseActor(
           p && p.actief && u.email ? { id: u.email, naam: p.naam || u.email } : null,
+        );
+        // Welke vestigingen mogen de Firestore-queries ophalen? Beheerder/coördinator +
+        // bootstrap-admin: alles. Mentor: enkel de eigen vestigingen. Anders: niets.
+        zetFirebaseBereik(
+          isBootstrapAdmin(u.email)
+            ? { alles: true, vestigingen: [] }
+            : p?.actief
+              ? {
+                  alles: p.rol === "beheerder" || p.rol === "coordinator",
+                  vestigingen: p.vestigingen,
+                }
+              : { alles: false, vestigingen: [] },
         );
         meld();
       });

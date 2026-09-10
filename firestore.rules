@@ -52,6 +52,24 @@ service cloud.firestore {
       return !(schooljaar in afgeslotenJaren());
     }
 
+    // Vestiging-afscherming: een mentor ziet enkel leerlingen/evaluaties/deelbadges van zijn
+    // eigen vestiging(en); coördinator/beheerder/bootstrap zien alles. De client moet zijn
+    // query dan beperken tot `where("vestiging","in", mijnVestigingen)` — Firestore weigert
+    // een bredere query dan deze regel toelaat.
+    function zietAlleVestigingen() {
+      return isBootstrapAdmin()
+        || actieveRol() == 'beheerder' || actieveRol() == 'coordinator';
+    }
+    function mijnVestigingen() {
+      let d = gebruikerDoc();
+      return d.vestigingen is list ? d.vestigingen
+        : ('vestiging' in d && d.vestiging is string && d.vestiging != '') ? [d.vestiging]
+        : [];
+    }
+    function magVestiging(v) {
+      return zietAlleVestigingen() || v in mijnVestigingen();
+    }
+
     // --- Personeelsaccounts -----------------------------------------------------
     match /gebruikers/{email} {
       allow get: if isSignedIn() && (email == request.auth.token.email || isBeheerder());
@@ -93,12 +111,18 @@ service cloud.firestore {
       allow list: if isPersoneel();
     }
 
-    // --- Instellingen (app-instellingen + doelen-/rubriek-overlays) -----------
-    // Rijdt mee in de normale app-save (`bewaar`), dus personeel-breed. Het bewerken van
-    // doelen/rubrieken zelf is client-side al beheerder-only; het in de regels afdwingen
-    // (zonder de gebatchte save van een mentor te breken) wacht op een rules-testsuite.
+    // --- Instellingen -------------------------------------------------------
+    // `instellingen/app` (schooljaar, matrix-filters) rijdt mee in de normale app-save
+    // (`bewaar`), dus personeel-breed. `instellingen/overlays` (doel-/rubriekwijzigingen) is
+    // beheerder-only: het rijdt NIET mee in `bewaar()` maar heeft een aparte schrijfweg
+    // (`schrijfOverlays`, aangeroepen door de store bij een overlay-wijziging).
+    match /instellingen/overlays {
+      allow get, list: if isPersoneel();
+      allow write: if isBeheerder();
+    }
     match /instellingen/{sleutel} {
-      allow get, list, write: if isPersoneel();
+      allow get, list: if isPersoneel();
+      allow write: if isPersoneel() && sleutel != 'overlays';
     }
 
     // --- Vestigingen (campussen): iedereen leest, alleen de beheerder wijzigt ---
@@ -113,25 +137,54 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
-    // --- Roster + inhoud: gedeeld door al het personeel -----------------------
-    match /leerlingen/{id}   { allow read, write: if isPersoneel(); }
+    // --- Roster + inhoud ----------------------------------------------------
+    // `mentoren`/`groepen`/`meldingen` = personeel-breed (id-lijsten / demo-roster; geen
+    // leerling-PII die per vestiging afgeschermd moet). `leerlingen` wél per vestiging.
     match /mentoren/{id}     { allow read, write: if isPersoneel(); }
     match /groepen/{id}      { allow read, write: if isPersoneel(); }
     match /meldingen/{id}    { allow read, write: if isPersoneel(); }
 
-    // Deelbadges: teacher-made toetsen + scores. Schrijven mag niet meer als het schooljaar
-    // van de deelbadge afgesloten is (leeg/ontbrekend schooljaar = behandeld als open).
+    // Leerlingen: een mentor ziet enkel de eigen vestiging(en).
+    match /leerlingen/{id} {
+      allow read: if isPersoneel() && magVestiging(resource.data.get('vestiging', ''));
+      allow write: if isPersoneel() && magVestiging(request.resource.data.get('vestiging', ''));
+    }
+
+    // Deelbadges: teacher-made toetsen + scores. Alleen-lezen bij een afgesloten schooljaar
+    // (leeg/ontbrekend schooljaar = open). Lezen: eigen vestiging(en) + de overkoepelende
+    // (`vestiging == ''`). Schrijven door een mentor: enkel de eigen vestiging(en).
+    // Deelbadges: per vestiging afgeschermd, net als `leerlingen`. Een overkoepelende deelbadge
+    // (`vestiging == ''`) is coördinator/beheerder-only: Firestore's query-analyzer kan een
+    // `vestiging == ''`- of `list.concat()`-tak in de regel niet volgen en zou dan een
+    // onbeperkte mentor-query tóch doorlaten.
     match /deelbadges/{id} {
-      allow read: if isPersoneel();
-      allow create: if isPersoneel() && jaarOpen(request.resource.data.get('schooljaar', ''));
-      allow update, delete: if isPersoneel() && jaarOpen(resource.data.get('schooljaar', ''));
+      allow read: if isPersoneel() && magVestiging(resource.data.get('vestiging', ''));
+      allow create: if isPersoneel()
+        && jaarOpen(request.resource.data.get('schooljaar', ''))
+        && magVestiging(request.resource.data.get('vestiging', ''));
+      allow update, delete: if isPersoneel()
+        && jaarOpen(resource.data.get('schooljaar', ''))
+        && magVestiging(resource.data.get('vestiging', ''));
     }
 
     // --- Evaluaties: /evaluaties/{schooljaar}/leerlingen/{leerlingId} ---------
-    // Een afgesloten schooljaar staat vast: enkel lezen, geen create/update/delete meer.
+    // `vestiging` staat gedenormaliseerd op het doc (afgeleid van de leerling). Afgesloten
+    // schooljaar → enkel lezen; mentor → enkel de eigen vestiging(en). Uitzondering: op een
+    // afgesloten jaar mag het gedenormaliseerde `vestiging`-veld nog toegevoegd worden (migratie).
     match /evaluaties/{schooljaar}/leerlingen/{leerlingId} {
-      allow read: if isPersoneel();
-      allow write: if isPersoneel() && jaarOpen(schooljaar);
+      function alleenVestigingToegevoegd() {
+        return resource != null && !('vestiging' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['vestiging', 'updatedAt', 'updatedBy']);
+      }
+      allow read: if isPersoneel() && magVestiging(resource.data.get('vestiging', ''));
+      allow create: if isPersoneel() && jaarOpen(schooljaar)
+        && magVestiging(request.resource.data.get('vestiging', ''));
+      allow update: if isPersoneel()
+        && magVestiging(request.resource.data.get('vestiging', ''))
+        && (jaarOpen(schooljaar) || alleenVestigingToegevoegd());
+      allow delete: if isPersoneel() && jaarOpen(schooljaar)
+        && magVestiging(resource.data.get('vestiging', ''));
     }
 
     // --- Legacy: oude AI-Studio-documenten -----------------------------------
