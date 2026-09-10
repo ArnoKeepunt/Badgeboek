@@ -12,7 +12,8 @@ import { HUIDIG_SCHOOLJAAR } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
 import { RATING_LABEL } from "../lib/ratings";
 import { getDeelKleur, getDeelNotitie, rubriekenLijst, useStore } from "../lib/store";
-import type { Kleurcriteria, Rating } from "../lib/types";
+import { useBeoordelaar } from "../lib/wijzigingslog";
+import { deelSleutel, doelSleutel, type Kleurcriteria, type Rating } from "../lib/types";
 
 /** De vier kleuren, positiefste eerst — met de sleutel in `Kleurcriteria` en de CSS-klasse. */
 const RUBRIEK_KLEUREN: { key: keyof Kleurcriteria; klasse: string; label: string }[] = [
@@ -51,6 +52,7 @@ export function LeerlingCursus() {
   const { cursusId } = useParams();
   const { kleuren, notities, deelevaluaties, deelKleuren, deelNotities } = useStore();
   const aangemeld = useAangemeld();
+  const beoordelaar = useBeoordelaar();
 
   if (aangemeld?.rol !== "leerling") {
     return (
@@ -131,13 +133,18 @@ export function LeerlingCursus() {
           <div className="ll-badges">
             {doelen.map((doel) => {
               const notitie = graadNotitie(notities, leerling.id, doel.id);
+              const kleur = graadKleur(kleuren, leerling.id, doel.id);
+              const wie = kleur
+                ? beoordelaar(doelSleutel(HUIDIG_SCHOOLJAAR, leerling.id, doel.id))
+                : null;
               return (
                 <div key={doel.id} className="ll-badge">
                   <div className="ll-badge-links">
                     <span className="ll-badge-tekst">{doel.omschrijving}</span>
+                    {wie && <span className="ll-badge-beoordelaar">Beoordeeld door {wie}</span>}
                     {notitie && <MentorNotitie tekst={notitie} />}
                   </div>
-                  <Status kleur={graadKleur(kleuren, leerling.id, doel.id)} />
+                  <Status kleur={kleur} />
                 </div>
               );
             })}
@@ -175,6 +182,8 @@ export function LeerlingCursus() {
           <ul className="ll-deel-lijst">
             {deelVanCursus.map((d) => {
               const dn = getDeelNotitie(deelNotities, d.id, leerling.id).zichtbaar;
+              const deelKleur = getDeelKleur(deelKleuren, d.id, leerling.id);
+              const deelWie = deelKleur ? beoordelaar(deelSleutel(d.id, leerling.id)) : null;
               return (
                 <li key={d.id} className="ll-deel">
                   <div className="ll-deel-links">
@@ -193,9 +202,12 @@ export function LeerlingCursus() {
                         ))}
                       </div>
                     )}
+                    {deelWie && (
+                      <span className="ll-badge-beoordelaar">Beoordeeld door {deelWie}</span>
+                    )}
                     {dn && <MentorNotitie tekst={dn} />}
                   </div>
-                  <Status kleur={getDeelKleur(deelKleuren, d.id, leerling.id)} />
+                  <Status kleur={deelKleur} />
                 </li>
               );
             })}

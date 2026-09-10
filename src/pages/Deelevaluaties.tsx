@@ -18,7 +18,13 @@ import {
 import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import {
+  bereikBeperkt,
+  bereikVestiging,
+  useBereik,
+  useHuidigeActorId,
+  useZichtbareLeerlingen,
+} from "../lib/rechten";
 import { vestigingKeuzes } from "../lib/vestigingen";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
@@ -111,11 +117,13 @@ export function Deelevaluaties() {
   // het veld niet); een coördinator/beheerder kiest de vestiging in de editor (verplicht).
   // `vestiging` hier = de vaste keuze (mentor, of een gekozen vestigingfilter) waarmee de
   // matrix gefilterd wordt; `""` = alle vestigingen tonen.
-  const vestiging = bereik.vestiging || filter.vestiging;
-  const vestigingOpties = useMemo(
-    () => vestigingKeuzes(students.map((s) => s.vestiging)),
-    [students],
-  );
+  const vestiging = bereikVestiging(bereik) || filter.vestiging;
+  const vestigingOpties = useMemo(() => {
+    const alle = vestigingKeuzes(students.map((s) => s.vestiging));
+    // Een mentor kiest enkel tussen zijn eigen (aangevinkte) vestigingen.
+    return bereikBeperkt(bereik) ? alle.filter((v) => bereik.vestigingen.includes(v)) : alle;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, bereik.allesZichtbaar, bereik.vestigingen.join(",")]);
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [openSecties, setOpenSecties] = useState<string[]>(loadOpen);

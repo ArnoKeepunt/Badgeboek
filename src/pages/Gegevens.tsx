@@ -36,6 +36,27 @@ export function Gegevens() {
 
   const doelen = metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen);
 
+  /**
+   * De database-versie wegschrijven overschrijft wat er in Firestore staat met de kopie die
+   * deze app vasthoudt — dus achter een dubbele bevestiging, zodat het niet "voor de zekerheid"
+   * gebeurt terwijl de app een verouderde of halve versie vasthoudt.
+   */
+  const bevestigWegschrijven = (wat: string, uitvoeren: () => void) => {
+    if (
+      !confirm(
+        `${wat} naar de database schrijven?\n\nDit overschrijft wat er nu in Firestore staat met de versie die deze app op dit moment vasthoudt.`,
+      )
+    )
+      return;
+    if (
+      !confirm(
+        `Zeker weten? Doe dit alleen als je wéét dat de database-versie fout of leeg is — niet "voor de zekerheid". Bij twijfel: eerst een CSV-back-up downloaden.`,
+      )
+    )
+      return;
+    uitvoeren();
+  };
+
   return (
     <section>
       {melding && (
@@ -169,40 +190,46 @@ export function Gegevens() {
             <button
               type="button"
               className="knop-primair"
-              onClick={() => {
-                const set = curriculumOverride ?? gebundeldCurriculum();
-                zetCurriculumOverride(set);
-                setMelding({
-                  soort: "ok",
-                  tekst: `Badges weggeschreven: ${set.cursussen.length} cursussen, ${set.badges.length} badges.`,
-                });
-              }}
+              onClick={() =>
+                bevestigWegschrijven("Badges", () => {
+                  const set = curriculumOverride ?? gebundeldCurriculum();
+                  zetCurriculumOverride(set);
+                  setMelding({
+                    soort: "ok",
+                    tekst: `Badges weggeschreven: ${set.cursussen.length} cursussen, ${set.badges.length} badges.`,
+                  });
+                })
+              }
             >
               Badges wegschrijven
             </button>
             <button
               type="button"
               className="knop-primair"
-              onClick={() => {
-                zetRubriekenInDatabase();
-                setMelding({
-                  soort: "ok",
-                  tekst: `Rubrics weggeschreven: ${rubriekenLijst().length} stuks.`,
-                });
-              }}
+              onClick={() =>
+                bevestigWegschrijven("Rubrics", () => {
+                  zetRubriekenInDatabase();
+                  setMelding({
+                    soort: "ok",
+                    tekst: `Rubrics weggeschreven: ${rubriekenLijst().length} stuks.`,
+                  });
+                })
+              }
             >
               Rubrics wegschrijven
             </button>
             <button
               type="button"
               className="knop-primair"
-              onClick={() => {
-                zetVestigingenInDatabase();
-                setMelding({
-                  soort: "ok",
-                  tekst: `Vestigingen weggeschreven: ${vestigingenLijst().length} stuks.`,
-                });
-              }}
+              onClick={() =>
+                bevestigWegschrijven("Vestigingen", () => {
+                  zetVestigingenInDatabase();
+                  setMelding({
+                    soort: "ok",
+                    tekst: `Vestigingen weggeschreven: ${vestigingenLijst().length} stuks.`,
+                  });
+                })
+              }
             >
               Vestigingen wegschrijven
             </button>

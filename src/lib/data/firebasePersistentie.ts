@@ -9,11 +9,10 @@ import { HUIDIG_SCHOOLJAAR, eerdereSchooljaren } from "../schooljaar";
 import {
   auth,
   db,
-  handleFirestoreError,
-  OperationType,
   schrijfCurriculum as schrijfCurriculumDoc,
   schrijfDocMap,
 } from "./firebaseApp";
+import { duidOpslagFout, zetOpslagStatus } from "../opslagStatus";
 import { type DocData, type DocMap, diffDocs, docsNaarStore, storeNaarDocs } from "./firestoreLayout";
 import type { CurriculumRuw } from "../curriculum";
 import type { BadgeboekPersistentie, PersistedStore, RauweStore } from "./persistentie";
@@ -118,8 +117,13 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         try {
           await schrijfDocMap(schrijf, verwijder);
           vorigeDocs = nu;
+          zetOpslagStatus({ soort: "ok" });
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, "batch");
+          // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont
+          // de fout; de wijziging blijft lokaal staan en `bewaar` probeert het bij de volgende
+          // wijziging opnieuw.
+          console.error("Firestore batch-schrijffout:", error);
+          zetOpslagStatus(duidOpslagFout(error));
         }
       }, 600);
     },

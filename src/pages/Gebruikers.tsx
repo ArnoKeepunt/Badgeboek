@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Modal } from "../components/Modal";
 import { PERSISTENTIE_MODUS, abonneerGebruikers, schrijfGebruiker, verwijderGebruiker } from "../lib/data";
 import { useAuthStatus, useDevToegang } from "../lib/firebaseAuth";
 import {
@@ -12,11 +13,50 @@ import {
 import { useStore } from "../lib/store";
 import { vestigingKeuzes } from "../lib/vestigingen";
 
+const svgBasis = {
+  viewBox: "0 0 16 16",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.4,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+const PotloodIcoon = () => (
+  <svg {...svgBasis}>
+    <path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z" />
+  </svg>
+);
+
+/** Deactiveren — "uit de keuzelijsten halen". */
+const OogUitIcoon = () => (
+  <svg {...svgBasis}>
+    <path d="M2 8s2.4-4.3 6-4.3S14 8 14 8s-2.4 4.3-6 4.3S2 8 2 8z" />
+    <circle cx="8" cy="8" r="1.7" />
+    <path d="M2.5 2.5l11 11" />
+  </svg>
+);
+
+/** Heractiveren. */
+const OogIcoon = () => (
+  <svg {...svgBasis}>
+    <path d="M2 8s2.4-4.3 6-4.3S14 8 14 8s-2.4 4.3-6 4.3S2 8 2 8z" />
+    <circle cx="8" cy="8" r="1.7" />
+  </svg>
+);
+
+const PrullenbakIcoon = () => (
+  <svg {...svgBasis}>
+    <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.6 4.5l.5 8.1a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.5-8.1M6.8 6.8v4.4M9.2 6.8v4.4" />
+  </svg>
+);
+
 const leegFormulier = (): Personeelslid => ({
   email: "",
   naam: "",
   rol: "mentor",
-  vestiging: "",
+  vestigingen: [],
   actief: true,
   dev: false,
 });
@@ -41,7 +81,7 @@ export function Gebruikers() {
   }, []);
 
   const vestigingen = useMemo(
-    () => vestigingKeuzes((lijst ?? []).map((p) => p.vestiging)),
+    () => vestigingKeuzes((lijst ?? []).flatMap((p) => p.vestigingen)),
     [lijst],
   );
 
@@ -58,6 +98,10 @@ export function Gebruikers() {
     }
     if (!p.naam.trim()) {
       setMelding("Vul een naam in.");
+      return;
+    }
+    if (p.rol === "mentor" && p.vestigingen.length === 0) {
+      setMelding("Vink minstens één vestiging aan voor een mentor.");
       return;
     }
     try {
@@ -131,7 +175,7 @@ export function Gebruikers() {
                 email: gebruiker?.email ?? "",
                 naam: gebruiker?.displayName ?? gebruiker?.email ?? "Beheerder",
                 rol: "beheerder",
-                vestiging: "",
+                vestigingen: [],
                 actief: true,
               })
             }
@@ -152,25 +196,53 @@ export function Gebruikers() {
             <li key={p.email} className={`gebruikers-rij${p.actief ? "" : " is-inactief"}`}>
               <span className="gebruikers-naam">{p.naam}</span>
               <span className="gebruikers-mail">{p.email}</span>
-              <span className="gebruikers-rol">
+              <span
+                className="gebruikers-rol"
+                title={
+                  p.rol === "mentor" && p.vestigingen.length > 0
+                    ? p.vestigingen.join(", ")
+                    : undefined
+                }
+              >
                 {PERSONEEL_ROL_LABEL[p.rol]}
-                {p.rol === "mentor" && p.vestiging ? ` · ${p.vestiging}` : ""}
+                {p.rol === "mentor" && p.vestigingen.length > 0 && (
+                  <span className="gebruikers-rol-vestiging">
+                    {" · "}
+                    {p.vestigingen.length <= 2
+                      ? p.vestigingen.join(", ")
+                      : `${p.vestigingen.length} vestigingen`}
+                  </span>
+                )}
               </span>
               <span className="gebruikers-status">{p.actief ? "actief" : "inactief"}</span>
               <span className="gebruikers-acties">
-                <button type="button" className="linkknop" onClick={() => setBewerk(p)}>
-                  Bewerken
+                <button
+                  type="button"
+                  className="knop-icoon knop-icoon-klein knop-icoon--plat"
+                  title="Bewerken"
+                  aria-label={`${p.naam} bewerken`}
+                  onClick={() => setBewerk(p)}
+                >
+                  <PotloodIcoon />
                 </button>
                 <button
                   type="button"
-                  className="linkknop"
+                  className="knop-icoon knop-icoon-klein knop-icoon--plat"
+                  title={p.actief ? "Deactiveren" : "Heractiveren"}
+                  aria-label={`${p.naam} ${p.actief ? "deactiveren" : "heractiveren"}`}
                   onClick={() => void bewaar({ ...p, actief: !p.actief })}
                 >
-                  {p.actief ? "Deactiveren" : "Heractiveren"}
+                  {p.actief ? <OogUitIcoon /> : <OogIcoon />}
                 </button>
                 {magVerwijderen && (
-                  <button type="button" className="linkknop linkknop-gevaar" onClick={() => void verwijder(p)}>
-                    Verwijderen
+                  <button
+                    type="button"
+                    className="knop-icoon knop-icoon-klein knop-icoon--plat is-gevaar"
+                    title="Verwijderen"
+                    aria-label={`${p.naam} verwijderen`}
+                    onClick={() => void verwijder(p)}
+                  >
+                    <PrullenbakIcoon />
                   </button>
                 )}
               </span>
@@ -180,17 +252,24 @@ export function Gebruikers() {
       )}
 
       {bewerk && (
-        <GebruikerForm
-          waarde={bewerk}
-          nieuw={nieuw}
-          vestigingen={vestigingen}
-          magDevZetten={isBootstrapAdmin(gebruiker?.email)}
-          onBewaar={bewaar}
-          onSluit={() => {
+        <Modal
+          label={nieuw ? "Nieuw personeelslid" : `${bewerk.naam || "Personeelslid"} bewerken`}
+          onClose={() => {
             setBewerk(null);
             setNieuw(false);
           }}
-        />
+        >
+          <GebruikerForm
+            waarde={bewerk}
+            nieuw={nieuw}
+            vestigingen={vestigingen}
+            onBewaar={bewaar}
+            onSluit={() => {
+              setBewerk(null);
+              setNieuw(false);
+            }}
+          />
+        </Modal>
       )}
     </section>
   );
@@ -200,17 +279,18 @@ function GebruikerForm({
   waarde,
   nieuw,
   vestigingen,
-  magDevZetten,
   onBewaar,
   onSluit,
 }: {
   waarde: Personeelslid;
   nieuw: boolean;
   vestigingen: string[];
-  magDevZetten: boolean;
   onBewaar: (p: Personeelslid) => void;
   onSluit: () => void;
 }) {
+  // `dev` (toegang tot pagina's in ontwikkeling) staat bewust NIET in dit formulier — te
+  // makkelijk aan te vinken. Zet het rechtstreeks op het `gebruikers/{email}`-doc in de
+  // Firestore-console. Bestaande waarde blijft behouden bij het opslaan.
   const [p, setP] = useState<Personeelslid>(waarde);
 
   return (
@@ -245,20 +325,44 @@ function GebruikerForm({
       </label>
       <p className="gebruikers-roluitleg">{PERSONEEL_ROL_UITLEG[p.rol]}</p>
       {p.rol === "mentor" && (
-        <label className="de-veld">
-          <span>Vestiging</span>
-          <select
-            value={p.vestiging}
-            onChange={(e) => setP({ ...p, vestiging: e.target.value })}
-          >
-            <option value="">— kies —</option>
-            {vestigingen.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="de-veld">
+          <span>Vestigingen</span>
+          {vestigingen.length === 0 ? (
+            <p className="gebruikers-roluitleg">
+              Nog geen vestigingen bekend. Voeg ze eerst toe bij <strong>Vestigingen</strong>.
+            </p>
+          ) : (
+            <ul className="keuzelijst" aria-label="Vestigingen voor deze mentor">
+              {vestigingen.map((v) => {
+                const aan = p.vestigingen.includes(v);
+                return (
+                  <li key={v}>
+                    <label className={`keuzelijst-optie${aan ? " is-aan" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="keuzelijst-input"
+                        checked={aan}
+                        onChange={(e) =>
+                          setP({
+                            ...p,
+                            vestigingen: e.target.checked
+                              ? [...p.vestigingen, v]
+                              : p.vestigingen.filter((x) => x !== v),
+                          })
+                        }
+                      />
+                      <span className="keuzelijst-vink" aria-hidden="true" />
+                      <span className="keuzelijst-label">{v}</span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {vestigingen.length > 0 && p.vestigingen.length === 0 && (
+            <p className="gebruikers-roluitleg">Kies minstens één vestiging.</p>
+          )}
+        </div>
       )}
       <label className="gebruikers-actief">
         <input
@@ -268,16 +372,6 @@ function GebruikerForm({
         />
         <span>Account is actief</span>
       </label>
-      {magDevZetten && (
-        <label className="gebruikers-actief">
-          <input
-            type="checkbox"
-            checked={p.dev === true}
-            onChange={(e) => setP({ ...p, dev: e.target.checked })}
-          />
-          <span>Dev-toegang (Deelbadges, Rubrics — pagina's in ontwikkeling)</span>
-        </label>
-      )}
       <div className="gebruikers-form-acties">
         <button type="button" className="knop-primair" onClick={() => onBewaar(p)}>
           Opslaan

@@ -12,13 +12,13 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
-import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import { bereikBeperkt, useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { getDoelKleur, useStore } from "../lib/store";
 
 export function Students() {
   const { kleuren, groepen, schooljaar } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = useBereik().vestiging;
+  const bereik = useBereik();
   const [filter, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
   const [nieuweGroep, setNieuweGroep] = useState(false);
@@ -41,10 +41,15 @@ export function Students() {
           />
         </Modal>
       )}
-      {scopeVestiging && (
+      {bereikBeperkt(bereik) && (
         <p className="jaar-melding">
-          Je ziet enkel de leerlingen van vestiging <strong>{scopeVestiging}</strong>. Voor
-          toegang tot andere vestigingen contacteer je een beheerder.
+          Je ziet enkel de leerlingen van{" "}
+          <strong>
+            {bereik.vestigingen.length === 0
+              ? "geen enkele vestiging"
+              : `${bereik.vestigingen.length === 1 ? "vestiging" : "de vestigingen"} ${bereik.vestigingen.join(", ")}`}
+          </strong>
+          . Voor toegang tot andere vestigingen contacteer je een beheerder.
         </p>
       )}
 

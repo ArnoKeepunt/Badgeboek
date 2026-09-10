@@ -41,16 +41,29 @@ service cloud.firestore {
         actieveRol() == 'beheerder' || actieveRol() == 'coordinator' || actieveRol() == 'mentor';
     }
 
+    // Afgesloten schooljaren: "vastgezet in september", evaluaties zijn dan alleen-lezen.
+    // Spiegelt `AFGESLOTEN_SCHOOLJAREN` in `src/lib/schooljaar.ts` — vast gehouden zodat de regel
+    // geen extra document-lees per evaluatie-write nodig heeft. Wordt het afsluiten later een
+    // beheerder-actie in de app, dan hier meelezen uit `instellingen/app.afgeslotenSchooljaren`.
+    function afgeslotenJaren() {
+      return ['2024-2025'];
+    }
+    function jaarOpen(schooljaar) {
+      return !(schooljaar in afgeslotenJaren());
+    }
+
     // --- Personeelsaccounts -----------------------------------------------------
     match /gebruikers/{email} {
       allow get: if isSignedIn() && (email == request.auth.token.email || isBeheerder());
       allow list: if isBeheerder();
       allow create, update: if isBeheerder()
         && request.resource.data.keys().hasOnly(
-             ['email', 'naam', 'rol', 'vestiging', 'actief', 'dev', 'updatedAt', 'updatedBy'])
+             ['email', 'naam', 'rol', 'vestiging', 'vestigingen', 'actief', 'dev', 'updatedAt', 'updatedBy'])
         && request.resource.data.rol in ['beheerder', 'coordinator', 'mentor']
         && request.resource.data.actief is bool
-        && (!('dev' in request.resource.data) || request.resource.data.dev is bool);
+        && (!('dev' in request.resource.data) || request.resource.data.dev is bool)
+        && (!('vestigingen' in request.resource.data) || request.resource.data.vestigingen is list)
+        && (!('vestiging' in request.resource.data) || request.resource.data.vestiging is string);
       allow delete: if isBeheerder();
     }
 
@@ -81,8 +94,9 @@ service cloud.firestore {
     }
 
     // --- Instellingen (app-instellingen + doelen-/rubriek-overlays) -----------
-    // Wordt meegeschreven in de normale app-save (`bewaar`), dus personeel-breed. Het
-    // bewerken van doelen/rubrieken zelf is client-side al beheerder-only.
+    // Rijdt mee in de normale app-save (`bewaar`), dus personeel-breed. Het bewerken van
+    // doelen/rubrieken zelf is client-side al beheerder-only; het in de regels afdwingen
+    // (zonder de gebatchte save van een mentor te breken) wacht op een rules-testsuite.
     match /instellingen/{sleutel} {
       allow get, list, write: if isPersoneel();
     }
@@ -103,12 +117,21 @@ service cloud.firestore {
     match /leerlingen/{id}   { allow read, write: if isPersoneel(); }
     match /mentoren/{id}     { allow read, write: if isPersoneel(); }
     match /groepen/{id}      { allow read, write: if isPersoneel(); }
-    match /deelbadges/{id}   { allow read, write: if isPersoneel(); }
     match /meldingen/{id}    { allow read, write: if isPersoneel(); }
 
+    // Deelbadges: teacher-made toetsen + scores. Schrijven mag niet meer als het schooljaar
+    // van de deelbadge afgesloten is (leeg/ontbrekend schooljaar = behandeld als open).
+    match /deelbadges/{id} {
+      allow read: if isPersoneel();
+      allow create: if isPersoneel() && jaarOpen(request.resource.data.get('schooljaar', ''));
+      allow update, delete: if isPersoneel() && jaarOpen(resource.data.get('schooljaar', ''));
+    }
+
     // --- Evaluaties: /evaluaties/{schooljaar}/leerlingen/{leerlingId} ---------
+    // Een afgesloten schooljaar staat vast: enkel lezen, geen create/update/delete meer.
     match /evaluaties/{schooljaar}/leerlingen/{leerlingId} {
-      allow read, write: if isPersoneel();
+      allow read: if isPersoneel();
+      allow write: if isPersoneel() && jaarOpen(schooljaar);
     }
 
     // --- Legacy: oude AI-Studio-documenten -----------------------------------

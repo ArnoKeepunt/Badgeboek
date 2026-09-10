@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SOORT_LABEL, alleGroepDefs } from "../lib/groepen";
 import { GRAAD_LABEL, graadVan, unieke } from "../lib/leerlingen";
-import { useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { bereikBeperkt, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
 import { maakGroep, useStore, verwijderGroep, wijzigGroep } from "../lib/store";
 import type { Groep } from "../lib/types";
 
@@ -36,7 +36,7 @@ export function GroepEditor({
 }) {
   const { groepen } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = useBereik().vestiging;
+  const beperkt = bereikBeperkt(useBereik());
   const [naam, setNaam] = useState(groep?.naam ?? "");
   const [zoek, setZoek] = useState("");
   const [vestiging, setVestiging] = useState("");
@@ -184,7 +184,7 @@ export function GroepEditor({
           value={zoek}
           onChange={(e) => setZoek(e.target.value)}
         />
-        {!scopeVestiging && (
+        {(!beperkt || vestigingen.length > 1) && (
           <select value={vestiging} onChange={(e) => setVestiging(e.target.value)}>
             <option value="">Alle vestigingen</option>
             {vestigingen.map((v) => (
@@ -242,7 +242,7 @@ export function GroepEditor({
             </button>
           )}
         </div>
-        {scopeVestiging && verborgenLeden > 0 && (
+        {beperkt && verborgenLeden > 0 && (
           <p className="groep-editor-item-meta">
             Waarvan {verborgenLeden} uit een andere vestiging — die zie je hieronder niet, maar
             ze blijven bij de groep en worden niet gewist.

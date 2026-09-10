@@ -5,7 +5,7 @@ import { GroepOpenen } from "../components/GroepOpenen";
 import { Modal } from "../components/Modal";
 import { SOORT_LABEL, SYSTEEM_SOORTEN, stromenVanGroep, systeemGroepen } from "../lib/groepen";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
-import { useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import { bereikBeperkt, useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
 
@@ -32,7 +32,8 @@ function PotloodIcoon() {
 export function Groepen() {
   const { mentoren, groepen } = useStore();
   const students = useZichtbareLeerlingen();
-  const scopeVestiging = useBereik().vestiging;
+  const bereik = useBereik();
+  const beperkt = bereikBeperkt(bereik);
   const [, setFilter] = useLeerlingFilter();
   const navigate = useNavigate();
   const mentorId = useHuidigeActorId();
@@ -53,7 +54,7 @@ export function Groepen() {
   ).filter(
     // Binnen een vestiging-scope: enkel groepen met minstens één zichtbare leerling, of de
     // eigen groepen (die de mentor sowieso moet kunnen beheren).
-    (g) => !scopeVestiging || g.mentorId === mentorId || leden(g.leerlingIds).length > 0,
+    (g) => !beperkt || g.mentorId === mentorId || leden(g.leerlingIds).length > 0,
   );
   const teBewerken = editor?.id ? groepen.find((g) => g.id === editor.id) : undefined;
 
@@ -70,9 +71,15 @@ export function Groepen() {
 
   return (
     <section>
-      {scopeVestiging && (
+      {beperkt && (
         <p className="jaar-melding">
-          Groepen en leerlingen zijn beperkt tot vestiging <strong>{scopeVestiging}</strong>.
+          Groepen en leerlingen zijn beperkt tot{" "}
+          <strong>
+            {bereik.vestigingen.length === 0
+              ? "geen enkele vestiging"
+              : `${bereik.vestigingen.length === 1 ? "vestiging" : "de vestigingen"} ${bereik.vestigingen.join(", ")}`}
+          </strong>
+          .
         </p>
       )}
 
@@ -126,7 +133,7 @@ export function Groepen() {
                 </button>
                 <div className="groep-kaart-naam">{g.naam}</div>
                 <div className="groep-kaart-meta">
-                  {scopeVestiging && ll.length !== g.leerlingIds.length
+                  {beperkt && ll.length !== g.leerlingIds.length
                     ? `${ll.length} van ${g.leerlingIds.length} leerlingen · rest in andere vestigingen`
                     : `${g.leerlingIds.length} leerlingen`}
                   {g.mentorId && (

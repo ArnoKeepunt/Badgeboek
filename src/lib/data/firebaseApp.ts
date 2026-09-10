@@ -24,7 +24,7 @@ import {
 import type { CurriculumRuw } from "../curriculum";
 import { STROMEN } from "../types";
 import { type DocData, type DocMap, curriculumNaarDocs } from "./firestoreLayout";
-import type { Personeelslid } from "../gebruikers";
+import { type Personeelslid, normaliseerGebruiker } from "../gebruikers";
 
 const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -217,7 +217,7 @@ export function abonneerGebruiker(
 ): Unsubscribe {
   return onSnapshot(
     gebruikerRef(email),
-    (snap) => cb(snap.exists() ? (snap.data() as Personeelslid) : null),
+    (snap) => cb(snap.exists() ? normaliseerGebruiker(snap.data()) : null),
     (err) => {
       console.warn("Firestore gebruiker snapshot melding:", err.message);
       cb(null);
@@ -229,7 +229,7 @@ export function abonneerGebruiker(
 export function abonneerGebruikers(cb: (lijst: Personeelslid[]) => void): Unsubscribe {
   return onSnapshot(
     collection(db, "gebruikers"),
-    (snap) => cb(snap.docs.map((d) => d.data() as Personeelslid)),
+    (snap) => cb(snap.docs.map((d) => normaliseerGebruiker(d.data()))),
     (err) => console.warn("Firestore gebruikers snapshot melding:", err.message),
   );
 }
@@ -237,12 +237,16 @@ export function abonneerGebruikers(cb: (lijst: Personeelslid[]) => void): Unsubs
 /** Voeg een personeelslid toe of werk het bij (beheerder). */
 export async function schrijfGebruiker(p: Personeelslid): Promise<void> {
   if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  const vestigingen = p.rol === "mentor" ? [...new Set(p.vestigingen)] : [];
   try {
     await setDoc(gebruikerRef(p.email), {
       email: p.email,
       naam: p.naam,
       rol: p.rol,
-      vestiging: p.rol === "mentor" ? p.vestiging : "",
+      vestigingen,
+      // TODO: schrappen zodra alle clients + regels op `vestigingen` draaien. Tijdens de
+      // overgang meegeschreven zodat een oude client (die nog `.vestiging` leest) blijft werken.
+      vestiging: vestigingen[0] ?? "",
       actief: p.actief,
       dev: p.dev === true,
       updatedAt: new Date().toISOString(),

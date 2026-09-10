@@ -3,6 +3,7 @@ import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, abonneerAuth, abonneerGebruiker } from "./data";
 import type { Personeelslid } from "./gebruikers";
 import { heeftDevToegang, isBootstrapAdmin } from "./gebruikers";
+import { zetFirebaseActor } from "./store";
 
 /**
  * Eén module-brede bron voor "wie is er aangemeld bij Firebase" + "welk personeelsaccount
@@ -33,12 +34,17 @@ if (PERSISTENTIE_MODUS === "firebase") {
   abonneerAuth((u) => {
     stopPersoon?.();
     stopPersoon = null;
+    zetFirebaseActor(null);
 
     if (u?.email) {
       status = { gebruiker: u, persoon: null, laden: true };
       meld();
       stopPersoon = abonneerGebruiker(u.email, (p) => {
         status = { ...status, persoon: p, laden: false };
+        // Zo weet de wijzigingsgeschiedenis wie de evaluatie ingaf (id = e-mailadres).
+        zetFirebaseActor(
+          p && p.actief && u.email ? { id: u.email, naam: p.naam || u.email } : null,
+        );
         meld();
       });
     } else {

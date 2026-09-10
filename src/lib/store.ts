@@ -415,8 +415,37 @@ export function useStore(): State {
 
 // --- Wijzigingsgeschiedenis: wie wijzigde een evaluatiecel (kleur of notitie) wanneer --------
 
+/**
+ * Het personeelslid dat via een Firebase-login is aangemeld (id = e-mailadres). Gezet door
+ * `src/lib/firebaseAuth.ts` zodra het `gebruikers`-account geladen is. In local-modus / zonder
+ * login blijft dit `null` en valt de actor terug op de demo-`sessie`.
+ */
+let firebaseActor: { id: string; naam: string } | null = null;
+
+/** Koppel (of ontkoppel, met `null`) het aangemelde personeelslid aan de wijzigingsgeschiedenis. */
+export function zetFirebaseActor(actor: { id: string; naam: string } | null): void {
+  firebaseActor = actor;
+}
+
+/**
+ * Wie handelt er nu — id + naam. Volgorde: de demo-"bekijk als"-sessie (beheerder test een
+ * mentor/leerling), anders het aangemelde Firebase-personeelslid, anders de beheerder(smodus)
+ * (id "", geen naam).
+ */
+function huidigeActor(): { id: string; naam: string } {
+  const s = state.sessie;
+  if (s) {
+    if (s.rol === "mentor") {
+      const m = state.mentoren.find((x) => x.id === s.id);
+      return { id: s.id, naam: m ? `${m.voornaam} ${m.naam}` : s.id };
+    }
+    return { id: s.id, naam: s.id };
+  }
+  return firebaseActor ?? { id: "", naam: "" };
+}
+
 /** De id van wie nu handelt, of "" voor de beheerder(smodus). */
-const huidigeGebruiker = (): string => state.sessie?.id ?? "";
+const huidigeGebruiker = (): string => huidigeActor().id;
 
 /** Ruime bovengrens per cel — de oudste regels vallen weg (het is een demo/prototype). */
 const MAX_AUDIT_PER_CEL = 50;
@@ -427,13 +456,14 @@ type Wijziging = { sleutel: string; veld: AuditRegel["veld"]; van: string; naar:
 function metAudit(auditLog: AuditLog, wijzigingen: Wijziging[]): AuditLog {
   if (wijzigingen.length === 0) return auditLog;
   const op = Date.now();
-  const door = huidigeGebruiker();
+  const actor = huidigeActor();
   const next = { ...auditLog };
   for (const w of wijzigingen) {
     const bestaand = next[w.sleutel] ?? [];
-    next[w.sleutel] = [...bestaand, { op, door, veld: w.veld, van: w.van, naar: w.naar }].slice(
-      -MAX_AUDIT_PER_CEL,
-    );
+    next[w.sleutel] = [
+      ...bestaand,
+      { op, door: actor.id, doorNaam: actor.naam || undefined, veld: w.veld, van: w.van, naar: w.naar },
+    ].slice(-MAX_AUDIT_PER_CEL);
   }
   return next;
 }

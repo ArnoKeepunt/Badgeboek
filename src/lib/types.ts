@@ -211,13 +211,17 @@ export const deelSleutel = (deelevaluatieId: string, studentId: string): string 
 /**
  * Eén regel in de wijzigingsgeschiedenis van een evaluatiecel (kleur of notitie). De log is
  * append-only: een nieuwe waarde overschrijft de vorige niet in de geschiedenis, ze komt erbij.
- * `door` = de gebruikers-id, of "" voor de beheerder(smodus). `op` = epoch-ms. `van`/`naar` =
+ * `door` = de gebruikers-id (demo-mentor-id of, bij een Firebase-login, het e-mailadres van het
+ * personeelsaccount), of "" voor de beheerder(smodus). `doorNaam` = de naam van die persoon op
+ * het moment van de wijziging, meegeschreven zodat de leerlingweergave de beoordelaar kan tonen
+ * zonder de (beheerder-only) `gebruikers`-collectie te lezen. `op` = epoch-ms. `van`/`naar` =
  * de waarde als tekst ("" = leeg; voor een kleur de `Rating`, voor een notitie een korte
  * weergave).
  */
 export interface AuditRegel {
   op: number;
   door: string;
+  doorNaam?: string;
   veld: "kleur" | "notitie";
   van: string;
   naar: string;

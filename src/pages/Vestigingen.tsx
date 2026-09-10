@@ -43,7 +43,7 @@ export function Vestigingen() {
     for (const v of lijst) {
       m.set(v.id, {
         ...vestigingInGebruik(v.naam),
-        personeel: personeel.filter((p) => p.vestiging === v.naam).length,
+        personeel: personeel.filter((p) => p.vestigingen.includes(v.naam)).length,
       });
     }
     return m;
@@ -66,8 +66,15 @@ export function Vestigingen() {
     }
     // Personeelsaccounts staan buiten de store — die hier meenemen.
     if (PERSISTENTIE_MODUS === "firebase") {
-      const raak = personeel.filter((p) => p.vestiging === oudeNaam);
-      await Promise.all(raak.map((p) => schrijfGebruiker({ ...p, vestiging: naam })));
+      const raak = personeel.filter((p) => p.vestigingen.includes(oudeNaam));
+      await Promise.all(
+        raak.map((p) =>
+          schrijfGebruiker({
+            ...p,
+            vestigingen: p.vestigingen.map((v) => (v === oudeNaam ? naam : v)),
+          }),
+        ),
+      );
     }
     setMelding(`"${oudeNaam}" hernoemd naar "${naam}".`);
     setBewerkId(null);

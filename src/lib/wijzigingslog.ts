@@ -39,6 +39,13 @@ const noemGebruiker = (mentoren: Mentor[], id: string | undefined): string => {
   return m ? `${m.voornaam} ${m.naam}` : id;
 };
 
+/**
+ * De naam van wie een geschiedenisregel schreef: bij voorkeur de meegeschreven `doorNaam`
+ * (Firebase-personeelslid), anders de demo-mentor opgezocht op id.
+ */
+const naamVoorRegel = (regel: AuditRegel, mentoren: Mentor[]): string =>
+  regel.doorNaam?.trim() || noemGebruiker(mentoren, regel.door);
+
 /** Kleur-`Rating` (of "" = leeg) → leesbaar label; notitietekst → tussen aanhalingstekens. */
 const waardeTekst = (veld: AuditRegel["veld"], v: string): string => {
   if (veld === "kleur") return v === "" ? RATING_EMPTY_LABEL : RATING_LABEL[v as Rating];
@@ -61,17 +68,46 @@ function overgangTekst(regel: AuditRegel): string {
 
 /** Eén geschiedenisregel als platte tekst (voor een tooltip). */
 export function beschrijfAuditRegel(regel: AuditRegel, mentoren: Mentor[]): string {
-  const wie = noemGebruiker(mentoren, regel.door);
+  const wie = naamVoorRegel(regel, mentoren);
   return `${wie} · ${datumFmt.format(new Date(regel.op))} · ${overgangTekst(regel)}`;
 }
 
 /** Eén geschiedenisregel als weergavemodel (naam / moment / overgang). */
 export function toonRegel(regel: AuditRegel, mentoren: Mentor[]): GeschiedenisRegel {
   return {
-    wie: noemGebruiker(mentoren, regel.door),
+    wie: naamVoorRegel(regel, mentoren),
     moment: momentFmt.format(new Date(regel.op)),
     overgang: overgangTekst(regel),
   };
+}
+
+/**
+ * Wie de laatste kleurbeoordeling van een cel ingaf — voor de leerlingweergave ("Beoordeeld
+ * door …"). `null` als er geen geschiedenis is (seed-/demodata) of de laatste wijziging niet aan
+ * een persoon toe te wijzen is (beheerder(smodus), `door === ""`), of de laatste wijziging een
+ * wissing was.
+ */
+export function beoordelaarVoor(
+  auditLog: AuditLog,
+  mentoren: Mentor[],
+  sleutel: string,
+): string | null {
+  // De laatste regel die een kleur zette (niet: een notitie, niet: een wissing).
+  const kleurRegels = geschiedenisVoor(auditLog, sleutel).filter(
+    (r) => r.veld === "kleur" && r.naar !== "",
+  );
+  const regel = kleurRegels[kleurRegels.length - 1];
+  if (!regel || !regel.door) return null;
+  return naamVoorRegel(regel, mentoren);
+}
+
+/** Hook: `(sleutel) => "naam van de beoordelaar"` of `null`, voor de leerlingweergave. */
+export function useBeoordelaar(): (sleutel: string) => string | null {
+  const { auditLog, mentoren } = useStore();
+  return useMemo(
+    () => (sleutel: string) => beoordelaarVoor(auditLog, mentoren, sleutel),
+    [auditLog, mentoren],
+  );
 }
 
 export function beschrijfWijziging(

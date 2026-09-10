@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
 import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
 import { PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
+import { useOpslagStatus } from "../lib/opslagStatus";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
 import { meldAf } from "../lib/store";
@@ -160,7 +161,9 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
     ? aangemeld.rol
     : persoon
       ? PERSONEEL_ROL_LABEL[persoon.rol] +
-        (persoon.rol === "mentor" && persoon.vestiging ? ` · ${persoon.vestiging}` : "")
+        (persoon.rol === "mentor" && persoon.vestigingen.length > 0
+          ? ` · ${persoon.vestigingen.join(", ")}`
+          : "")
       : "volledige toegang";
   return (
     <div className="sidebar-account">
@@ -235,6 +238,7 @@ export function Layout() {
   const breed =
     !isLeerling && (pathname.startsWith("/badges") || pathname.startsWith("/students/"));
   const titel = paginaTitel(pathname, students);
+  const opslag = useOpslagStatus();
 
   const [ingeklapt, setIngeklapt] = useState(loadIngeklapt);
   useEffect(() => {
@@ -298,6 +302,11 @@ export function Layout() {
           {!isLeerling && <SchooljaarKiezer />}
         </header>
         <main className={`content${breed ? " content--breed" : ""}`}>
+          {opslag.soort === "fout" && (
+            <div className="opslag-foutbalk" role="alert">
+              <strong>Niet bewaard.</strong> {opslag.melding}
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
