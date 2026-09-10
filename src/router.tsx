@@ -52,7 +52,7 @@ export const router = createHashRouter([
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
       { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
-      { path: "rubrics", element: <AlleenDev>{traag(<Rubrics />)}</AlleenDev> },
+      { path: "rubrics", element: traag(<Rubrics />) },
       { path: "doelen", element: traag(<Doelen />) },
       { path: "groepen", element: <AlleenBeheerder>{<Groepen />}</AlleenBeheerder> },
       {

@@ -62,15 +62,18 @@ const leerlingenItem: NavItem = {
   icoon: "leerlingen",
 };
 const groepenItem: NavItem = { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" };
+// Naslag: de doelenlijst + de rubrics-infographic (beide alleen-lezen voor de mentor).
 const doelenGroep: NavGroep = {
-  items: [{ to: "/doelen", label: "Doelen", end: false, icoon: "doelen" }],
+  items: [
+    { to: "/doelen", label: "Doelen", end: false, icoon: "doelen" },
+    { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
+  ],
 };
 
-// Deelbadges + Rubrics zijn nog niet af / niet de focus → alleen zichtbaar voor de
-// bootstrap-beheerder (Arno), of in local-modus (dev).
+// Deelbadges is nog niet af / niet de focus → alleen zichtbaar voor de bootstrap-beheerder
+// (Arno), iemand met de `dev`-vlag, of in local-modus.
 const devItems: NavItem[] = [
   { to: "/deelevaluaties", label: "Deelbadges", end: false, icoon: "deelevaluaties" },
-  { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
 ];
 
 // Mentor: badgeboek + leerlingen + naslag. Groepen maak je inline in de keuzelijsten, dus de

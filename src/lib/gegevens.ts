@@ -212,8 +212,15 @@ const EVAL_KOP = [
 /**
  * Elke ingevulde badgekleur als één rij — de "download op elk moment"-back-up. Elke sleutel
  * wijst naar één badge (leerdoel); er is geen evaluatie meer op cursus-/rubric-niveau.
+ *
+ * `alleenSchooljaar`: enkel de rijen van dat schooljaar meenemen (afgesloten jaren blijven uit
+ * de back-up). Weglaten = alle schooljaren.
  */
-export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): string {
+export function exportEvaluaties(
+  studenten: Student[],
+  kleuren: DoelKleuren,
+  alleenSchooljaar?: string,
+): string {
   const studById = new Map(studenten.map((s) => [s.id, s]));
   const doelById = new Map(alleLeerdoelen().map((d) => [d.id, d]));
   const rubById = new Map(alleRubrics().map((r) => [r.id, r]));
@@ -225,6 +232,7 @@ export function exportEvaluaties(studenten: Student[], kleuren: DoelKleuren): st
     const i1 = sleutel.indexOf(":");
     const i2 = sleutel.indexOf(":", i1 + 1);
     const schooljaar = sleutel.slice(0, i1);
+    if (alleenSchooljaar && schooljaar !== alleenSchooljaar) continue;
     const studentId = sleutel.slice(i1 + 1, i2);
     const nodeId = sleutel.slice(i2 + 1);
     const s = studById.get(studentId);

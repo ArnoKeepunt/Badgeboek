@@ -25,6 +25,7 @@ export function Gegevens() {
   const {
     students,
     kleuren,
+    schooljaar,
     doelWijzigingen,
     doelenImport,
     curriculumOverride,
@@ -95,14 +96,17 @@ export function Gegevens() {
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Evaluaties (back-up)</div>
-          <p>Elke ingevulde kleur, per leerling / schooljaar / badge (ook de graadsbadges).</p>
+          <p>
+            Elke ingevulde kleur, per leerling / badge — voor het <strong>geopende schooljaar
+            ({schooljaar})</strong>. Kies bovenaan een ander schooljaar om dat te downloaden.
+          </p>
           <button
             type="button"
             className="knop-primair"
             onClick={() =>
               downloadTekst(
-                `keerpunt-evaluaties-${datumStempel()}.csv`,
-                exportEvaluaties(students, kleuren),
+                `keerpunt-evaluaties-${schooljaar}-${datumStempel()}.csv`,
+                exportEvaluaties(students, kleuren, schooljaar),
               )
             }
           >

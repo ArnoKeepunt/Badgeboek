@@ -961,6 +961,20 @@ th {
   }
 }
 
+/* `max-width` op een <td>/<th> wordt door de auto-tabelindeling niet altijd gerespecteerd:
+   op zeer brede schermen dijt de eerste kolom dan uit tot bijna halve schermbreedte. Daarom
+   begrenzen we de *inhoud* van de cel — dat kapt de "preferred width" die de tabel gebruikt. */
+.grid-col-doel .grid-doel-rij,
+.grid-col-doel .grid-deel-tekst {
+  max-width: 300px;
+}
+
+.grid-doel-tekst,
+.grid-deel-titel {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .grid thead .grid-col-doel {
   z-index: 7;
 }
@@ -3350,6 +3364,12 @@ th {
   min-width: clamp(300px, 20vw, 440px);
   max-width: clamp(300px, 20vw, 440px);
   width: clamp(300px, 20vw, 440px);
+}
+
+/* In de split mag de celinhoud de volle (bredere) kolom vullen. */
+.badges-split .grid-col-doel .grid-doel-rij,
+.badges-split .grid-col-doel .grid-deel-tekst {
+  max-width: clamp(260px, 18vw, 400px);
 }
 
 @media (max-width: 980px) {
