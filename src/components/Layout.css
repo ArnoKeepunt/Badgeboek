@@ -25,7 +25,10 @@
    ingeklapt enkel het merkteken. */
 .brand {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
   min-height: 40px;
   padding: 0 8px;
 }
@@ -40,6 +43,13 @@
   display: none;
   width: 30px;
   height: 30px;
+}
+
+/* Staat altijd bij het logo — dit is een badgeboek voor het dagelijkse werk, geen archief. */
+.brand-onderschrift {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 /* Voet: de in-/uitklapknop boven het account + af-/aanmelden. */
@@ -323,6 +333,10 @@
 
   .sidebar--ingeklapt .brand-merk {
     display: block;
+  }
+
+  .sidebar--ingeklapt .brand-onderschrift {
+    display: none;
   }
 
   .sidebar--ingeklapt .nav-link,

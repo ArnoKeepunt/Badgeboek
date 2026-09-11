@@ -21,7 +21,8 @@ const KLEUR_KEY: Record<(typeof KLEUREN)[number], keyof Kleurcriteria> = {
  * stroom liggen vast; naam, doelen, de vier kleurcriteria en de leerlijntekst zijn bewerkbaar.
  * Zonder database-versie gebeurt bewaren als patch bovenop de brontekst (`rubriekWijzigingen`),
  * zodat een nieuwe generatie van het bronbestand de bewerking niet wist. Staat de rubriekenlijst
- * wél in de database, dan schrijft `wijzigRubriek` rechtstreeks naar het `rubrieken/{id}`-doc.
+ * wél in de database, dan schrijft `wijzigRubriek` rechtstreeks naar het
+ * `rubrieken/{stroom}/cursussen/{cursusId}/lijst/{id}`-doc (zelfde structuur als het curriculum).
  */
 export function RubriekEditor({ rubriek, onSluit }: { rubriek: Rubriek; onSluit: () => void }) {
   // Op de store abonneren zodat de "bewerkt"-status meebeweegt.

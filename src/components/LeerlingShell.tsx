@@ -36,7 +36,9 @@ export function LeerlingShell() {
             />
             <path d="M7 10.5h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
-          Mijn badgeboek
+          <span className="ll-brand-tekst">
+            Mijn badgeboek<span className="ll-brand-sub"> — dagelijks werk</span>
+          </span>
         </Link>
         {aangemeld && (
           <div className="ll-account">

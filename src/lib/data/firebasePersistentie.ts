@@ -206,7 +206,8 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         currBadges: undefined,
         instellingen: undefined,
         vestigingen: undefined,
-        rubrieken: undefined,
+        rubriekCursussen: undefined,
+        rubriekLijst: undefined,
         evaluaties: undefined,
         // De twee vorige schooljaren (een graad = 2, soms 3 schooljaren) — voor de
         // kleur-overname. Leeg als er geen is.
@@ -295,6 +296,24 @@ export function firebasePersistentie(): BadgeboekPersistentie {
           (err) => console.warn(`Firestore curriculum/${naam}:`, err.message),
         );
 
+      // Rubrieken staan in dezelfde vorm als het curriculum: rubrieken/{stroom}/cursussen/{c}/
+      // lijst/{r}. "cursussen" is een collectionGroup-naam die het curriculum ook gebruikt —
+      // vandaar de eigen `rubrieken/`-padfilter (zelfde patroon als hierboven).
+      const rubriekenGroepLuisteraar = (naam: "cursussen" | "lijst"): Unsubscribe =>
+        onSnapshot(
+          collectionGroup(db, naam),
+          (snap) => {
+            const frag: DocMap = new Map();
+            snap.forEach((d) => {
+              const pad = d.ref.path.replace(/^.*?\/documents\//, "");
+              if (pad.startsWith("rubrieken/")) frag.set(pad, zonderMeta(d.data()));
+            });
+            bron[naam === "cursussen" ? "rubriekCursussen" : "rubriekLijst"] = frag;
+            emit();
+          },
+          (err) => console.warn(`Firestore rubrieken/${naam}:`, err.message),
+        );
+
       let unsubs: Unsubscribe[] = [];
       let unsubEvals: Unsubscribe[] = [];
 
@@ -362,9 +381,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
           collectieLuisteraar("meldingen", alle("meldingen"), (id) => `meldingen/${id}`),
           collectieLuisteraar("instellingen", alle("instellingen"), (id) => `instellingen/${id}`),
           collectieLuisteraar("vestigingen", alle("vestigingen"), (id) => `vestigingen/${id}`),
-          collectieLuisteraar("rubrieken", alle("rubrieken"), (id) => `rubrieken/${id}`),
           curriculumGroepLuisteraar("cursussen"),
           curriculumGroepLuisteraar("badges"),
+          rubriekenGroepLuisteraar("cursussen"),
+          rubriekenGroepLuisteraar("lijst"),
         ];
         startEvaluaties(actiefSchooljaar);
       };

@@ -107,7 +107,12 @@ beforeEach(async () => {
       db.doc("instellingen/app").set({ schooljaar: JAAR, matrixStromen: [], matrixCursus: "" }),
       db.doc("instellingen/overlays").set({ doelWijzigingen: {}, doelenImport: null, rubriekWijzigingen: {} }),
       db.doc("vestigingen/gent").set({ naam: "Gent", actief: true, volgorde: 0 }),
-      db.doc("rubrieken/r1").set({ naam: "Rubric", stroom: "1A", cursus: "Cursus", criteria: {} }),
+      // Rubrieken: zelfde structuur als curriculum/1A/cursussen/c1 (cursus-id's komen overeen).
+      db.doc("rubrieken/1A").set({}),
+      db.doc("rubrieken/1A/cursussen/c1").set({ naam: "Cursus", volgorde: 0 }),
+      db.doc("rubrieken/1A/cursussen/c1/lijst/c1-r1").set({
+        naam: "Rubric", doelen: [], criteria: { blauw: "", groen: "", geel: "", rood: "" }, leerlijn: "", volgorde: 0,
+      }),
       db.doc("badgeboek/_globaal").set({ legacy: true }),
       db.doc("test/oud").set({ legacy: true }),
     ]);
@@ -188,9 +193,11 @@ describe("actief personeel — toegestaan", () => {
     );
   });
 
-  it("iedereen van het personeel leest vestigingen en rubrieken", async () => {
+  it("iedereen van het personeel leest vestigingen en rubrieken (incl. collectionGroup)", async () => {
     await assertSucceeds(mentor.collection("vestigingen").get());
     await assertSucceeds(coordinator.collection("rubrieken").get());
+    await assertSucceeds(mentor.doc("rubrieken/1A/cursussen/c1/lijst/c1-r1").get());
+    await assertSucceeds(mentor.collectionGroup("lijst").get());
   });
 });
 
@@ -297,9 +304,15 @@ describe("afgesloten schooljaar (2024-2025) — alleen-lezen", () => {
 describe("vestigingen en rubrieken — beheerder-write", () => {
   it("mentor mag niet schrijven, beheerder wel", async () => {
     await assertFails(mentor.doc("vestigingen/nieuw").set({ naam: "Nieuw", actief: true, volgorde: 1 }));
-    await assertFails(mentor.doc("rubrieken/r2").set({ naam: "R2" }));
+    await assertFails(mentor.doc("rubrieken/1A/cursussen/c1").set({ naam: "Cursus" }));
+    await assertFails(mentor.doc("rubrieken/1A/cursussen/c1/lijst/c1-r2").set({ naam: "R2" }));
     await assertSucceeds(beheerder.doc("vestigingen/nieuw").set({ naam: "Nieuw", actief: true, volgorde: 1 }));
-    await assertSucceeds(beheerder.doc("rubrieken/r2").set({ naam: "R2", stroom: "1A", cursus: "C", criteria: {} }));
+    await assertSucceeds(beheerder.doc("rubrieken/1A/cursussen/c1").set({ naam: "Cursus", volgorde: 0 }));
+    await assertSucceeds(
+      beheerder.doc("rubrieken/1A/cursussen/c1/lijst/c1-r2").set({
+        naam: "R2", doelen: [], criteria: { blauw: "", groen: "", geel: "", rood: "" }, leerlijn: "", volgorde: 1,
+      }),
+    );
   });
 });
 

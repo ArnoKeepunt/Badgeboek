@@ -4,6 +4,7 @@ import type {
   AuditRegel,
   Deelevaluatie,
   Groep,
+  Kleurcriteria,
   Melding,
   Mentor,
   Notitie,
@@ -26,6 +27,8 @@ import type { PersistedStore, RauweStore } from "./persistentie";
  *   meldingen/{leerlingId}     instellingen/app        instellingen/overlays
  *   curriculum/{stroom}/cursussen/{cursusId}/badges/{badgeId}
  *                             (apart geschreven via schrijfCurriculum; hier NIET in storeNaarDocs)
+ *   rubrieken/{stroom}/cursussen/{cursusId}/lijst/{rubriekId}
+ *                             (zelfde vorm als curriculum: cursus-id's komen overeen)
  */
 
 export type DocData = Record<string, unknown>;
@@ -78,11 +81,28 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
       m.set(`vestigingen/${v.id}`, { naam: v.naam, actief: v.actief, volgorde: v.volgorde });
     }
   }
-  // Rubrics: alleen wegschrijven als er een database-versie is (`null` = de bundel).
+  // Rubrics: alleen wegschrijven als er een database-versie is (`null` = de bundel). Zelfde
+  // structuur als het curriculum: cursus-id's komen overeen (bv. "1A-cultuur"), de rubric-id
+  // is `${cursusId}-r${n}` — stabiel, niet op de rij-positie in het bronbestand gebouwd.
   if (s.rubriekenOverride) {
+    const cursussen = new Map<string, { stroom: string; naam: string }>();
     for (const r of s.rubriekenOverride) {
-      const { id, ...rest } = r;
-      m.set(`rubrieken/${id}`, { ...rest });
+      const cursusId = r.id.replace(/-r\d+$/, "");
+      if (!cursussen.has(cursusId)) cursussen.set(cursusId, { stroom: r.stroom, naam: r.cursus });
+      m.set(`rubrieken/${r.stroom}/cursussen/${cursusId}/lijst/${r.id}`, {
+        naam: r.naam,
+        doelen: r.doelen,
+        criteria: r.criteria,
+        leerlijn: r.leerlijn,
+        volgorde: r.volgorde,
+      });
+    }
+    const volgordePerStroom = new Map<string, number>();
+    for (const [cursusId, c] of cursussen) {
+      m.set(`rubrieken/${c.stroom}`, {}); // node-marker, browsebaar in de console
+      const volgorde = volgordePerStroom.get(c.stroom) ?? 0;
+      volgordePerStroom.set(c.stroom, volgorde + 1);
+      m.set(`rubrieken/${c.stroom}/cursussen/${cursusId}`, { naam: c.naam, volgorde });
     }
   }
 
@@ -245,7 +265,19 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   const vestigingen: Vestiging[] = [];
   let heeftVestigingen = false;
 
-  const rubriekenArr: Rubriek[] = [];
+  // Rubrieken: zelfde tweetraps-aanpak als curriculum — cursusnaam en rubric-doc apart
+  // verzameld (kunnen in andere volgorde binnenkomen), na de loop samengevoegd op cursus-id.
+  const rubriekCursusNamen = new Map<string, string>(); // cursusId -> naam
+  const rubriekRuw: Array<{
+    id: string;
+    stroom: Stroom;
+    cursusId: string;
+    naam: string;
+    doelen: string[];
+    criteria: Kleurcriteria;
+    leerlijn: string;
+    volgorde: number;
+  }> = [];
   let heeftRubrieken = false;
 
   for (const [pad, data] of docs) {
@@ -269,10 +301,27 @@ export function docsNaarStore(docs: DocMap): RauweStore {
           volgorde: (data.volgorde as number) ?? 0,
         });
         break;
-      case "rubrieken":
-        heeftRubrieken = true;
-        rubriekenArr.push({ id: seg[1], ...(data as Omit<Rubriek, "id">) });
+      case "rubrieken": {
+        // rubrieken/{stroom} (marker, genegeerd) | .../cursussen/{c} | .../cursussen/{c}/lijst/{r}
+        const stroom = seg[1] as Stroom;
+        if (seg[2] === "cursussen" && seg[4] === "lijst") {
+          heeftRubrieken = true;
+          rubriekRuw.push({
+            id: seg[5],
+            stroom,
+            cursusId: seg[3],
+            naam: (data.naam as string) ?? "",
+            doelen: (data.doelen as string[]) ?? [],
+            criteria: (data.criteria as Kleurcriteria) ?? { blauw: "", groen: "", geel: "", rood: "" },
+            leerlijn: (data.leerlijn as string) ?? "",
+            volgorde: (data.volgorde as number) ?? 0,
+          });
+        } else if (seg[2] === "cursussen") {
+          heeftRubrieken = true;
+          rubriekCursusNamen.set(seg[3], (data.naam as string) ?? seg[3]);
+        }
         break;
+      }
       case "curriculum": {
         // curriculum/{stroom}  |  .../cursussen/{c}  |  .../cursussen/{c}/badges/{b}
         const stroom = seg[1] as Stroom;
@@ -345,7 +394,24 @@ export function docsNaarStore(docs: DocMap): RauweStore {
       ? { cursussen: currCursussen, badges: currBadges }
       : null;
   r.vestigingen = heeftVestigingen ? vestigingen : null;
-  r.rubriekenOverride = heeftRubrieken ? rubriekenArr : null;
+  const rubriekenArr: Rubriek[] = rubriekRuw
+    .map((x) => ({
+      id: x.id,
+      stroom: x.stroom,
+      cursus: rubriekCursusNamen.get(x.cursusId) ?? x.cursusId,
+      naam: x.naam,
+      doelen: x.doelen,
+      criteria: x.criteria,
+      leerlijn: x.leerlijn,
+      volgorde: x.volgorde,
+    }))
+    .sort(
+      (a, b) =>
+        a.stroom.localeCompare(b.stroom) ||
+        a.cursus.localeCompare(b.cursus, "nl") ||
+        a.volgorde - b.volgorde,
+    );
+  r.rubriekenOverride = heeftRubrieken && rubriekenArr.length > 0 ? rubriekenArr : null;
 
   if (!geinitialiseerd) return r; // enkel de curriculum-/vestiging-/rubriek-override; de rest = seed behouden
 

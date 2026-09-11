@@ -80,6 +80,8 @@ export interface Rubriek {
   criteria: Kleurcriteria;
   /** Waar de leerling vandaan komt en waar het naartoe gaat (leerlijn). */
   leerlijn: string;
+  /** Volgorde binnen de cursus (zoals in het bronbestand) — Firestore garandeert geen volgorde. */
+  volgorde: number;
 }
 
 /** De rollen die de app (voorlopig) kent. */

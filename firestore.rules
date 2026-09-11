@@ -103,11 +103,15 @@ service cloud.firestore {
       }
     }
 
-    // collectionGroup-queries op de curriculum-subcollecties (de app luistert zo).
+    // collectionGroup-queries op de curriculum-/rubrieken-subcollecties (de app luistert zo).
+    // "cursussen" wordt door beide bomen gebruikt — vandaar path-agnostisch (`{pad=**}`).
     match /{pad=**}/cursussen/{cursusId} {
       allow list: if isPersoneel();
     }
     match /{pad=**}/badges/{badgeId} {
+      allow list: if isPersoneel();
+    }
+    match /{pad=**}/lijst/{rubriekId} {
       allow list: if isPersoneel();
     }
 
@@ -131,10 +135,22 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
-    // --- Uitgeschreven rubrics: iedereen leest, alleen de beheerder wijzigt ---
-    match /rubrieken/{id} {
+    // --- Uitgeschreven rubrics: zelfde structuur als het curriculum -----------
+    // rubrieken/{stroom}/cursussen/{cursusId}/lijst/{rubriekId} — de cursus-id's komen overeen
+    // met die van het curriculum. Iedereen van het personeel leest, enkel de beheerder wijzigt.
+    match /rubrieken/{stroom} {
       allow get, list: if isPersoneel();
       allow write: if isBeheerder();
+
+      match /cursussen/{cursusId} {
+        allow get, list: if isPersoneel();
+        allow write: if isBeheerder();
+
+        match /lijst/{rubriekId} {
+          allow get, list: if isPersoneel();
+          allow write: if isBeheerder();
+        }
+      }
     }
 
     // --- Roster + inhoud ----------------------------------------------------

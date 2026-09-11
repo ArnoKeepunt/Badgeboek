@@ -1976,10 +1976,23 @@ th {
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  min-width: 0;
   font-weight: 800;
   font-size: 17px;
   color: var(--text);
   text-decoration: none;
+}
+
+/* Laat de titel afkappen i.p.v. de zijbalk in te duwen op smalle schermen. */
+.ll-brand-tekst {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "— dagelijks werk": iets minder zwaar dan de merknaam, zelfde kleur. */
+.ll-brand-sub {
+  font-weight: 600;
 }
 
 .ll-brand-icoon {

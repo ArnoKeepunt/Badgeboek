@@ -11,9 +11,17 @@ Het bestand bundelt per cursus en stroom de rubrics met:
 Nog niet alle cursussen staan in het bestand — dit script draait gewoon over wat er is.
 Bij een nieuwe versie van het bestand: dit script opnieuw draaien.
 
+Id's zijn net als bij de badges (`extract_badges.py`) op de cursus gebouwd — `<stroom>-<cursus-
+slug>-r<n>`, bv. "1A-cultuur-r1" — en niet op de rij-positie in het bestand, zodat een nieuwe
+rij ergens anders in het bestand niet alle andere id's doet verschuiven. `volgorde` is de positie
+binnen de cursus (Firestore garandeert geen volgorde). De cursus-slug moet overeenkomen met de
+cursus-id's uit het curriculum (`extract_badges.py`) — dezelfde cursusnaam geeft dezelfde slug.
+
     python3 scripts/extract_rubrics.py
 """
 import json
+import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -73,6 +81,13 @@ def split_doelen(ruw: str) -> list[str]:
     return [d.strip() for d in ruw.replace(";", ",").split(",") if d.strip()]
 
 
+def slug(s: str) -> str:
+    """Leesbare, ascii-veilige id-component — zelfde algoritme als extract_badges.py."""
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
+    return s or "x"
+
+
 def main() -> None:
     z = zipfile.ZipFile(XLSX)
     ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
@@ -82,6 +97,7 @@ def main() -> None:
 
     entries = []
     per_stroom: dict[str, int] = {}
+    per_cursus: dict[str, int] = {}  # teller per cursus-id, voor het volgnummer in het id
     for cells in load_rows(z, sheet_path, strings):
         cursus = cells.get(1, "")
         stroom = cells.get(2, "").upper()
@@ -89,9 +105,12 @@ def main() -> None:
         if stroom not in GELDIGE_STROMEN or not cursus or not naam:
             continue
         per_stroom[stroom] = per_stroom.get(stroom, 0) + 1
+        cursus_id = f"{stroom}-{slug(cursus)}"
+        volgorde = per_cursus.get(cursus_id, 0)
+        per_cursus[cursus_id] = volgorde + 1
         entries.append(
             {
-                "id": f"rbr-{stroom}-{per_stroom[stroom]}",
+                "id": f"{cursus_id}-r{volgorde + 1}",
                 "cursus": cursus,
                 "stroom": stroom,
                 "naam": naam,
@@ -103,6 +122,7 @@ def main() -> None:
                     "rood": cells.get(8, ""),
                 },
                 "leerlijn": cells.get(9, ""),
+                "volgorde": volgorde,
             }
         )
 
@@ -125,6 +145,7 @@ def main() -> None:
             lines.append(f'      {kleur}: {json.dumps(e["criteria"][kleur], ensure_ascii=False)},')
         lines.append("    },")
         lines.append(f'    leerlijn: {json.dumps(e["leerlijn"], ensure_ascii=False)},')
+        lines.append(f'    volgorde: {e["volgorde"]},')
         lines.append("  },")
     lines.append("];")
     lines.append("")

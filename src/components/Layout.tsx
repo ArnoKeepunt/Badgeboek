@@ -261,6 +261,7 @@ export function Layout() {
             height={241}
           />
           <img className="brand-merk" src={keerpuntMerk} alt="Keerpunt" width={128} height={128} />
+          <span className="brand-onderschrift">Dagelijks werk</span>
         </div>
         <nav>
           {nav.map((groep, i) => (
