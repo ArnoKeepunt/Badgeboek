@@ -1,112 +1,68 @@
-# Wat kan er nu al, terwijl we wachten
+# Wat nog moet gebeuren vóór échte leerlinggegevens
 
-**Context / blokkers (aug–sep 2026):**
+**Status (2026-09-11):** de backend is intussen **live** — Firestore + verplichte Google-login,
+per-vestiging afgeschermd in de regels, personeelsaccounts zijn **echt** (geïmporteerd vanuit
+Smartschool/school-administratie). Enkel de **leerlingen** zijn nog fictief. Deze pagina beschreef
+oorspronkelijk (03/09) een to-do-lijst voor toen alles nog een prototype was; wat hieronder als
+✅ staat is intussen gewoon gebouwd en live, zie de root-`README.md` voor de architectuur.
 
-- Er mag pas met **echte leerlinggegevens** gewerkt worden na een GDPR-check. Eerst willen we
-  bewijzen dat alles klopt met fake data, inclusief de werking met een echte database.
-- De **database** zelf hangt vast op rechten binnen de organisatie om een nieuw Google-project
-  aan te maken.
-
-Dus: alles hieronder kan zonder echte data en zonder de echte DB. Ongeveer op volgorde van
-opbrengst.
-
----
-
-## 1. Persistentielaag afschermen (grootste winst) — ✅ GEDAAN 2026-09-03
-
-`src/lib/data/` bevat nu de seam:
-
-- `persistentie.ts` — de `BadgeboekPersistentie`-interface + `PersistedStore`-type
-- `localStoragePersistentie.ts` — de huidige opslag (+ gratis cross-tab sync via het
-  `storage`-event)
-- `firebasePersistentie.ts` — **skelet** met de Firestore-mapping uitgeschreven in comments
-- `sessieOpslag.ts` — de per-tab sessie (blijft altijd `sessionStorage`)
-- `index.ts` — `maakPersistentie()` kiest op basis van `VITE_PERSISTENTIE` (`.env.example`)
-- `README.md` — hoe het in elkaar zit + hoe je naar Supabase wisselt
-
-`store.ts` praat enkel nog met die interface; geen enkele pagina is aangeraakt. Van backend
-wisselen = één `.env`-regel + één bestand invullen.
-
-## 2. De store async maken
-
-Een echte DB is asynchroon. Maak de repo-methodes nu al `async` (ook al retourneert de
-localStorage-versie meteen), en voeg een **kunstmatige vertraging** toe (`await sleep(300)`).
-Dan zie je nu al waar **laad- en foutstates** ontbreken (matrix, overzicht, rubrics…). Dat soort
-ding doet pas pijn als de DB er is.
-
-## 3. Auth-seam definiëren
-
-`useEffectieveRol()` / `sessie` is al een goed aanknopingspunt. Leg de **Google-mapping** vast:
-Google-account (id + e-mail) → leerling / mentor / beheerder. Schrijf de interface
-(`AuthProvider`) met een `DemoAuthProvider` (huidige `/aanmelden`) en een lege
-`GoogleAuthProvider`.
-
-### 3b. Leerlingrechten (nieuw — vanwege de wetgeving)
-
-Niet elke leerkracht mag alle leerlingen zien. **Eerste laag is gebouwd** (`src/lib/rechten.ts`):
-een mentor ziet enkel de leerlingen van de **eigen vestiging**, een beheerder ziet iedereen,
-een leerling enkel zichzelf. Alle pagina's die leerlingen tonen gebruiken de hook
-`useZichtbareLeerlingen()`; `StudentDetail` blokkeert met "Geen toegang" bij een leerling buiten
-het bereik. Nog te doen: **fijnmaziger** (per klasgroep / groep / individuele leerling) en
-**database-gestuurd** — dat komt allemaal in `rechten.ts` (`leerlingenBinnenBereik` /
-`magLeerlingZien`), de pagina's hoeven niet mee te veranderen.
-
-## 4. GDPR-document schrijven
-
-Dit is de blokker, dus naar voren halen. Een **DPIA-light / verwerkingsregister**: welke
-persoonsgegevens, waar opgeslagen, bewaartermijn, recht op verwijdering (+ de flow ervoor in de
-app), dataminimalisatie, EU-regio, geen runtime-AI. Als dit klaar is, is de stap naar echte
-data veel minder eng — en er is iets om aan de organisatie voor te leggen.
-
-## 5. CSV import/export rond maken (`/gegevens`)
-
-Zorg dat **alles** round-trippt met fake data: leerlingen, doelen, evaluaties, deelevaluaties,
-groepen, `rubriekWijzigingen`, `doelWijzigingen`. Dat is meteen het **back-up- en
-migratieverhaal** én de manier om testdata te beheren.
-
-## 6. Tests op de pure logica (Vitest)
-
-Geen DB nodig, en het beschermt tijdens de refactor van punt 1–2. Goede kandidaten:
-
-- `codeMatchtPrefix` / `zoekDoel` (`src/lib/rubriekDoelen.ts`)
-- `filterLeerlingen`, `verzoenGraadLeerjaar` (`src/lib/leerlingen.ts`)
-- `voortgangVoor` (`src/lib/voortgang.ts`)
-- `telKleuren` / `aantalIngevuld` (`src/lib/kleurstats.ts`)
-- `systeemGroepen` (`src/lib/groepen.ts`)
-- `pasGewistAan` en de meldingen-helpers (`src/lib/store.ts`)
-
-## 7. Prototype hard maken voor de mentortest
-
-Systematische doorklik van **elke pagina × elke rol** (leerling / mentor / beheerder), met een
-checklist. Plus de openstaande kleintjes:
-
-- **Schooljaar afsluiten**-actie (de read-only lock bestaat al hard-coded als
-  `AFGESLOTEN_SCHOOLJAREN`), + beheerder-gating
-- Een **undo** voor evaluaties
-- Lege / fout / laadstates overal
-
-## 8. Online zetten
-
-De `dist` is nu al deploybaar (hash-routing + `base: "./"` staan goed). Op een eigen adres
-zetten zodat mentoren kunnen testen — hangt niet van de DB af.
+**De enige echte blocker:** een **GDPR-check** vooraleer met échte leerlinggegevens gewerkt mag
+worden (DPIA-light / verwerkingsregister — nog te schrijven). Dat geldt ongeacht hóe de
+leerlingen straks in de app terechtkomen.
 
 ---
 
-## Aanbevolen startvolgorde
+## ✅ Al gedaan
 
-1. **1 + 2 samen** (repo-interface + async) — dat ís het antwoord op "werkt de architectuur met
-   een DB": je simuleert de DB met een vertraagde localStorage-repo.
-2. **4** (GDPR-doc) — want dat is de echte blokker.
-3. Daarna 5–8 in willekeurige volgorde.
+- **Persistentielaag** (`src/lib/data/`) — `firebasePersistentie` is de echte, live backend, geen
+  skelet meer. Zie `src/lib/data/README.md`.
+- **Auth-seam** — Google-login via `Toegangspoort.tsx`, enkel `@keerpuntscholen.be` met een
+  actief `gebruikers`-doc.
+- **Leerlingrechten** — niet enkel client-side (`src/lib/rechten.ts`,
+  `useZichtbareLeerlingen()`), maar ook **in de Firestore-regels zelf**:
+  `leerlingen`/`evaluaties`/`deelbadges` zijn per vestiging afgeschermd, een mentor-query buiten
+  de eigen vestiging wordt geweigerd. Zie `security_spec.md`.
+- **Personeelsaccounts** — echt, 9 vestigingen, rollen (beheerder/coördinator/mentor).
 
-## Verderop (heeft de DB / echte data / meer wel nodig)
+## Hoe de leerlingen er straks bij moeten komen: Smartschool-sync
 
-- Echte Google-auth + DB-implementatie achter de seams van punt 1 en 3
-- Smartschool / OneRoster-koppeling — **plan uitgeschreven in `smartschool-sync-plan.md`**
-  (mentoren synchroniseren + automatisch toegang; wacht op de Smartschool API-sleutel)
-- Rapportmodule, badgewiel, huisstijl
-- 3A-doelen + resterende rubric-criteria (Cultuur/Vrije Tekst zijn er, de rest niet)
+Voor de mentoren ligt het plan al klaar (en is voor personeel deels al hergebruikt) in
+`smartschool-sync-plan.md`: een sync haalt accounts op uit Smartschool en zet ze om naar
+`gebruikers/{email}` + een roosterdocument. Dat plan sluit **leerlingen bewust uit** ("valt onder
+de GDPR-blokker, bewust apart houden" — zie §9 van dat document).
+
+Leerlingen zullen via **diezelfde soort synchronisatie** binnenkomen, zodra de GDPR-check rond is.
+Twee routes zijn mogelijk, nog niet beslist:
+
+1. **Rechtstreeks via de Smartschool-webservices-API** — dezelfde `getAllAccountsExtended`-call
+   als voor personeel geeft ook leerlingen terug (accounttype = leerling i.p.v. eruit gefilterd).
+   Data-mapping en sync-regels uit `smartschool-sync-plan.md` §4–5 gelden dan ook voor leerlingen.
+2. **Via Google (Workspace) i.p.v. rechtstreeks Smartschool** — Smartschool provisioneert bij
+   veel scholen de leerling-Google-accounts zelf al in Google Workspace (klas/afdeling als
+   organisatie-eenheid of groep). Als dat hier ook zo loopt, kan een sync tegen de **Google
+   Workspace Admin Directory API** volstaan i.p.v. een aparte Smartschool-accesscode — mogelijk
+   eenvoudiger op te zetten (geen aparte API-sleutel/SOAP), maar dan moet de vestiging/klas nog
+   wel afleidbaar zijn uit de Google-groepsstructuur.
+
+**Te beslissen zodra de GDPR-check rond is:** welke van de twee, en of de bestaande
+Smartschool-sync-Function (mentoren) uitgebreid wordt, of dat er een aparte leerling-sync komt.
+Tot dan blijven de 150 fictieve testleerlingen (`src/lib/seedGebruikers.ts`) de manier om de app
+te testen — zie ook de opmerking daarover in `README.md` en `security_spec.md`.
+
+## Verderop (nog te doen, los van de leerling-sync)
+
+- **GDPR-document** — DPIA-light / verwerkingsregister: welke persoonsgegevens, waar opgeslagen,
+  bewaartermijn, recht op verwijdering (+ de flow ervoor in de app), dataminimalisatie,
+  EU-regio (al bevestigd: `europe-west1`), geen runtime-AI. Dé blocker, dus prioriteit.
+- **CSV-rondtrip** (`/gegevens`) — vandaag enkel export (leerlingen/doelen/evaluaties). Een
+  volledige import/export-rondtrip (ook groepen, `rubriekWijzigingen`, `doelWijzigingen`) is het
+  back-up- en migratieverhaal, en handig om testdata te beheren zolang alles fictief is.
+- **Firebase App Check** staat nog niet aan (zie `security_spec.md` §2).
+- **Bootstrap-superuser** (`arno.boriau@keerpuntscholen.be`) uitfaseren zodra `/gebruikers`
+  stabiel gevuld is.
+- **`auditLog{}`** wordt client-side geschreven, dus in principe vervalsbaar — een écht
+  onvervalsbaar auditspoor vergt een Cloud Function.
+- Rapportmodule, badgewiel, huisstijl.
+- 3A-doelen + resterende rubric-criteria (Cultuur/Vrije Tekst zijn er, de rest niet).
 - De twee badgeboek-evaluatiemodi echt uitwerken (deelstapjes→badge; kleur per rapport per
-  1e/2e jaar)
-- Identifier-rename `leerdoel` → `badge` (dev-facing opkuis)
-- Badge-`omschrijving`-teksten herschrijven (nu nog uit het papieren badgeboek)
+  1e/2e jaar).

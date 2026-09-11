@@ -118,6 +118,8 @@ Minimaal:
 - Smartschool API-versie en exacte methodenamen/velden verschillen per school-setup — pas te
   finaliseren met de echte documentatie.
 - **GDPR:** personeelsgegevens zijn óók persoonsgegevens → opnemen in het verwerkingsregister;
-  de sync draait in een EU-regio. Zie `roadmap-voor-echte-data.md` §4.
-- **Leerling-sync** loopt via dezelfde API (`getAllAccounts` bevat leerlingen) en is een logische
-  vervolgstap, maar valt onder de GDPR-blokker voor leerlinggegevens — bewust apart houden.
+  de sync draait in een EU-regio. Zie het GDPR-punt in `roadmap-voor-echte-data.md`.
+- **Leerling-sync** loopt via dezelfde API (`getAllAccounts` bevat leerlingen) — of mogelijk via
+  Google Workspace i.p.v. rechtstreeks Smartschool, als leerling-Google-accounts daar al via
+  Smartschool geprovisioneerd worden. Logische vervolgstap, maar valt onder de GDPR-blokker voor
+  leerlinggegevens — bewust apart gehouden, uitgewerkt in `roadmap-voor-echte-data.md`.

@@ -68,8 +68,8 @@ Geen CI in de repo. Twee aparte stappen, allebei handmatig:
 | `security_spec.md` | de Firestore-regels: wie mag wat, en waarom |
 | `docs/roadmap-voor-echte-data.md` | wat nog moet gebeuren vóór echte leerlinggegevens |
 | `docs/smartschool-sync-plan.md` | plan voor een Smartschool-koppeling (nog niet gebouwd) |
-| `docs/handleidingen/Badgeboek - naslag voor mentoren.docx` | mentoren: naslag per knop/functie, geen uitleg over wat kleuren betekenen |
-| `docs/handleidingen/Badgeboek - naslag voor beheerders.docx` | beheerders: zelfde opzet + wat onomkeerbaar is |
+| `docs/handleidingen/Badgeboek - naslag voor mentoren.pdf` (+ `.pages`-bronbestand) | mentoren: naslag per knop/functie, geen uitleg over wat kleuren betekenen |
+| `docs/handleidingen/Badgeboek - naslag voor beheerders.pdf` (+ `.pages`-bronbestand) | beheerders: zelfde opzet + wat onomkeerbaar is |
 
 ## Structuur
 
