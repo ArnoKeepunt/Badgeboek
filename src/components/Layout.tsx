@@ -63,10 +63,10 @@ const leerlingenItem: NavItem = {
   icoon: "leerlingen",
 };
 const groepenItem: NavItem = { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" };
-// Naslag: de doelenlijst + de rubrics-infographic (beide alleen-lezen voor de mentor).
+// Naslag: de rubrics-infographic (alleen-lezen voor de mentor).
+// Doelen-item is bewust uit de zijbalk gehaald (pagina/route blijft gewoon bestaan).
 const doelenGroep: NavGroep = {
   items: [
-    { to: "/doelen", label: "Doelen", end: false, icoon: "doelen" },
     { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
   ],
 };

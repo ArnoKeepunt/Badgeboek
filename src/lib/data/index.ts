@@ -4,6 +4,8 @@ import type { BadgeboekPersistentie } from "./persistentie";
 
 export type { BadgeboekPersistentie, PersistedStore, RauweStore } from "./persistentie";
 export { sessieOpslag } from "./sessieOpslag";
+export { matrixVoorkeurOpslag } from "./matrixVoorkeur";
+export type { MatrixVoorkeur } from "./matrixVoorkeur";
 export {
   auth,
   db,

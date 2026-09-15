@@ -132,7 +132,12 @@ export function GroepEditor({
     if (groep) {
       wijzigGroep(groep.id, { naam: naamOk, leerlingIds: ids });
     } else {
-      onGemaakt?.(maakGroep(naamOk, ids, mentorId));
+      // Let op: `onGemaakt?.(maakGroep(...))` zou `maakGroep()` NOOIT aanroepen wanneer
+      // `onGemaakt` niet is meegegeven — optional chaining (`a?.(x)`) evalueert het argument `x`
+      // niet als `a` nullish is. Groepen.tsx geeft geen `onGemaakt` mee, dus daar zou een groep
+      // aanmaken dan stilzwijgend niets doen. Vandaar de aanroep losgetrokken van de callback.
+      const id = maakGroep(naamOk, ids, mentorId);
+      onGemaakt?.(id);
     }
     onSluit();
   };
@@ -283,12 +288,18 @@ export function GroepEditor({
           className="knop-primair"
           onClick={opslaan}
           disabled={gekozen.size === 0}
+          title={gekozen.size === 0 ? "Kies hierboven eerst minstens één leerling" : undefined}
         >
           {groep ? "Opslaan" : "Groep aanmaken"} ({gekozen.size})
         </button>
         <button type="button" className="linkknop" onClick={onSluit}>
           Annuleren
         </button>
+        {gekozen.size === 0 && (
+          <span className="groep-editor-item-meta">
+            Kies hierboven eerst minstens één leerling.
+          </span>
+        )}
         {groep && (
           <button
             type="button"

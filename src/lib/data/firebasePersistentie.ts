@@ -130,6 +130,77 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   let actiefSchooljaar: string = HUIDIG_SCHOOLJAAR;
   /** Gezet door `abonneer`: herabonneer de evaluaties-luisteraar op een ander schooljaar. */
   let herabonneerEvaluaties: ((sj: string) => void) | null = null;
+  /**
+   * De eigen, nog niet bevestigde schrijfactie (gezet zodra `bewaar()` binnenkomt, dus al vóór
+   * de 600ms-debounce afloopt). Zonder dit kan een ongerelateerde live-update van elders — iemand
+   * klikt een kleurtje aan, wat in een actieve school voortdurend gebeurt — tussen het lokaal
+   * aanmaken van bv. een groep en de eigen (gedebouncete) Firestore-schrijfactie in komen: de
+   * snapshot-merge in `emitNu` zou de nog-niet-geschreven groep dan alweer wegvegen (ook uit de
+   * lokale cache) nog vóór de eigen schrijfactie de kans kreeg om te lopen. `emitNu` legt dit
+   * overheen wat het toont aan de app; `vorigeDocs` zelf blijft de kale serverstand, anders zou
+   * de schrijfactie zelf denken dat er niets te doen is en zichzelf overslaan.
+   */
+  let pendingOverlay: DocMap | null = null;
+
+  /** Enkel de door `bewaar()` beheerde paden voor het huidige schooljaar (zie `magBewarenSchrijven`). */
+  const beheerd = (m: DocMap): DocMap =>
+    new Map([...m].filter(([pad]) => magBewarenSchrijven(pad, actiefSchooljaar)));
+
+  /**
+   * De eigenlijke schrijfactie: normaal aangeroepen na de 600ms-debounce, maar ook rechtstreeks
+   * bij `visibilitychange` (zie onder) zodat een wijziging vlak vóór het sluiten/verlaten van het
+   * tabblad niet verloren gaat — de debounce-timer zelf haalt dat anders niet meer.
+   */
+  const schrijfNu = async () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (!auth.currentUser || !laatsteStore) return;
+    // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar — anders
+    // zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
+    if (vorigeDocs && vorigeDocsSchooljaar !== actiefSchooljaar) return;
+    // Vastleggen welke overlay dit specifiek is: als er ondertussen een NIEUWERE `bewaar()`-
+    // aanroep gebeurde (die `pendingOverlay` alweer verving), mag succes hier die nieuwere
+    // overlay niet opheffen — die heeft zijn eigen (nog lopende) schrijfactie nodig.
+    const dezeOverlay = pendingOverlay;
+    const volledigNu = storeNaarDocs(laatsteStore, actiefSchooljaar);
+    // Alleen het actieve schooljaar aanraken, en alleen de door `bewaar` beheerde collecties —
+    // anders ziet de diff het curriculum (dat `storeNaarDocs` niet teruggeeft), het meegeladen
+    // vorige schooljaar of `instellingen/overlays` (aparte schrijfweg) als "verdwenen" en
+    // wist/overschrijft het.
+    const nu = beheerd(volledigNu);
+    const vorigeBeheerd = vorigeDocs ? beheerd(vorigeDocs) : null;
+    const { schrijf, verwijder } = vorigeBeheerd
+      ? diffDocs(vorigeBeheerd, nu)
+      : { schrijf: nu, verwijder: [] };
+    if (schrijf.size === 0 && verwijder.length === 0) {
+      if (pendingOverlay === dezeOverlay) pendingOverlay = null;
+      return;
+    }
+    try {
+      await schrijfDocMap(schrijf, verwijder);
+      vorigeDocs = volledigNu;
+      // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
+      if (pendingOverlay === dezeOverlay) pendingOverlay = null;
+      zetOpslagStatus({ soort: "ok" });
+    } catch (error) {
+      // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont de
+      // fout; de wijziging blijft lokaal staan (en overlayed, zie hierboven) en `bewaar`
+      // probeert het bij de volgende wijziging opnieuw.
+      console.error("Firestore batch-schrijffout:", error);
+      zetOpslagStatus(duidOpslagFout(error));
+    }
+  };
+
+  // Best-effort: sluit je het tabblad of schakel je weg terwijl er nog een schrijfactie in de
+  // wachtrij staat (de 600ms-debounce), stuur 'm dan meteen — anders haalt de timer het niet
+  // meer en verdwijnt de wijziging (bv. een net aangemaakte groep) na een refresh gewoon weer.
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && timer) void schrijfNu();
+    });
+  }
 
   return {
     naam: "firebase (Firestore)",
@@ -160,38 +231,13 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         actiefSchooljaar = store.schooljaar;
         herabonneerEvaluaties?.(store.schooljaar);
       }
+      // Meteen (niet pas na de debounce) vastleggen wat we van plan zijn te schrijven, zodat een
+      // live-update van elders dit niet kan wegvegen vóór de echte schrijfactie kans krijgt —
+      // zie de uitleg bij `pendingOverlay` hierboven.
+      pendingOverlay = beheerd(storeNaarDocs(store, actiefSchooljaar));
 
       if (timer) clearTimeout(timer);
-      timer = setTimeout(async () => {
-        if (!auth.currentUser || !laatsteStore) return;
-        // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar —
-        // anders zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
-        if (vorigeDocs && vorigeDocsSchooljaar !== actiefSchooljaar) return;
-        const volledigNu = storeNaarDocs(laatsteStore, actiefSchooljaar);
-        // Alleen het actieve schooljaar aanraken, en alleen de door `bewaar` beheerde collecties
-        // — anders ziet de diff het curriculum (dat `storeNaarDocs` niet teruggeeft), het
-        // meegeladen vorige schooljaar of `instellingen/overlays` (aparte schrijfweg) als
-        // "verdwenen" en wist/overschrijft het.
-        const beheerd = (m: DocMap) =>
-          new Map([...m].filter(([pad]) => magBewarenSchrijven(pad, actiefSchooljaar)));
-        const nu = beheerd(volledigNu);
-        const vorigeBeheerd = vorigeDocs ? beheerd(vorigeDocs) : null;
-        const { schrijf, verwijder } = vorigeBeheerd
-          ? diffDocs(vorigeBeheerd, nu)
-          : { schrijf: nu, verwijder: [] };
-        if (schrijf.size === 0 && verwijder.length === 0) return;
-        try {
-          await schrijfDocMap(schrijf, verwijder);
-          vorigeDocs = volledigNu;
-          zetOpslagStatus({ soort: "ok" });
-        } catch (error) {
-          // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont
-          // de fout; de wijziging blijft lokaal staan en `bewaar` probeert het bij de volgende
-          // wijziging opnieuw.
-          console.error("Firestore batch-schrijffout:", error);
-          zetOpslagStatus(duidOpslagFout(error));
-        }
-      }, 600);
+      timer = setTimeout(schrijfNu, 600);
     },
 
     abonneer(luister: (store: RauweStore) => void): () => void {
@@ -245,7 +291,20 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         }
         vorigeDocs = docs;
         vorigeDocsSchooljaar = actiefSchooljaar;
-        const rauw = docsNaarStore(docs);
+        // Aan de app (en de lokale cache) tonen we onze eigen, nog niet bevestigde schrijfactie
+        // erover heen — zie `pendingOverlay` hierboven. Voor de beheerde paden (groepen, …) is
+        // onze eigen volledige stand leidend, inclusief een intussen lokaal verwijderd item (dat
+        // ontbreekt dan gewoon in `pendingOverlay`, i.p.v. te blijven hangen uit de oudere
+        // serverstand). Niet-beheerde paden (curriculum, een ander schooljaar, …) komen gewoon
+        // van de server. `vorigeDocs` zelf blijft de kale serverstand: die gebruikt `schrijfNu`
+        // om te bepalen wat nog geschreven moet worden, en zou anders denken dat het al gebeurd is.
+        const getoond = pendingOverlay
+          ? new Map([
+              ...[...docs].filter(([pad]) => !magBewarenSchrijven(pad, actiefSchooljaar)),
+              ...pendingOverlay,
+            ])
+          : docs;
+        const rauw = docsNaarStore(getoond);
         bewaarCache(rauw);
         luister(rauw);
       };

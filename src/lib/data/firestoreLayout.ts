@@ -179,10 +179,12 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   }
   for (const [p, d] of meldDocs) m.set(p, d as unknown as DocData);
 
+  // Let op: de stroom-/cursusfilter van de matrix-pagina's (`matrixStromen`/`matrixCursus`)
+  // rijdt hier bewust NIET mee — dat is een per-browser UI-voorkeur (`matrixVoorkeur.ts`), geen
+  // personeel-brede instelling. Anders bepaalt de laatste klik van de ene mentor wat een ander
+  // te zien krijgt.
   m.set("instellingen/app", {
     schooljaar: s.schooljaar,
-    matrixStromen: s.matrixStromen,
-    matrixCursus: s.matrixCursus,
     afgeslotenSchooljaren: s.afgeslotenSchooljaren ?? null,
   });
   m.set("instellingen/overlays", overlaysNaarDoc(s));
@@ -376,8 +378,6 @@ export function docsNaarStore(docs: DocMap): RauweStore {
       case "instellingen": {
         if (seg[1] === "app") {
           r.schooljaar = data.schooljaar as string;
-          r.matrixStromen = data.matrixStromen as Stroom[];
-          r.matrixCursus = data.matrixCursus as string;
           r.afgeslotenSchooljaren = (data.afgeslotenSchooljaren as string[] | null) ?? null;
         } else if (seg[1] === "overlays") {
           r.doelWijzigingen = data.doelWijzigingen as RauweStore["doelWijzigingen"];

@@ -1,5 +1,4 @@
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN } from "../schooljaar";
-import type { Stroom } from "../types";
 import { leesDoc, schrijfDocMap, verwijderDocs } from "./firebaseApp";
 import { storeNaarDocs } from "./firestoreLayout";
 import type { PersistedStore } from "./persistentie";
@@ -46,8 +45,6 @@ export async function migreerDatabase(): Promise<MigratieResultaat> {
     mentoren: (globaal.mentoren ?? []) as PersistedStore["mentoren"],
     groepen: (globaal.groepen ?? []) as PersistedStore["groepen"],
     schooljaar: (globaal.schooljaar as string) ?? HUIDIG_SCHOOLJAAR,
-    matrixStromen: (globaal.matrixStromen ?? ["1A"]) as Stroom[],
-    matrixCursus: (globaal.matrixCursus as string) ?? "",
     afgeslotenSchooljaren: null,
     doelWijzigingen: (globaal.doelWijzigingen ?? {}) as PersistedStore["doelWijzigingen"],
     doelenImport: (globaal.doelenImport ?? null) as PersistedStore["doelenImport"],

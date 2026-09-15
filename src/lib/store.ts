@@ -9,7 +9,13 @@ import {
   cursusVanNode,
   zetCurriculum,
 } from "./curriculum";
-import { type PersistedStore, type RauweStore, maakPersistentie, sessieOpslag } from "./data";
+import {
+  type PersistedStore,
+  type RauweStore,
+  maakPersistentie,
+  matrixVoorkeurOpslag,
+  sessieOpslag,
+} from "./data";
 import {
   deelKleuren as seedDeelKleuren,
   seedDeelevaluaties,
@@ -76,11 +82,16 @@ const opslag = maakPersistentie();
 
 /**
  * De volledige store = alles wat bewaard wordt (`PersistedStore`, veldbeschrijvingen staan in
- * `src/lib/data/persistentie.ts`) + de per-tab `sessie` die buiten de gedeelde opslag leeft.
+ * `src/lib/data/persistentie.ts`) + twee dingen die buiten de gedeelde opslag leven: de per-tab
+ * `sessie` en de per-browser `matrixStromen`/`matrixCursus` (UI-voorkeur, zie `matrixVoorkeur.ts`).
  */
 interface State extends PersistedStore {
   /** Wie er is aangemeld (per browsertab). */
   sessie: Sessie | null;
+  /** Getoonde stromen op de matrix-pagina's — persoonlijke voorkeur, niet gedeeld. */
+  matrixStromen: Stroom[];
+  /** Cursusfilter (op naam) voor de matrix-pagina's; `""` = alle — persoonlijke voorkeur. */
+  matrixCursus: string;
 }
 
 const MAX_MELDINGEN = 120;
@@ -96,8 +107,6 @@ const seed = (): PersistedStore => ({
   groepen: [],
   schooljaar: HUIDIG_SCHOOLJAAR,
   afgeslotenSchooljaren: null,
-  matrixStromen: ["1A"],
-  matrixCursus: "",
   doelWijzigingen: {},
   doelenImport: null,
   rubriekWijzigingen: {},
@@ -150,10 +159,6 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   }
   if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
   if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
-  // Migratie: vroeger één stroom (`matrixStroom`), nu een lijst (`matrixStromen`).
-  if (!Array.isArray(bewaard.matrixStromen)) {
-    basis.matrixStromen = bewaard.matrixStroom ? [bewaard.matrixStroom] : standaard.matrixStromen;
-  }
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
   basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
   zetCurriculum(basis.curriculumOverride);
@@ -243,8 +248,7 @@ function schoonOrphans(basis: PersistedStore): void {
   // Geldig = in de bundel OF in de database-versie. Zo wist het verwijderen van een badge uit
   // de database níét meteen alle evaluaties ervan (die komen terug als de badge weer opduikt);
   // enkel wat in geen van beide zit (bv. de oude Basisvaardigheden-badges) wordt opgekuist.
-  const { badges: geldigeBadges, cursusIds: geldigeCursusIds, cursusNamen: geldigeCursusNamen } =
-    geldigeSets();
+  const { badges: geldigeBadges, cursusIds: geldigeCursusIds } = geldigeSets();
 
   const badgeVanSleutel = (sleutel: string): string => {
     const i1 = sleutel.indexOf(":");
@@ -283,10 +287,24 @@ function schoonOrphans(basis: PersistedStore): void {
   basis.meldingen = basis.meldingen.map((m) =>
     m.cursusId && !geldigeCursusIds.has(m.cursusId) ? { ...m, cursusId: "" } : m,
   );
-  if (basis.matrixCursus && !geldigeCursusNamen.has(basis.matrixCursus)) {
-    basis.matrixCursus = "";
-  }
   basis.gewist = basis.gewist.filter((k) => geldigeBadges.has(badgeVanSleutel(k)));
+}
+
+/**
+ * De per-browser matrix-voorkeur (`matrixVoorkeur.ts`) inlezen en normaliseren: onbekende
+ * stromen/cursusnamen (bv. na een curriculumwijziging) vallen terug op "alles"/"geen filter".
+ */
+function laadMatrixVoorkeur(): Pick<State, "matrixStromen" | "matrixCursus"> {
+  const { cursusNamen: geldigeCursusNamen } = geldigeSets();
+  const voorkeur = matrixVoorkeurOpslag.laad();
+  const stromen = Array.isArray(voorkeur?.stromen)
+    ? voorkeur.stromen.filter((s): s is Stroom => STROMEN.includes(s))
+    : [];
+  const cursus = typeof voorkeur?.cursus === "string" ? voorkeur.cursus : "";
+  return {
+    matrixStromen: stromen.length > 0 ? stromen : ["1A"],
+    matrixCursus: cursus && geldigeCursusNamen.has(cursus) ? cursus : "",
+  };
 }
 
 function load(): State {
@@ -296,7 +314,8 @@ function load(): State {
   } catch {
     // opslag onbereikbaar — terugvallen op de seed
   }
-  return { ...verwerkRauw(bewaard), sessie: sessieOpslag.laad() };
+  const basis = verwerkRauw(bewaard);
+  return { ...basis, ...laadMatrixVoorkeur(), sessie: sessieOpslag.laad() };
 }
 
 let state: State = load();
@@ -308,8 +327,18 @@ function commit(next: State) {
   zetCurriculum(state.curriculumOverride);
   zetVestigingen(state.vestigingen);
   zetAfgeslotenSchooljaren(state.afgeslotenSchooljaren);
-  const { sessie, ...rest } = state;
-  void opslag.bewaar(rest);
+  // `matrixStromen`/`matrixCursus` zijn een per-browser voorkeur (zie `matrixVoorkeur.ts`) en
+  // rijden bewust niet mee in de gedeelde `bewaar()` — anders overschrijft de laatste klik van
+  // de ene mentor wat een andere mentor of de beheerder te zien krijgt.
+  const { sessie, matrixStromen, matrixCursus, ...rest } = state;
+  try {
+    void opslag.bewaar(rest);
+  } catch (error) {
+    // Een fout in de persistentielaag mag de in-memory store nooit blokkeren — anders zou
+    // een falende `bewaar()` ook de lokale UI-update (hieronder, `listeners.forEach`) laten
+    // afhangen van de database, wat de wijziging in de UI onzichtbaar zou maken.
+    console.error("[store] opslag.bewaar() faalde synchroon:", error);
+  }
   // De doelen-/rubriek-overlays (`instellingen/overlays`) rijden in firebase-modus NIET mee in
   // `bewaar()` (beheerder-only doc) — apart wegschrijven zodra ze wijzigen.
   if (
@@ -322,6 +351,9 @@ function commit(next: State) {
       doelenImport: state.doelenImport,
       rubriekWijzigingen: state.rubriekWijzigingen,
     });
+  }
+  if (vorige.matrixStromen !== matrixStromen || vorige.matrixCursus !== matrixCursus) {
+    matrixVoorkeurOpslag.bewaar({ stromen: matrixStromen, cursus: matrixCursus });
   }
   sessieOpslag.bewaar(sessie);
   listeners.forEach((notify) => notify());
@@ -348,7 +380,14 @@ opslag.abonneer?.((rauw) => {
       vestigingen: behoudVestigingen ? state.vestigingen : rauw.vestigingen,
       rubriekenOverride: behoudRubrieken ? state.rubriekenOverride : rauw.rubriekenOverride,
     };
-    state = { ...verwerkRauw(gehydrateerd), sessie: state.sessie };
+    // `matrixStromen`/`matrixCursus` zijn per-browser en leven buiten `verwerkRauw` — een
+    // live update van elders mag de lokale voorkeur niet overschrijven.
+    state = {
+      ...verwerkRauw(gehydrateerd),
+      sessie: state.sessie,
+      matrixStromen: state.matrixStromen,
+      matrixCursus: state.matrixCursus,
+    };
     listeners.forEach((notify) => notify());
   } catch {
     // onbruikbare payload van elders — huidige state behouden
@@ -746,7 +785,10 @@ export function zetSchooljaarAfgesloten(schooljaar: string, afgesloten: boolean)
   });
 }
 
-/** Zet de getoonde stromen van de matrix-pagina's (in vaste volgorde, minstens één). */
+/**
+ * Zet de getoonde stromen van de matrix-pagina's (in vaste volgorde, minstens één). Persoonlijke
+ * voorkeur (per browser, zie `matrixVoorkeur.ts`) — niet gedeeld met andere personeelsleden.
+ */
 export function setMatrixStromen(stromen: Stroom[]) {
   const uniek = STROMEN.filter((s) => stromen.includes(s));
   commit({ ...state, matrixStromen: uniek.length > 0 ? uniek : ["1A"] });
@@ -765,7 +807,8 @@ export function toggleMatrixStroom(stroom: Stroom) {
 
 /**
  * Cursusfilter voor de matrix-pagina's (Badges / Deelevaluaties / Rubrics), op cursusnaam.
- * `""` = alle cursussen. Gedeeld zodat de keuze meegaat als je van pagina wisselt.
+ * `""` = alle cursussen. Persoonlijke voorkeur (per browser): gaat mee van pagina naar pagina
+ * voor jezelf, maar wordt niet gedeeld met andere personeelsleden.
  */
 export function setMatrixCursus(cursus: string) {
   commit({ ...state, matrixCursus: cursus });
@@ -1237,5 +1280,5 @@ export function setDeelKleurBulk(
 
 /** Wis alle lokale aanpassingen en ga terug naar de seed-data (meldt ook af). */
 export function resetStore() {
-  commit({ ...seed(), sessie: null });
+  commit({ ...seed(), sessie: null, matrixStromen: ["1A"], matrixCursus: "" });
 }

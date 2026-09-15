@@ -12,7 +12,6 @@ import type {
   Mentor,
   Notities,
   Rubriek,
-  Stroom,
   Student,
 } from "../types";
 
@@ -49,9 +48,6 @@ export interface PersistedStore {
   schooljaar: string;
   /** Schooljaren die de beheerder heeft vastgezet (alleen-lezen). `null` = de standaardlijst. */
   afgeslotenSchooljaren: string[] | null;
-  matrixStromen: Stroom[];
-  /** Cursusfilter (op naam) voor de matrix-pagina's; `""` = alle. */
-  matrixCursus: string;
   doelWijzigingen: Record<string, Partial<Minimumdoel>>;
   doelenImport: Minimumdoel[] | null;
   rubriekWijzigingen: Record<string, Partial<Rubriek>>;
@@ -80,9 +76,9 @@ export interface PersistedStore {
 
 /**
  * Wat er uit de opslag terugkomt: mogelijk onvolledig of van een oudere versie. De store legt
- * hier de seed-data onder en voert migraties uit (bv. `matrixStroom` → `matrixStromen`).
+ * hier de seed-data onder en voert migraties uit.
  */
-export type RauweStore = Partial<PersistedStore> & { matrixStroom?: Stroom };
+export type RauweStore = Partial<PersistedStore>;
 
 export interface BadgeboekPersistentie {
   /** Korte naam voor logging/debug ("localStorage", "firebase"…). */

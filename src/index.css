@@ -248,14 +248,19 @@ th {
 }
 
 /* Rechterbovenhoek: normaal het percentage; bij een verwijderbare "mijn groepen"-kaart wisselt
-   dat bij hover naar het ×-knopje (op dezelfde plek, geen layout-sprong). */
+   dat bij hover naar het ×-knopje (op dezelfde plek, geen layout-sprong). `stretch` (i.p.v.
+   `end`) zorgt dat beide dezelfde volle hitbox delen — anders is die hitbox voor het (smallere)
+   ×-knopje enkel de breedte van het "×"-teken zelf, terwijl het bredere percentage (bv. "47%")
+   ernaast nog steeds los, onzichtbaar én klikbaar blijft staan: hoveren/klikken daar viel dan
+   door naar de tekst zelf (vandaar de tekst-cursor) of naar de "hele kaart klikbaar"-laag
+   eronder (opent dan de badges i.p.v. de groep te verwijderen). */
 .voortgang-kaart-hoek {
   position: absolute;
   top: 14px;
   right: 16px;
   z-index: 1;
   display: grid;
-  justify-items: end;
+  justify-items: stretch;
   align-items: center;
 }
 
@@ -268,7 +273,12 @@ th {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
+  text-align: right;
   transition: opacity 0.12s;
+  /* Puur een uitlezing, nooit bedoeld als klikdoel — en deelt dezelfde plek als het ×-knopje
+     (zie hierboven). Zonder dit kan deze tekst (ook onzichtbaar, bij opacity 0) nog steeds
+     klikken onderscheppen die voor het ×-knopje bedoeld zijn. */
+  pointer-events: none;
 }
 
 .voortgang-kaart-x {
@@ -278,6 +288,7 @@ th {
   font-size: 18px;
   line-height: 1;
   padding: 0 2px;
+  text-align: right;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
@@ -290,6 +301,18 @@ th {
 
 .voortgang-kaart:hover .heeft-x .voortgang-kaart-pct {
   opacity: 0;
+}
+
+/* Zonder hover (tablet/touchscreen) verschijnt het kruisje nooit via :hover — toon het dan
+   sowieso, net als het potlood-icoontje op de Groepen-pagina (`.groep-kaart-bewerk` hieronder). */
+@media (hover: none) {
+  .voortgang-kaart-x {
+    opacity: 1;
+  }
+
+  .heeft-x .voortgang-kaart-pct {
+    opacity: 0;
+  }
 }
 
 .voortgang-kaart-x:hover {

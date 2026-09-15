@@ -33,7 +33,10 @@ interface BadgeboekPersistentie {
 ```
 
 - `PersistedStore` = de volledige `State` uit `store.ts` **zonder** `sessie` (die leeft per
-  browsertab in `sessieOpslag.ts`, los van dit alles — ook in firebase-modus).
+  browsertab in `sessieOpslag.ts`, los van dit alles — ook in firebase-modus) **en zonder**
+  `matrixStromen`/`matrixCursus` (de stroom-/cursusfilter op de matrix-pagina's, een per-browser
+  UI-voorkeur uit `matrixVoorkeur.ts` — puur `localStorage`, niet gedeeld met andere
+  personeelsleden, ook niet in firebase-modus).
 - `schrijfCurriculum` en `schrijfOverlays` bestaan omdat die twee dingen **beheerder-only** zijn
   in de Firestore-regels, terwijl `bewaar()` personeel-breed schrijft — ze mogen dus niet in
   dezelfde gebatchte save meerijden (dat zou de save van een mentor doen falen). `localStorage`

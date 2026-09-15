@@ -116,10 +116,12 @@ service cloud.firestore {
     }
 
     // --- Instellingen -------------------------------------------------------
-    // `instellingen/app` (schooljaar, matrix-filters) rijdt mee in de normale app-save
-    // (`bewaar`), dus personeel-breed. `instellingen/overlays` (doel-/rubriekwijzigingen) is
-    // beheerder-only: het rijdt NIET mee in `bewaar()` maar heeft een aparte schrijfweg
-    // (`schrijfOverlays`, aangeroepen door de store bij een overlay-wijziging).
+    // `instellingen/app` (schooljaar) rijdt mee in de normale app-save (`bewaar`), dus
+    // personeel-breed. De matrix-filters (stroom/cursus op de matrix-pagina's) zitten hier
+    // bewust NIET meer bij: dat is een per-browser UI-voorkeur (`matrixVoorkeur.ts`, enkel
+    // `localStorage`), geen gedeelde instelling. `instellingen/overlays` (doel-/
+    // rubriekwijzigingen) is beheerder-only: het rijdt NIET mee in `bewaar()` maar heeft een
+    // aparte schrijfweg (`schrijfOverlays`, aangeroepen door de store bij een overlay-wijziging).
     match /instellingen/overlays {
       allow get, list: if isPersoneel();
       allow write: if isBeheerder();
