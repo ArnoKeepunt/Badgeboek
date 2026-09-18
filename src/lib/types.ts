@@ -131,6 +131,13 @@ export interface Groep {
   leerlingIds: string[];
   /** Koppeling: de mentor die deze groep aanmaakte / opvolgt. */
   mentorId?: string;
+  /**
+   * `true` = enkel de eigenaar (`mentorId`) ziet deze groep; andere mentoren niet. Nieuwe
+   * groepen zijn voortaan standaard privé (afspraak: iedereen maakt zijn eigen groepen aan).
+   * Ontbreekt dit veld (oudere groep, van vóór die afspraak), dan blijft ze zichtbaar voor
+   * iedereen, zoals voorheen. Beheerder/coördinator zien sowieso alles, privé of niet.
+   */
+  prive?: boolean;
 }
 
 /**

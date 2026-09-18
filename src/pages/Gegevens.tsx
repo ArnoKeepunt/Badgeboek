@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import { SlotIcoon } from "../components/SlotIcoon";
 import { datumStempel, downloadTekst } from "../lib/download";
 import { exportDoelen, exportEvaluaties, exportLeerlingen } from "../lib/gegevens";
@@ -170,10 +171,10 @@ export function Gegevens() {
           <div className="gegevens-kaart-naam">Database-versie wegschrijven</div>
           <p>
             De badges (<code>curriculum/…</code>), rubrics (<code>rubrieken/…</code>) en
-            vestigingen (<code>vestigingen/…</code>) staan als losse documenten in Firestore en
-            worden daar of in de app bewerkt. De app houdt de laatst ontvangen versie vast — bij
-            een storing blijft ze daarmee werken in plaats van terug te vallen op de ingebouwde
-            bundel.
+            vestigingen (<code>vestigingen/…</code>) staan als losse documenten in Firestore. De
+            app houdt de laatst ontvangen versie vast — bij een storing blijft ze daarmee werken
+            in plaats van terug te vallen op de ingebouwde bundel. Een badge zelf hernoemen,
+            toevoegen of verwijderen doe je bij <NavLink to="/badges-beheer">Badges beheren</NavLink>.
           </p>
           <p>
             Een knop hieronder schrijft de versie die de app nu heeft naar de database: de laatst

@@ -31,6 +31,10 @@ const Gebruikers = lazy(() => import("./pages/Gebruikers").then((m) => ({ defaul
 const Vestigingen = lazy(() =>
   import("./pages/Vestigingen").then((m) => ({ default: m.Vestigingen })),
 );
+// oxlint-disable-next-line react/only-export-components
+const BadgesBeheer = lazy(() =>
+  import("./pages/BadgesBeheer").then((m) => ({ default: m.BadgesBeheer })),
+);
 
 const traag = (node: ReactNode) => (
   <Suspense fallback={<p style={{ padding: 24, color: "var(--text-muted)" }}>Laden…</p>}>
@@ -54,7 +58,8 @@ export const router = createHashRouter([
       { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
       { path: "rubrics", element: traag(<Rubrics />) },
       { path: "doelen", element: traag(<Doelen />) },
-      { path: "groepen", element: <AlleenBeheerder>{<Groepen />}</AlleenBeheerder> },
+      { path: "groepen", element: <Groepen /> },
+      { path: "badges-beheer", element: <AlleenBeheerder>{traag(<BadgesBeheer />)}</AlleenBeheerder> },
       {
         path: "gegevens",
         element: (

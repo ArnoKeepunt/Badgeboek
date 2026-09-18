@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useBeheerderWeergave, zetVereenvoudigdeWeergave } from "../lib/beheerderWeergave";
 import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
 import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
 import { PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
 import { useOpslagStatus } from "../lib/opslagStatus";
 import { useZichtbareLeerlingen } from "../lib/rechten";
-import { type Aangemeld, naamVan, useAangemeld, useEffectieveRol } from "../lib/sessie";
+import { type Aangemeld, naamVan, useAangemeld, useBasisRol, useEffectieveRol } from "../lib/sessie";
 import { meldAf } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Icoon, type IcoonNaam } from "./Icoon";
@@ -34,6 +35,7 @@ const PAGINA_TITELS: Record<string, string> = {
   "/gebruikers": "Gebruikers",
   "/vestigingen": "Vestigingen",
   "/gegevens": "Gegevens",
+  "/badges-beheer": "Badges beheren",
   "/aanmelden": "Bekijk als",
 };
 
@@ -77,12 +79,13 @@ const devItems: NavItem[] = [
   { to: "/deelevaluaties", label: "Deelbadges", end: false, icoon: "deelevaluaties" },
 ];
 
-// Mentor: badgeboek + leerlingen + naslag. Groepen maak je inline in de keuzelijsten, dus de
-// aparte Groepen-pagina is voor "meer rechten" (beheerder).
+// Mentor: badgeboek + eigen groepen + leerlingen + naslag. Iedereen maakt/bewerkt zijn eigen
+// groepen (die blijven privé, zie `Groep.prive`); de Groepen-pagina toont dus ook aan een
+// mentor enkel zijn eigen groepen + de oudere, niet-privé groepen (`useBereik`/`Groepen.tsx`).
 const mentorNav: NavGroep[] = [
   overzichtGroep,
   { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }] },
-  { items: [leerlingenItem] },
+  { items: [groepenItem, leerlingenItem] },
   doelenGroep,
 ];
 
@@ -99,6 +102,10 @@ const beheerderNav = (dev: boolean): NavGroep[] => [
         : []),
       { to: "/vestigingen", label: "Vestigingen", end: false, icoon: "vestigingen" },
       { to: "/gegevens", label: "Gegevens", end: false, icoon: "gegevens" },
+      // De échte badges (leerdoelen) zelf bewerken — enkel de beheerder, vandaar hier en niet
+      // in `mentorNav`. Route is bovendien `AlleenBeheerder`-gegated (en de Firestore-rules
+      // laten enkel `isBeheerder()` op `curriculum/...` schrijven).
+      { to: "/badges-beheer", label: "Badges beheren", end: false, icoon: "badges" as const },
     ],
   },
 ];
@@ -147,10 +154,38 @@ function PaneelIcoon({ ingeklapt }: { ingeklapt: boolean }) {
   );
 }
 
+// De uitleg staat enkel nog in de title (hover) — de vestiging(en) zelf staan gewoon op het
+// account (Gebruikers); hier enkel de aan/uit-schakelaar, want die moet zonder herladen werken
+// en per browser gelden.
+const BEHEERDERVIEW_UITLEG =
+  "Beheerdersview uit = je ziet enkel je eigen vestiging(en), net als een mentor, en geen " +
+  "beheerderspagina's. In te stellen bij Gebruikers. Verandert niets aan je echte rechten — " +
+  "enkel op dit scherm, meteen weer aan te zetten.";
+
+function BeheerderModusSchakelaar() {
+  const { vereenvoudigd } = useBeheerderWeergave();
+
+  return (
+    <label className="sidebar-beheerdermodus-schakelaar" title={BEHEERDERVIEW_UITLEG}>
+      <input
+        type="checkbox"
+        className="sidebar-beheerdermodus-input"
+        checked={!vereenvoudigd}
+        onChange={(e) => zetVereenvoudigdeWeergave(!e.target.checked)}
+      />
+      <span className="sidebar-beheerdermodus-track" aria-hidden="true">
+        <span className="sidebar-beheerdermodus-duim" />
+      </span>
+      <span className="sidebar-beheerdermodus-tekst">Beheerdersview</span>
+    </label>
+  );
+}
+
 function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingeklapt: boolean }) {
   const { persoon } = useHuidigPersoneelslid();
   const { gebruiker } = useFirebaseGebruiker();
   const effRol = useEffectieveRol();
+  const basisRol = useBasisRol();
   // "Bekijk als" is een beheerderrecht. In bekijk-als-modus (`aangemeld`) is de kijker per
   // definitie een beheerder; anders telt de echte rol.
   const magBekijkenAls = aangemeld ? true : effRol === "beheerder";
@@ -176,6 +211,8 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
           <span className="sidebar-account-rol">{rol}</span>
         </span>
       </div>
+
+      {!aangemeld && basisRol === "beheerder" && <BeheerderModusSchakelaar />}
 
       {aangemeld && (
         <button

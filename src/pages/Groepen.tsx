@@ -51,11 +51,13 @@ export function Groepen() {
   };
   const zichtbareGroepen = (
     alleenVanMij && mentorId ? groepen.filter((g) => g.mentorId === mentorId) : groepen
-  ).filter(
-    // Binnen een vestiging-scope: enkel groepen met minstens één zichtbare leerling, of de
-    // eigen groepen (die de mentor sowieso moet kunnen beheren).
-    (g) => !beperkt || g.mentorId === mentorId || leden(g.leerlingIds).length > 0,
-  );
+  ).filter((g) => {
+    if (!beperkt) return true; // beheerder/coördinator-overzicht: alles
+    if (g.mentorId === mentorId) return true; // eigen groep altijd zichtbaar/bewerkbaar
+    if (g.prive) return false; // privégroep van een andere mentor
+    // Oudere, niet-privé groep: enkel tonen als er minstens één zichtbare leerling in zit.
+    return leden(g.leerlingIds).length > 0;
+  });
   const teBewerken = editor?.id ? groepen.find((g) => g.id === editor.id) : undefined;
 
   // Groep als filter zetten + de stromen erop afstemmen (anders kan de stroomkeuze een andere
@@ -111,6 +113,11 @@ export function Groepen() {
           </button>
         </div>
       </div>
+      {mentorId && (
+        <p style={{ color: "var(--text-muted)", marginTop: -8 }}>
+          Een nieuwe groep is enkel voor jezelf zichtbaar.
+        </p>
+      )}
 
       {zichtbareGroepen.length === 0 ? (
         <p className="lege-staat">
@@ -120,17 +127,23 @@ export function Groepen() {
         <div className="groep-kaarten">
           {zichtbareGroepen.map((g) => {
             const ll = leden(g.leerlingIds);
+            // Enkel eigen groepen bewerken/verwijderen — nooit een gedeelde/oudere groep van
+            // iemand anders. Een onbeperkt overzicht (beheerder/coördinator) mag, zoals
+            // voorheen, alles beheren.
+            const magBewerken = !beperkt || g.mentorId === mentorId;
             return (
               <div key={g.id} className="groep-kaart">
-                <button
-                  type="button"
-                  className="knop-icoon knop-icoon-klein groep-kaart-bewerk"
-                  title="Groep bewerken"
-                  aria-label={`"${g.naam}" bewerken`}
-                  onClick={() => setEditor({ id: g.id })}
-                >
-                  <PotloodIcoon />
-                </button>
+                {magBewerken && (
+                  <button
+                    type="button"
+                    className="knop-icoon knop-icoon-klein groep-kaart-bewerk"
+                    title="Groep bewerken"
+                    aria-label={`"${g.naam}" bewerken`}
+                    onClick={() => setEditor({ id: g.id })}
+                  >
+                    <PotloodIcoon />
+                  </button>
+                )}
                 <div className="groep-kaart-naam">{g.naam}</div>
                 <div className="groep-kaart-meta">
                   {beperkt && ll.length !== g.leerlingIds.length
@@ -139,6 +152,7 @@ export function Groepen() {
                   {g.mentorId && (
                     <> · {g.mentorId === mentorId ? "van mij" : mentorNaam(g.mentorId)}</>
                   )}
+                  {g.prive && <> · privé</>}
                 </div>
 
                 <Avatars leden={ll} />

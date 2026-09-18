@@ -284,6 +284,75 @@
   text-align: center;
 }
 
+/* "Beheerdersview" — een echte aan/uit-schakelaar (pil + duimpje), geen kale checkbox. De
+   uitleg zit in de `title` (hover), niet in de layout. */
+.sidebar-beheerdermodus-schakelaar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 2px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-beheerdermodus-schakelaar:hover {
+  background: var(--accent-soft);
+}
+
+.sidebar-beheerdermodus-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-beheerdermodus-track {
+  flex: none;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.sidebar-beheerdermodus-duim {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.sidebar-beheerdermodus-input:checked + .sidebar-beheerdermodus-track {
+  background: var(--accent);
+}
+
+.sidebar-beheerdermodus-input:checked + .sidebar-beheerdermodus-track .sidebar-beheerdermodus-duim {
+  transform: translateX(13px);
+}
+
+.sidebar-beheerdermodus-input:focus-visible + .sidebar-beheerdermodus-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-beheerdermodus-tekst {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* "Bekijk als…" — secundaire actie, apart en ingetogen. */
 .sidebar-account-actie-subtiel {
   margin-top: 4px;
@@ -358,6 +427,14 @@
   }
 
   .sidebar--ingeklapt .sidebar-account-actie-tekst {
+    display: none;
+  }
+
+  .sidebar--ingeklapt .sidebar-beheerdermodus-schakelaar {
+    justify-content: center;
+  }
+
+  .sidebar--ingeklapt .sidebar-beheerdermodus-tekst {
     display: none;
   }
 

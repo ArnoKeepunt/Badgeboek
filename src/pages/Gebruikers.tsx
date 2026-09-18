@@ -332,7 +332,7 @@ function GebruikerForm({
         </select>
       </label>
       <p className="gebruikers-roluitleg">{PERSONEEL_ROL_UITLEG[p.rol]}</p>
-      {p.rol === "mentor" && (
+      {(p.rol === "mentor" || p.rol === "beheerder") && (
         <div className="de-veld">
           <span>Vestigingen</span>
           {vestigingen.length === 0 ? (
@@ -340,7 +340,10 @@ function GebruikerForm({
               Nog geen vestigingen bekend. Voeg ze eerst toe bij <strong>Vestigingen</strong>.
             </p>
           ) : (
-            <ul className="keuzelijst" aria-label="Vestigingen voor deze mentor">
+            <ul
+              className="keuzelijst"
+              aria-label={`Vestigingen voor deze ${p.rol === "mentor" ? "mentor" : "beheerder"}`}
+            >
               {vestigingen.map((v) => {
                 const aan = p.vestigingen.includes(v);
                 return (
@@ -367,8 +370,15 @@ function GebruikerForm({
               })}
             </ul>
           )}
-          {vestigingen.length > 0 && p.vestigingen.length === 0 && (
+          {p.rol === "mentor" && vestigingen.length > 0 && p.vestigingen.length === 0 && (
             <p className="gebruikers-roluitleg">Kies minstens één vestiging.</p>
+          )}
+          {p.rol === "beheerder" && (
+            <p className="gebruikers-roluitleg">
+              Een beheerder ziet sowieso alles; dit bepaalt enkel wat die zelf te zien krijgt
+              als die de "vereenvoudigde weergave" aanzet. Niets aangevinkt = voorlopig alle
+              vestigingen.
+            </p>
           )}
         </div>
       )}

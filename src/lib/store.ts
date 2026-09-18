@@ -4,6 +4,7 @@ import {
   GEBUNDELD_RUW,
   alleCursussen,
   alleLeerdoelen,
+  type BadgeRuw,
   type CurriculumRuw,
   cursusVanLeerdoel,
   cursusVanNode,
@@ -872,10 +873,18 @@ export function importeerGebruikers(leerlingen: Student[], mentoren: Mentor[]) {
 
 // --- Eigen groepen ---------------------------------------------------------
 
-/** Maak een nieuwe groep en geef de id terug. Optioneel gekoppeld aan een mentor. */
+/**
+ * Maak een nieuwe groep en geef de id terug. Optioneel gekoppeld aan een mentor — heeft de
+ * groep een eigenaar, dan is ze meteen privé (enkel die mentor ziet ze, zie `Groep.prive`).
+ * Een groep zonder eigenaar (aangemaakt vanuit een volledig beheerdersoverzicht) blijft, zoals
+ * voorheen, voor iedereen zichtbaar.
+ */
 export function maakGroep(naam: string, leerlingIds: string[], mentorId?: string): string {
   const id = `g${Date.now().toString(36)}`;
-  commit({ ...state, groepen: [...state.groepen, { id, naam, leerlingIds, mentorId }] });
+  commit({
+    ...state,
+    groepen: [...state.groepen, { id, naam, leerlingIds, mentorId, prive: Boolean(mentorId) }],
+  });
   return id;
 }
 
@@ -928,6 +937,68 @@ export function zetCurriculumOverride(ruw: CurriculumRuw | null) {
 
 /** De ingebouwde (gebundelde) badge-set, ruw — bron voor "zet de huidige badges in de database". */
 export const gebundeldCurriculum = (): CurriculumRuw => GEBUNDELD_RUW;
+
+/**
+ * Wijzig één badge in de curriculum-database-versie: neem de huidige override, of anders de
+ * bundel (eerste bewerking start dus vanaf de ingebouwde set), pas ze aan, en schrijf het
+ * resultaat weg via `zetCurriculumOverride` — dezelfde weg als "Zet de ingebouwde badges in de
+ * database". Enkel de beheerder roept dit aan (route + Firestore-rules).
+ */
+function wijzigCurriculum(fn: (ruw: CurriculumRuw) => CurriculumRuw): void {
+  const basis = state.curriculumOverride ?? gebundeldCurriculum();
+  zetCurriculumOverride(fn({ cursussen: [...basis.cursussen], badges: [...basis.badges] }));
+}
+
+/** Nieuwe badge in `cursusId`, achteraan die cursus. Geeft de nieuwe id terug. */
+export function maakBadge(
+  cursusId: string,
+  veld: Omit<BadgeRuw, "id" | "cursusId" | "volgorde">,
+): string {
+  const id = `b${Date.now().toString(36)}`;
+  wijzigCurriculum((ruw) => {
+    const volgorde =
+      1 + Math.max(0, ...ruw.badges.filter((b) => b.cursusId === cursusId).map((b) => b.volgorde));
+    return { ...ruw, badges: [...ruw.badges, { id, cursusId, volgorde, ...veld }] };
+  });
+  return id;
+}
+
+/** Wijzig naam/groep/categorie/volgorde van een bestaande badge. */
+export function wijzigBadge(id: string, patch: Partial<Omit<BadgeRuw, "id">>): void {
+  wijzigCurriculum((ruw) => ({
+    ...ruw,
+    badges: ruw.badges.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+  }));
+}
+
+/** Verwijder een badge. Evaluaties die er al op staan blijven bestaan maar wijzen dan nergens
+ * meer naar (net als bij een verwijderde leerling — bewust niet mee opgekuist). */
+export function verwijderBadge(id: string): void {
+  wijzigCurriculum((ruw) => ({ ...ruw, badges: ruw.badges.filter((b) => b.id !== id) }));
+}
+
+/** Wissel de volgorde van een badge met haar buur binnen dezelfde cursus. */
+export function verplaatsBadge(id: string, richting: "omhoog" | "omlaag"): void {
+  wijzigCurriculum((ruw) => {
+    const b = ruw.badges.find((x) => x.id === id);
+    if (!b) return ruw;
+    const reeks = ruw.badges
+      .filter((x) => x.cursusId === b.cursusId)
+      .sort((a, c) => a.volgorde - c.volgorde);
+    const i = reeks.findIndex((x) => x.id === id);
+    const j = richting === "omhoog" ? i - 1 : i + 1;
+    if (j < 0 || j >= reeks.length) return ruw;
+    const buur = reeks[j];
+    return {
+      ...ruw,
+      badges: ruw.badges.map((x) => {
+        if (x.id === b.id) return { ...x, volgorde: buur.volgorde };
+        if (x.id === buur.id) return { ...x, volgorde: b.volgorde };
+        return x;
+      }),
+    };
+  });
+}
 
 // --- Vestigingen (beheerder) -------------------------------------------
 

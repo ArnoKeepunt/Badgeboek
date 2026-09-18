@@ -21,9 +21,13 @@ export interface Personeelslid {
   naam: string;
   rol: PersoneelRol;
   /**
-   * De vestigingen waar deze mentor toegang toe heeft (een mentor kan aan meerdere campussen
-   * lesgeven). Enkel betekenisvol bij `rol: "mentor"`; `coordinator`/`beheerder` zien sowieso
-   * alles. Leeg bij een mentor = (nog) geen enkele vestiging → ziet niets.
+   * De vestigingen waar dit personeelslid toegang toe heeft (iemand kan aan meerdere campussen
+   * lesgeven).
+   * - Bij `rol: "mentor"` bepaalt dit meteen het echte leerlingenbereik; leeg = (nog) geen
+   *   enkele vestiging → ziet niets. `coordinator` ziet sowieso alles, ongeacht dit veld.
+   * - Bij `rol: "beheerder"` heeft dit geen invloed op de echte rechten (die zien sowieso
+   *   alles) — het is enkel de vestiging-selectie voor als de beheerder zelf de
+   *   "vereenvoudigde weergave" aanzet (zie `useBereik`). Leeg = voorlopig alle vestigingen.
    */
   vestigingen: string[];
   actief: boolean;

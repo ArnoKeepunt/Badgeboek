@@ -1,3 +1,4 @@
+import { useBeheerderWeergave } from "./beheerderWeergave";
 import { useHuidigPersoneelslid } from "./firebaseAuth";
 import { useStore } from "./store";
 import type { Mentor, Student } from "./types";
@@ -13,12 +14,20 @@ import type { Mentor, Student } from "./types";
  */
 export type EffectieveRol = "beheerder" | "coordinator" | "mentor" | "leerling";
 
+/** De rol vóór "bekijk als" én vóór de "beheerdersmodus uit"-weergaveschakelaar. */
+export function useBasisRol(): EffectieveRol {
+  const { persoon } = useHuidigPersoneelslid();
+  return persoon?.actief ? persoon.rol : "beheerder";
+}
+
 export function useEffectieveRol(): EffectieveRol {
   const { sessie } = useStore();
-  const { persoon } = useHuidigPersoneelslid();
+  const basisRol = useBasisRol();
+  const { vereenvoudigd } = useBeheerderWeergave();
   if (sessie) return sessie.rol; // "bekijk als" leerling/mentor
-  if (persoon?.actief) return persoon.rol;
-  return "beheerder";
+  // "Beheerdersmodus uit" — enkel een weergavevoorkeur, geen echte rechtenwijziging.
+  if (basisRol === "beheerder" && vereenvoudigd) return "mentor";
+  return basisRol;
 }
 
 /** De aangemelde gebruiker via de "bekijk als"-kiezer. `null` = geen bekijk-als actief. */
