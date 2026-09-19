@@ -1650,6 +1650,17 @@ th {
   background: var(--accent-soft);
 }
 
+.knop-secundair:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.knop-secundair:disabled:hover {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface);
+}
+
 .linkknop-gevaar {
   color: #b91c1c;
 }
@@ -1694,6 +1705,25 @@ th {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 4px;
+}
+
+/* Bestandskiezer die eruitziet als een gewone knop: de echte <input type="file"> ligt
+   onzichtbaar over het hele label, zodat klik/toetsenbord gewoon werken. */
+.gegevens-upload-knop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.gegevens-upload-knop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .gegevens-melding {
@@ -3940,4 +3970,415 @@ th {
 .modal-sluit svg {
   width: 16px;
   height: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   Rapport — rapportmoment-kiezer, statusbalk en de printweergave.
+   --------------------------------------------------------------------------- */
+
+/* Eén kader rond de rapportmoment-/cursuskiezer + de statusbalk, zodat het als één
+   samenhangend "bedieningspaneel" leest i.p.v. losse rijen die zomaar op de pagina staan. */
+.rapport-paneel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.rapport-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.rapport-toolbar-kies {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rapport-toolbar-kies span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.rapport-toolbar select {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* /rapport: hetzelfde rapportmoment in één keer aanmaken voor alle leerlingen van de huidige
+   filter (i.p.v. per leerling apart "+ Nieuw rapportmoment" te moeten klikken). */
+.rapport-bulk-paneel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.rapport-bulk-melding {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Overlay: naam + LeerlingFilterBar (vestiging/graad/leerjaar/klasgroep/groep) samen — dezelfde
+   invoerstijl als de rapportmoment-/cursuskiezer op de detailpagina. */
+.rapport-toolbar-kies input[type="text"] {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.rapport-modal-samenvatting {
+  margin: 16px 0;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rapport-status-balk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* Groepje van bij-elkaar-horende acties (bv. printen + pdf, of afwerken + heropenen) — een
+   dun lijntje tussen groepen onderling houdt losse knoppen leesbaar geclusterd. */
+.rapport-knopgroep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rapport-knopgroep + .rapport-knopgroep {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+/* Eigen (flex-)verhouding bovenop `.sd-split` (grid, 50/50 — gedeeld met StudentDetail): het
+ * rapport zelf mag hier het meeste plaats innemen, het badgeboek-naslagpaneel rechts krijgt een
+ * vaste, krappere breedte — anders staat de tabel erin met veel lege ruimte vóór de scrollbalk,
+ * want die matrix (Badge + Kleur, 2 kolommen) heeft nooit de halve pagina nodig.
+ */
+.rapport-split {
+  display: flex;
+  align-items: start;
+}
+
+.rapport-split .sd-badges {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Badgeboek-naslag rechts: vaste breedte i.p.v. de helft van het scherm (zie hierboven), en het
+ * paneel zelf scrolt niet meer als geheel (kop + tabel samen) — enkel de matrix zelf krijgt een
+ * eigen scrollbare hoogte, zodat de kop (titel + "alles uitklappen") altijd zichtbaar blijft. */
+.rapport-split .badges-deelpaneel {
+  flex: 0 0 440px;
+  width: 440px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* `.grid-wrap` is normaal `width: max-content` (past zich aan de inhoud aan) — hier laten we het
+ * i.p.v. daarvan de volle kolombreedte vullen, anders blijft de tabel op haar eigen (smallere)
+ * inhoudsbreedte staan en ontstaat er lege ruimte tussen de tabel en de volgende kolom. */
+.rapport-split .grid-wrap {
+  width: 100%;
+}
+
+.rapport-split .grid-wrap table {
+  width: 100%;
+}
+
+/* Met `table-layout: auto` ving de kolom zonder eigen breedte (Cursus/Badge) alle overschot op
+ * zodra de tabel breder werd — bv. de Cursus-kolom werd absurd breed, en aan de andere kant kon
+ * de Kleur-kolom onder haar eigen inhoud gedrukt worden (kleurpil half afgesneden). `fixed` +
+ * expliciete breedtes per kolom lost beide op: enkel de kolom zonder eigen breedte (Opmerking
+ * links, Badge rechts) krijgt het overschot, Kleur houdt altijd zijn volle breedte. */
+.rapport-split .grid-wrap table {
+  table-layout: fixed;
+}
+
+.rapport-split .sd-badges .grid-col-doel {
+  width: 220px;
+}
+
+.rapport-split .grid-col-kleur {
+  width: 160px;
+}
+
+.rapport-split .badges-deelpaneel-kop {
+  flex: none;
+}
+
+.rapport-split .badges-deelpaneel .grid-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+@media (max-width: 980px) {
+  .rapport-split {
+    flex-direction: column;
+  }
+
+  .rapport-split .badges-deelpaneel {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .rapport-split .badges-deelpaneel .grid-wrap {
+    max-height: 70vh;
+  }
+}
+
+.rapport-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rapport-status-chip.is-concept {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.rapport-status-chip.is-afgewerkt {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.rapport-icoonknop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rapport-icoonknop svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.rapport-leerling-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rapport-leerling-kies-knop {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  text-align: center;
+  cursor: pointer;
+}
+
+.rapport-leerling-nav-naam {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rapport-leerling-nav-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.rapport-leerling-picker {
+  width: 300px;
+  max-width: 84vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rapport-leerling-picker-zoek {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.rapport-leerling-picker-lijst {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.rapport-leerling-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rapport-leerling-picker-item:hover {
+  background: var(--accent-soft);
+}
+
+.rapport-leerling-picker-item.is-huidig {
+  background: var(--accent-soft);
+}
+
+.rapport-leerling-picker-naam {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rapport-leerling-picker-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.rapport-col-opmerking,
+.rapport-col-opmerking-tekst {
+  text-align: left;
+}
+
+.rapport-col-opmerking-tekst {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: break-word;
+}
+
+.rapport-algemeen {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.rapport-algemeen textarea {
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  resize: vertical;
+}
+
+/* Printweergave: enkel getoond in `@media print` hieronder — op het scherm blijft de
+   interactieve editor (`.no-print`) staan, niet dit statische blad. */
+.rapport-print {
+  display: none;
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .opslag-foutbalk,
+  .no-print {
+    display: none !important;
+  }
+
+  .layout {
+    display: block;
+  }
+
+  .content,
+  .content--breed {
+    max-width: none;
+    padding: 0;
+  }
+
+  .rapport-print {
+    display: block;
+  }
+
+  .rapport-print h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+
+  .rapport-print-meta {
+    margin: 0 0 18px;
+    color: #444;
+    font-size: 13px;
+  }
+
+  .rapport-print-tabel {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .rapport-print-tabel th,
+  .rapport-print-tabel td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  .rapport-print-algemeen {
+    margin-top: 20px;
+  }
+
+  .rapport-print-algemeen h2 {
+    font-size: 14px;
+    margin: 0 0 4px;
+  }
+
+  .rapport-print-algemeen p {
+    white-space: pre-wrap;
+    margin: 0;
+  }
 }

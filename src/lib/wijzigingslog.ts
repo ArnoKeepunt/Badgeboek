@@ -61,9 +61,10 @@ function overgangTekst(regel: AuditRegel): string {
     if (regel.naar === "") return `Gewist (was ${van})`;
     return `${van} aangepast naar ${naar}`;
   }
-  if (regel.van === "") return `Notitie toegevoegd: ${naar}`;
-  if (regel.naar === "") return "Notitie verwijderd";
-  return `Notitie ${van} aangepast naar ${naar}`;
+  const label = regel.veld === "opmerking" ? "Opmerking" : "Notitie";
+  if (regel.van === "") return `${label} toegevoegd: ${naar}`;
+  if (regel.naar === "") return `${label} verwijderd`;
+  return `${label} ${van} aangepast naar ${naar}`;
 }
 
 /** Eén geschiedenisregel als platte tekst (voor een tooltip). */

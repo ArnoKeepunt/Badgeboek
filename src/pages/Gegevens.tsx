@@ -2,16 +2,26 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { SlotIcoon } from "../components/SlotIcoon";
 import { datumStempel, downloadTekst } from "../lib/download";
-import { exportDoelen, exportEvaluaties, exportLeerlingen } from "../lib/gegevens";
+import {
+  exportDoelen,
+  exportEvaluaties,
+  exportLeerlingen,
+  exportRubrieken,
+  importLeerlingen,
+  importRubrieken,
+} from "../lib/gegevens";
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import {
   gebundeldCurriculum,
   rubriekenLijst,
+  upsertStudenten,
   useStore,
   vestigingenLijst,
+  wisRubriekenOverride,
   zetCurriculumOverride,
   zetRubriekenInDatabase,
+  zetRubriekenUitImport,
   zetSchooljaarAfgesloten,
   zetVestigingenInDatabase,
 } from "../lib/store";
@@ -56,6 +66,81 @@ export function Gegevens() {
     )
       return;
     uitvoeren();
+  };
+
+  /**
+   * Terug naar de bundel wist de database-versie (Firestore-docs verdwijnen bij de volgende
+   * save) — nodig omdat "wegschrijven" hierboven de HUIDIGE (database- of bundel-)versie
+   * herschrijft: staat er al een database-versie, dan overschrijft die knop zichzelf en komt
+   * een nieuwe/aangepaste bundel (bv. na een nieuwe rubrics_overzicht.xlsx) er niet doorheen
+   * zonder eerst hier te resetten.
+   */
+  const bevestigWissen = (wat: string, uitvoeren: () => void) => {
+    if (
+      !confirm(
+        `${wat}: terug naar de ingebouwde bundel?\n\nDit wist de database-versie in Firestore — iedereen valt dan terug op de bundel die in de app zelf zit.`,
+      )
+    )
+      return;
+    uitvoeren();
+  };
+
+  /**
+   * Leerlingen importeren is een upsert (op `id`) — bestaande leerlingen die niet in het
+   * bestand staan, blijven gewoon staan. Rechtstreeks bedoeld voor de échte leerlingendata,
+   * los van de Smartschool-synchronisatie (die er misschien voorlopig niet komt).
+   */
+  const importeerLeerlingenBestand = async (input: HTMLInputElement) => {
+    const bestand = input.files?.[0];
+    input.value = ""; // zelfde bestand nog eens kiezen moet opnieuw een change-event geven
+    if (!bestand) return;
+    const tekst = await bestand.text();
+    const { rijen, fouten } = importLeerlingen(tekst);
+    if (rijen.length === 0) {
+      setMelding({ soort: "fout", tekst: `Geen leerlingen gevonden in "${bestand.name}".`, details: fouten });
+      return;
+    }
+    if (
+      !confirm(
+        `${rijen.length} leerling(en) uit "${bestand.name}" importeren?\n\nBestaande leerlingen met dezelfde id worden bijgewerkt; leerlingen die niet in het bestand staan, blijven gewoon staan.`,
+      )
+    ) {
+      return;
+    }
+    const { toegevoegd, bijgewerkt } = upsertStudenten(rijen);
+    setMelding({
+      soort: "ok",
+      tekst: `Leerlingen geïmporteerd: ${toegevoegd} nieuw, ${bijgewerkt} bijgewerkt.`,
+      details: fouten.length > 0 ? fouten : undefined,
+    });
+  };
+
+  /**
+   * Rubrics importeren zet de geïmporteerde lijst meteen als nieuwe databaseversie (zelfde
+   * effect als "Rubrics wegschrijven" hieronder, maar met de net geüploade data i.p.v. de
+   * huidige bundel/database-stand) — vandaar dezelfde dubbele bevestiging.
+   */
+  const importeerRubricsBestand = async (input: HTMLInputElement) => {
+    const bestand = input.files?.[0];
+    input.value = "";
+    if (!bestand) return;
+    const tekst = await bestand.text();
+    const { rijen, fouten } = importRubrieken(tekst);
+    if (rijen.length === 0) {
+      setMelding({ soort: "fout", tekst: `Geen rubrics gevonden in "${bestand.name}".`, details: fouten });
+      return;
+    }
+    const perStroom = new Map<string, number>();
+    for (const r of rijen) perStroom.set(r.stroom, (perStroom.get(r.stroom) ?? 0) + 1);
+    const samenvatting = [...perStroom.entries()].map(([s, n]) => `${s}: ${n}`).join(", ");
+    bevestigWegschrijven(`Rubrics (${rijen.length} stuks uit "${bestand.name}": ${samenvatting})`, () => {
+      zetRubriekenUitImport(rijen);
+      setMelding({
+        soort: "ok",
+        tekst: `Rubrics geïmporteerd: ${rijen.length} stuks (${samenvatting}).`,
+        details: fouten.length > 0 ? fouten : undefined,
+      });
+    });
   };
 
   return (
@@ -165,6 +250,65 @@ export function Gegevens() {
         </div>
       </div>
 
+      <h2 style={{ marginTop: 32 }}>Importeren</h2>
+      <p style={{ color: "var(--text-muted)", marginTop: 4 }}>
+        Rechtstreeks vanuit de browser, geen script nodig. Bestanden zijn <strong>CSV</strong>
+        (geen xlsx) — sla een Excel-/Numbers-bestand eerst op als CSV.
+      </p>
+      <div className="gegevens-kaarten">
+        <div className="gegevens-kaart">
+          <div className="gegevens-kaart-naam">Leerlingen</div>
+          <p>
+            De échte leerlingendata (upsert op <code>id</code>) — los van of we straks nog
+            overstappen op een Smartschool-synchronisatie. Kolommen: <code>id, voornaam,
+            achternaam, vestiging, leerjaar, klasgroep</code> (<code>id</code> optioneel, wordt
+            anders afgeleid uit de naam). Bestaande leerlingen die niet in het bestand staan,
+            blijven gewoon staan.
+          </p>
+          <label className="knop-secundair gegevens-upload-knop">
+            CSV kiezen…
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => void importeerLeerlingenBestand(e.currentTarget)}
+            />
+          </label>
+        </div>
+
+        <div className="gegevens-kaart">
+          <div className="gegevens-kaart-naam">Rubrics</div>
+          <p>
+            Voor terwijl de rubrics nog volop in ontwikkeling zijn — een nieuwe versie
+            rechtstreeks uploaden i.p.v. mij een nieuwe <code>rubrics_overzicht.xlsx</code> te
+            geven. Kolommen: <code>cursus, stroom, naam, doelen, blauw, groen, geel, rood,
+            leerlijn</code> (<code>doelen</code> komma-gescheiden). Wordt meteen de nieuwe
+            databaseversie, net als "Rubrics wegschrijven" hieronder.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <label className="knop-secundair gegevens-upload-knop">
+              CSV kiezen…
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => void importeerRubricsBestand(e.currentTarget)}
+              />
+            </label>
+            <button
+              type="button"
+              className="linkknop"
+              onClick={() =>
+                downloadTekst(
+                  `keerpunt-rubrics-${datumStempel()}.csv`,
+                  exportRubrieken(rubriekenLijst()),
+                )
+              }
+            >
+              Sjabloon downloaden
+            </button>
+          </div>
+        </div>
+      </div>
+
       <h2 style={{ marginTop: 32 }}>Badges, rubrics en vestigingen in de database</h2>
       <div className="gegevens-kaarten">
         <div className="gegevens-kaart">
@@ -219,6 +363,23 @@ export function Gegevens() {
             >
               Rubrics wegschrijven
             </button>
+            {rubriekenOverride && (
+              <button
+                type="button"
+                className="knop-secundair"
+                onClick={() =>
+                  bevestigWissen("Rubrics", () => {
+                    wisRubriekenOverride();
+                    setMelding({
+                      soort: "ok",
+                      tekst: "Rubrics: database-versie gewist, terug op de ingebouwde bundel.",
+                    });
+                  })
+                }
+              >
+                Rubrics: terug naar de bundel
+              </button>
+            )}
             <button
               type="button"
               className="knop-primair"

@@ -3,7 +3,7 @@ import { kopIndex, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
 import { RATING_LABEL } from "./ratings";
-import type { DoelKleuren, Mentor, Rating, Stroom, Student } from "./types";
+import type { DoelKleuren, Kleurcriteria, Mentor, Rating, Rubriek, Stroom, Student } from "./types";
 
 /**
  * Domeinspecifieke CSV-im/export. Geen backend: alles gebeurt in de browser.
@@ -360,4 +360,108 @@ export function importDoelen(csv: string): ImportResultaat<Minimumdoel> {
     });
   });
   return { rijen: doelen, fouten };
+}
+
+// --- Rubrics (uitgeschreven rubrics, zie docs/reference/rubrics_overzicht.xlsx) -----------
+
+const RUBRIEK_KOP = ["cursus", "stroom", "naam", "doelen", "blauw", "groen", "geel", "rood", "leerlijn"];
+
+export function exportRubrieken(rubrieken: Rubriek[]): string {
+  return toCsv([
+    RUBRIEK_KOP,
+    ...rubrieken.map((r) => [
+      r.cursus,
+      r.stroom,
+      r.naam,
+      r.doelen.join(", "),
+      r.criteria.blauw,
+      r.criteria.groen,
+      r.criteria.geel,
+      r.criteria.rood,
+      r.leerlijn,
+    ]),
+  ]);
+}
+
+/** Leesbare, ascii-veilige id-component — zelfde algoritme als scripts/extract_rubrics.py. */
+function slug(s: string): string {
+  const kaal = s
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  return kaal || "x";
+}
+
+/**
+ * CSV → uitgeschreven rubrics. Bron is meestal `rubrics_overzicht.xlsx` (opgeslagen/geëxporteerd
+ * als CSV) — de kolomvolgorde en id-opbouw (`${stroom}-${cursus-slug}-r${n}`) spiegelen
+ * `scripts/extract_rubrics.py`, zodat een import hier dezelfde id's oplevert als het script.
+ */
+export function importRubrieken(csv: string): ImportResultaat<Rubriek> {
+  const rijen = parseCsv(csv);
+  const fouten: string[] = [];
+  if (rijen.length < 2) return { rijen: [], fouten: ["Geen datarijen gevonden."] };
+
+  const k = kopIndex(rijen[0]);
+  const kol = (namen: string[]): number => {
+    for (const n of namen) if (n in k) return k[n];
+    return -1;
+  };
+  const iCursus = kol(["cursus"]);
+  const iStroom = kol(["stroom", "graad"]);
+  const iNaam = kol(["naam", "rubric", "rubriek"]);
+  const iDoelen = kol(["doelen", "doelcodes"]);
+  const iBlauw = kol(["blauw"]);
+  const iGroen = kol(["groen"]);
+  const iGeel = kol(["geel"]);
+  const iRood = kol(["rood"]);
+  const iLeerlijn = kol(["leerlijn"]);
+
+  if (iCursus < 0 || iStroom < 0 || iNaam < 0) {
+    return { rijen: [], fouten: ["Kolommen 'cursus', 'stroom' en 'naam' zijn verplicht."] };
+  }
+
+  const rubrieken: Rubriek[] = [];
+  const volgordePerCursus = new Map<string, number>();
+  rijen.slice(1).forEach((r, idx) => {
+    const nr = idx + 2;
+    const cursus = (r[iCursus] ?? "").trim();
+    const stroom = (r[iStroom] ?? "").trim().toUpperCase();
+    const naam = (r[iNaam] ?? "").trim();
+    if (!cursus || !naam) {
+      fouten.push(`Rij ${nr}: cursus of naam ontbreekt — overgeslagen.`);
+      return;
+    }
+    if (!(STROMEN as string[]).includes(stroom)) {
+      fouten.push(`Rij ${nr}: onbekende stroom "${stroom}" — overgeslagen.`);
+      return;
+    }
+    const cursusId = `${stroom}-${slug(cursus)}`;
+    const volgorde = volgordePerCursus.get(cursusId) ?? 0;
+    volgordePerCursus.set(cursusId, volgorde + 1);
+    const doelenRuw = iDoelen >= 0 ? (r[iDoelen] ?? "") : "";
+    const criteria: Kleurcriteria = {
+      blauw: iBlauw >= 0 ? (r[iBlauw] ?? "").trim() : "",
+      groen: iGroen >= 0 ? (r[iGroen] ?? "").trim() : "",
+      geel: iGeel >= 0 ? (r[iGeel] ?? "").trim() : "",
+      rood: iRood >= 0 ? (r[iRood] ?? "").trim() : "",
+    };
+    rubrieken.push({
+      id: `${cursusId}-r${volgorde + 1}`,
+      cursus,
+      stroom: stroom as Stroom,
+      naam,
+      doelen: doelenRuw
+        .replace(/;/g, ",")
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean),
+      criteria,
+      leerlijn: iLeerlijn >= 0 ? (r[iLeerlijn] ?? "").trim() : "",
+      volgorde,
+    });
+  });
+  return { rijen: rubrieken, fouten };
 }

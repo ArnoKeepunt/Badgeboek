@@ -61,6 +61,8 @@ export async function migreerDatabase(): Promise<MigratieResultaat> {
     gewist,
     meldingen: (globaal.meldingen ?? []) as PersistedStore["meldingen"],
     meldingGezien: (globaal.meldingGezien ?? {}) as PersistedStore["meldingGezien"],
+    // Rapporten bestonden nog niet in de oude structuur — niets te migreren.
+    rapporten: [],
   } satisfies PersistedStore;
 
   const docs = storeNaarDocs(store);

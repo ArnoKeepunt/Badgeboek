@@ -15,12 +15,13 @@ import { actieveVestigingen } from "./vestigingen";
  *    een leerling (enkel zichzelf) of een mentor (diens vestiging);
  *  - het **echte personeelsaccount** (`useHuidigPersoneelslid`): een `mentor` is beperkt tot
  *    de eigen vestiging; `coordinator` en `beheerder` zien alles;
- *  - de **"beheerdersmodus uit"-schakelaar** (`useBeheerderWeergave`): een beheerder kan zichzelf
- *    tijdelijk tot zijn eigen vestiging(en) beperken, als was hij mentor. De schakelaar zelf is
- *    een client-side weergavevoorkeur (geen Firestore-schrijf, meteen aan/uit); de vestiging(en)
- *    zelf staan gewoon op het account (`Personeelslid.vestigingen`, in te stellen bij
- *    Gebruikers) — leeg = voorlopig alle vestigingen. De echte rechten (Firestore-rules)
- *    blijven ondertussen gewoon die van een beheerder.
+ *  - de **"vereenvoudigde weergave"-schakelaar** (`useBeheerderWeergave`): een beheerder of
+ *    coördinator kan zichzelf tijdelijk tot zijn eigen vestiging(en) beperken, als was hij
+ *    mentor. De schakelaar zelf is een client-side weergavevoorkeur (geen Firestore-schrijf,
+ *    meteen aan/uit); de vestiging(en) zelf staan gewoon op het account
+ *    (`Personeelslid.vestigingen`, in te stellen bij Gebruikers) — leeg = voorlopig alle
+ *    vestigingen. De echte rechten (Firestore-rules) blijven ondertussen gewoon die van het
+ *    echte account (beheerder/coördinator).
  *
  * Wordt de scope later fijnmaziger (per klasgroep, per groep), pas je enkel `useBereik` /
  * `magLeerlingZien` aan; de pagina's blijven ongewijzigd.
@@ -52,10 +53,11 @@ export function useBereik(): Bereik {
     const v = aangemeld.mentor.vestiging;
     return { allesZichtbaar: false, vestigingen: v ? [v] : [], eigenLeerlingId: null };
   }
-  if (persoon?.actief && persoon.rol === "mentor") {
+  // `basisRol` normaliseert "extern" (externe mentor) al naar "mentor" — zie `useBasisRol`.
+  if (persoon?.actief && basisRol === "mentor") {
     return { allesZichtbaar: false, vestigingen: persoon.vestigingen, eigenLeerlingId: null };
   }
-  if (basisRol === "beheerder" && weergave.vereenvoudigd) {
+  if ((basisRol === "beheerder" || basisRol === "coordinator") && weergave.vereenvoudigd) {
     // Nog geen vestiging(en) gekozen bij Gebruikers → voorlopig gewoon alles, i.p.v. niets.
     const eigen = persoon?.vestigingen.length ? persoon.vestigingen : actieveVestigingen().map((v) => v.naam);
     return { allesZichtbaar: false, vestigingen: eigen, eigenLeerlingId: null };

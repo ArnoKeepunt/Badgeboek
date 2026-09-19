@@ -14,9 +14,19 @@ export function usePopover(
   open: boolean,
   anker: RefObject<HTMLElement | null>,
   sluit: () => void,
-  opties: { breedte: number; hoogte: number; uitlijn?: "links" | "rechts" | "midden" },
+  opties: {
+    breedte: number;
+    hoogte: number;
+    uitlijn?: "links" | "rechts" | "midden";
+    /**
+     * Optioneel: het paneel zelf. Scrollt er intern iets in het paneel (bv. een lange lijst),
+     * dan mag dat het paneel niet sluiten — enkel een scroll ERBUITEN (de pagina, of een andere
+     * scrollcontainer waar het anker in zit) betekent dat het anker verschoven is.
+     */
+    paneel?: RefObject<HTMLElement | null>;
+  },
 ): PopoverPos | null {
-  const { breedte, hoogte, uitlijn = "links" } = opties;
+  const { breedte, hoogte, uitlijn = "links", paneel } = opties;
   const [pos, setPos] = useState<PopoverPos | null>(null);
 
   useLayoutEffect(() => {
@@ -46,15 +56,23 @@ export function usePopover(
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") sluit();
     };
+    // Capture-phase: zo vangen we ook een scroll op een willekeurige voorouder-scrollcontainer
+    // (bv. de badgematrix) op, niet enkel de pagina zelf. Maar scrolt het net binnenin dit
+    // paneel (`e.target` zit in `paneel`), dan is het anker niet verschoven — niet sluiten.
+    const onScroll = (e: Event) => {
+      const p = paneel?.current;
+      if (p && e.target instanceof Node && p.contains(e.target)) return;
+      sluit();
+    };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", sluit, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", sluit);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", sluit, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", sluit);
     };
-  }, [open, sluit]);
+  }, [open, sluit, paneel]);
 
   return pos;
 }

@@ -70,7 +70,10 @@ def sheet_rel_map(z: zipfile.ZipFile) -> dict[str, str]:
     RID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
     out = {}
     for s in wb.iter(M + "sheet"):
-        target = rid_to_target[s.get(RID)]
+        # Normaal relatief aan "xl/" (Excel, bv. "worksheets/sheet1.xml"). Sommige andere tools
+        # (bv. na een export uit Google Sheets) schrijven een absoluut pad ("/xl/worksheets/…")
+        # — vandaar eerst een leidende "/" wegnemen, dan pas "xl/" toevoegen indien nodig.
+        target = rid_to_target[s.get(RID)].lstrip("/")
         if not target.startswith("xl/"):
             target = "xl/" + target
         out[s.get("name")] = target
@@ -90,8 +93,14 @@ def slug(s: str) -> str:
 
 def main() -> None:
     z = zipfile.ZipFile(XLSX)
-    ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
-    strings = ["".join(t.text or "" for t in si.iter(M + "t")) for si in ss]
+    # `sharedStrings.xml` is optioneel in de OOXML-spec — ontbreekt als het bestand enkel
+    # inline strings (<is>) gebruikt i.p.v. de gedeelde tabel (bv. na een export uit een andere
+    # tool dan Excel). `load_rows` ondersteunt beide; zonder shared strings is de lijst gewoon leeg.
+    if "xl/sharedStrings.xml" in z.namelist():
+        ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
+        strings = ["".join(t.text or "" for t in si.iter(M + "t")) for si in ss]
+    else:
+        strings = []
     rel = sheet_rel_map(z)
     sheet_path = next(iter(rel.values()))  # één tabblad
 

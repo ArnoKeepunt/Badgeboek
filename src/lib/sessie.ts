@@ -7,7 +7,10 @@ import type { Mentor, Student } from "./types";
  * De effectieve rol waarmee de app zich gedraagt.
  *
  * - Bij een Firebase-login komt de rol uit het personeelsaccount (`gebruikers/{email}`):
- *   `beheerder` | `coordinator` | `mentor`.
+ *   `beheerder` | `coordinator` | `mentor`. Een personeelsaccount met `rol: "extern"`
+ *   ("externe mentor") gedraagt zich hier al vanaf de bron als `mentor` — zie
+ *   `isMentorachtigeRol` in `gebruikers.ts` — zo hoeft geen enkele andere plek in de app dat
+ *   onderscheid nog te kennen; enkel de accountenlijst (`/gebruikers`) toont het aparte label.
  * - De demo-`sessie` in de store is de **"bekijk als"-override** (enkel door een beheerder te
  *   zetten via `/aanmelden`): tijdelijk de weergave van een leerling of mentor testen.
  * - Zonder beide (local-modus) → `beheerder`, zoals vroeger.
@@ -17,7 +20,8 @@ export type EffectieveRol = "beheerder" | "coordinator" | "mentor" | "leerling";
 /** De rol vóór "bekijk als" én vóór de "beheerdersmodus uit"-weergaveschakelaar. */
 export function useBasisRol(): EffectieveRol {
   const { persoon } = useHuidigPersoneelslid();
-  return persoon?.actief ? persoon.rol : "beheerder";
+  if (!persoon?.actief) return "beheerder";
+  return persoon.rol === "extern" ? "mentor" : persoon.rol;
 }
 
 export function useEffectieveRol(): EffectieveRol {
@@ -25,8 +29,10 @@ export function useEffectieveRol(): EffectieveRol {
   const basisRol = useBasisRol();
   const { vereenvoudigd } = useBeheerderWeergave();
   if (sessie) return sessie.rol; // "bekijk als" leerling/mentor
-  // "Beheerdersmodus uit" — enkel een weergavevoorkeur, geen echte rechtenwijziging.
-  if (basisRol === "beheerder" && vereenvoudigd) return "mentor";
+  // "Vereenvoudigde weergave" — enkel een weergavevoorkeur, geen echte rechtenwijziging. Zowel
+  // de beheerder als de coördinator zien standaard alles; dit laat beiden zichzelf tijdelijk tot
+  // hun eigen vestiging(en) beperken, als was het een mentor.
+  if ((basisRol === "beheerder" || basisRol === "coordinator") && vereenvoudigd) return "mentor";
   return basisRol;
 }
 

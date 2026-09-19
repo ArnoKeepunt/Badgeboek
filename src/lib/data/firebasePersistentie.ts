@@ -48,7 +48,7 @@ function bewaarCache(data: RauweStore): void {
  * er buiten — anders wist de diff ze omdat `storeNaarDocs` ze niet teruggeeft.
  */
 const BEHEERD =
-  /^(leerlingen|mentoren|groepen|deelbadges|meldingen|instellingen|vestigingen|rubrieken)\//;
+  /^(leerlingen|mentoren|groepen|deelbadges|rapporten|meldingen|instellingen|vestigingen|rubrieken)\//;
 
 /**
  * Mag `bewaar()` dit pad schrijven/verwijderen? `evaluaties/` alleen voor het actieve
@@ -247,6 +247,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         mentoren: undefined,
         groepen: undefined,
         deelbadges: undefined,
+        rapporten: undefined,
         meldingen: undefined,
         currCursussen: undefined,
         currBadges: undefined,
@@ -434,6 +435,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
           // Vestiging-afgeschermd (regels + query-filter):
           collectieLuisteraar("leerlingen", gescoopte(["leerlingen"]), (id) => `leerlingen/${id}`),
           collectieLuisteraar("deelbadges", gescoopte(["deelbadges"]), (id) => `deelbadges/${id}`),
+          collectieLuisteraar("rapporten", gescoopte(["rapporten"]), (id) => `rapporten/${id}`),
           // Personeel-breed:
           collectieLuisteraar("mentoren", alle("mentoren"), (id) => `mentoren/${id}`),
           collectieLuisteraar("groepen", alle("groepen"), (id) => `groepen/${id}`),

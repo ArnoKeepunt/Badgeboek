@@ -31,6 +31,7 @@ let beheerder: Firestore;
 let coordinator: Firestore;
 let mentor: Firestore; // vestigingen: ["Gent"]
 let mentor2: Firestore; // vestigingen: ["Gent", "Oudenaarde"]
+let externMentor: Firestore; // rol: "extern" — geen account vooraf geseed, zie de test zelf
 let inactief: Firestore;
 let bootstrap: Firestore;
 let geenAccount: Firestore;
@@ -55,6 +56,7 @@ beforeAll(async () => {
   coordinator = ctx("coord", "coord@keerpuntscholen.be");
   mentor = ctx("mentor", "mentor@keerpuntscholen.be");
   mentor2 = ctx("mentor2", "mentor2@keerpuntscholen.be");
+  externMentor = ctx("externmentor", "extern@keerpuntscholen.be");
   inactief = ctx("inactief", "inactief@keerpuntscholen.be");
   bootstrap = ctx("bootstrap", BOOTSTRAP);
   geenAccount = ctx("nieuw", "nieuw@keerpuntscholen.be");
@@ -99,6 +101,18 @@ beforeEach(async () => {
       db.doc("deelbadges/de-molenbeek").set({ titel: "MB", schooljaar: JAAR, scores: {}, vestiging: "Molenbeek" }),
       db.doc("deelbadges/de-overkoepelend").set({ titel: "Alle", schooljaar: JAAR, scores: {}, vestiging: "" }),
       db.doc("deelbadges/de-oud").set({ titel: "Oude toets", schooljaar: OUD, scores: {}, vestiging: "Gent" }),
+      db.doc("rapporten/rap-concept").set({
+        studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 1", status: "concept",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+      }),
+      db.doc("rapporten/rap-afgewerkt").set({
+        studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 0", status: "afgewerkt",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+      }),
+      db.doc("rapporten/rap-molenbeek").set({
+        studentId: "ll-molenbeek", schooljaar: JAAR, naam: "Rapport 1", status: "concept",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
+      }),
       db.doc("curriculum/1A").set({}),
       db.doc("curriculum/1A/cursussen/c1").set({ naam: "Cursus", volgorde: 0 }),
       db.doc("curriculum/1A/cursussen/c1/badges/b1").set({
@@ -259,6 +273,20 @@ describe("/gebruikers — beheer + shape", () => {
     await assertFails(beheerder.doc("gebruikers/x@keerpuntscholen.be").set({ ...basis, actief: "ja" }));
     await assertFails(beheerder.doc("gebruikers/x@keerpuntscholen.be").set({ ...basis, vestigingen: "Gent" }));
     await assertFails(beheerder.doc("gebruikers/x@keerpuntscholen.be").set({ ...basis, dev: "ja" }));
+    // `extern` (een oud, losgelaten boolean-veld) is geen toegelaten sleutel meer.
+    await assertFails(beheerder.doc("gebruikers/x@keerpuntscholen.be").set({ ...basis, extern: true }));
+  });
+
+  it("\"extern\" (externe mentor) is een volwaardige rol met exact dezelfde rechten als mentor", async () => {
+    await assertSucceeds(
+      beheerder.doc("gebruikers/extern@keerpuntscholen.be").set({
+        email: "extern@keerpuntscholen.be", naam: "Extern", rol: "extern", actief: true,
+        vestigingen: ["Gent"],
+      }),
+    );
+    await assertSucceeds(externMentor.doc("leerlingen/ll-gent").get());
+    await assertFails(externMentor.doc("leerlingen/ll-molenbeek").get());
+    await assertFails(externMentor.collection("gebruikers").get());
   });
 });
 
@@ -297,6 +325,48 @@ describe("afgesloten schooljaar (2024-2025) — alleen-lezen", () => {
     await assertSucceeds(
       mentor.doc("deelbadges/de-nieuw").set({ titel: "Nieuw", schooljaar: JAAR, scores: {}, vestiging: "Gent" }),
     );
+  });
+});
+
+// --- Rapporten: vestiging-afscherming + "afgewerkt" vergrendelt -------------
+describe("rapporten — handmatige rapporten per leerling", () => {
+  it("per vestiging afgeschermd, net als deelbadges", async () => {
+    await assertSucceeds(mentor.doc("rapporten/rap-concept").get());
+    await assertFails(mentor.doc("rapporten/rap-molenbeek").get());
+    await assertSucceeds(mentor.collection("rapporten").where("vestiging", "in", ["Gent"]).get());
+    await assertFails(mentor.collection("rapporten").get());
+    await assertSucceeds(coordinator.doc("rapporten/rap-molenbeek").get());
+  });
+
+  it("een concept-rapport is gewoon te bewerken door de eigen mentor, maar enkel de beheerder maakt een nieuw rapport aan", async () => {
+    await assertSucceeds(mentor.doc("rapporten/rap-concept").update({ algemeneOpmerking: "Goed bezig" }));
+    // Aanmaken is beheerder-only — ook binnen de eigen vestiging van de mentor.
+    await assertFails(
+      mentor.doc("rapporten/rap-nieuw").set({
+        studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 2", status: "concept",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+      }),
+    );
+    await assertSucceeds(
+      beheerder.doc("rapporten/rap-nieuw").set({
+        studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 2", status: "concept",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+      }),
+    );
+    // En ook de beheerder niet voor een niet-bestaande vestiging (magVestiging faalt niet voor
+    // de beheerder, maar dit toont dat de vestiging-check hier nog steeds meeloopt).
+    await assertSucceeds(
+      beheerder.doc("rapporten/rap-nieuw2").set({
+        studentId: "ll-molenbeek", schooljaar: JAAR, naam: "Rapport", status: "concept",
+        cursusItems: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
+      }),
+    );
+  });
+
+  it("een afgewerkt rapport is vergrendeld voor een mentor, maar niet voor de beheerder", async () => {
+    await assertFails(mentor.doc("rapporten/rap-afgewerkt").update({ algemeneOpmerking: "x" }));
+    await assertFails(mentor.doc("rapporten/rap-afgewerkt").delete());
+    await assertSucceeds(beheerder.doc("rapporten/rap-afgewerkt").update({ status: "concept" }));
   });
 });
 

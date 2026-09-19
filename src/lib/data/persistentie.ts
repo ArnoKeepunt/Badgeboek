@@ -11,6 +11,7 @@ import type {
   Melding,
   Mentor,
   Notities,
+  Rapport,
   Rubriek,
   Student,
 } from "../types";
@@ -72,6 +73,8 @@ export interface PersistedStore {
   meldingen: Melding[];
   meldingGezien: Record<string, number>;
   gewist: string[];
+  /** Handmatig ingevulde rapporten (per leerling, per rapportmoment). Zie `types.ts` (`Rapport`). */
+  rapporten: Rapport[];
 }
 
 /**

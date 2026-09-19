@@ -38,7 +38,8 @@ service cloud.firestore {
     }
     function isPersoneel() {
       return isBootstrapAdmin() ||
-        actieveRol() == 'beheerder' || actieveRol() == 'coordinator' || actieveRol() == 'mentor';
+        actieveRol() == 'beheerder' || actieveRol() == 'coordinator' || actieveRol() == 'mentor'
+        || actieveRol() == 'extern';
     }
 
     // Afgesloten schooljaren: "vastgezet in september", evaluaties zijn dan alleen-lezen.
@@ -77,7 +78,9 @@ service cloud.firestore {
       allow create, update: if isBeheerder()
         && request.resource.data.keys().hasOnly(
              ['email', 'naam', 'rol', 'vestiging', 'vestigingen', 'actief', 'dev', 'updatedAt', 'updatedBy'])
-        && request.resource.data.rol in ['beheerder', 'coordinator', 'mentor']
+        // `extern` ("externe mentor") is een volwaardige rolwaarde, exact dezelfde rechten als
+        // `mentor` (zie isPersoneel()/isMentorachtigeRol) — enkel een apart label in de lijst.
+        && request.resource.data.rol in ['beheerder', 'coordinator', 'mentor', 'extern']
         && request.resource.data.actief is bool
         && (!('dev' in request.resource.data) || request.resource.data.dev is bool)
         && (!('vestigingen' in request.resource.data) || request.resource.data.vestigingen is list)
@@ -183,6 +186,27 @@ service cloud.firestore {
       allow update, delete: if isPersoneel()
         && jaarOpen(resource.data.get('schooljaar', ''))
         && magVestiging(resource.data.get('vestiging', ''));
+    }
+
+    // Rapporten: handmatig ingevulde rapporten per leerling/rapportmoment. Per vestiging
+    // afgeschermd, net als `deelbadges`. Een "afgewerkt" rapport is vergrendeld — enkel de
+    // beheerder mag het nog wijzigen (bv. om het te heropenen).
+    function rapportOpen(r) {
+      return r.get('status', 'concept') != 'afgewerkt';
+    }
+    match /rapporten/{id} {
+      allow read: if isPersoneel() && magVestiging(resource.data.get('vestiging', ''));
+      // Enkel de beheerder start een nieuw rapportmoment (bewust: zo krijgt niet elke mentor
+      // losse, inconsistent benoemde rapportmomenten aan — zie de bulk-actie op /rapport).
+      // Bestaande rapporten invullen/afwerken/verwijderen blijft wel gewoon voor het personeel.
+      allow create: if isBeheerder()
+        && magVestiging(request.resource.data.get('vestiging', ''));
+      allow update: if isPersoneel()
+        && magVestiging(request.resource.data.get('vestiging', ''))
+        && (rapportOpen(resource.data) || isBeheerder());
+      allow delete: if isPersoneel()
+        && magVestiging(resource.data.get('vestiging', ''))
+        && (rapportOpen(resource.data) || isBeheerder());
     }
 
     // --- Evaluaties: /evaluaties/{schooljaar}/leerlingen/{leerlingId} ---------

@@ -224,20 +224,64 @@ export const deelSleutel = (deelevaluatieId: string, studentId: string): string 
  * personeelsaccount), of "" voor de beheerder(smodus). `doorNaam` = de naam van die persoon op
  * het moment van de wijziging, meegeschreven zodat de leerlingweergave de beoordelaar kan tonen
  * zonder de (beheerder-only) `gebruikers`-collectie te lezen. `op` = epoch-ms. `van`/`naar` =
- * de waarde als tekst ("" = leeg; voor een kleur de `Rating`, voor een notitie een korte
- * weergave).
+ * de waarde als tekst ("" = leeg; voor een kleur de `Rating`, voor een notitie/opmerking een
+ * korte weergave). `veld: "opmerking"` is de rapport-tegenhanger van `"notitie"`.
  */
 export interface AuditRegel {
   op: number;
   door: string;
   doorNaam?: string;
-  veld: "kleur" | "notitie";
+  veld: "kleur" | "notitie" | "opmerking";
   van: string;
   naar: string;
 }
 
 /** Sleutel (`doelSleutel` / `deelSleutel`) → chronologische geschiedenis, oudste eerst. */
 export type AuditLog = Record<string, AuditRegel[]>;
+
+/** Eén cursus-item binnen een rapport: manueel gekozen kleur + opmerking, geen berekening. */
+export interface RapportItem {
+  kleur: Rating | null;
+  opmerking: string;
+}
+
+export const LEEG_RAPPORTITEM: RapportItem = { kleur: null, opmerking: "" };
+
+export type RapportStatus = "concept" | "afgewerkt";
+
+/**
+ * Eén rapport voor één leerling op één rapportmoment (bv. "Rapport 1"), volledig handmatig
+ * door de mentor ingevuld — geen afleiding uit de badges. Anders dan de badgematrix (per badge)
+ * gaat een rapport per **cursus**: `cursusItems` is een map cursus-id → kleur + opmerking.
+ * `status: "afgewerkt"` vergrendelt het rapport (enkel een beheerder heropent, zie
+ * `heropenRapport` in `store.ts`) zodat het niet meer wijzigt na het printen/bewaren.
+ */
+export interface Rapport {
+  id: string;
+  studentId: string;
+  schooljaar: string;
+  /** Vrij gekozen naam van het rapportmoment, bv. "Rapport 1" of "Kerst 2026". */
+  naam: string;
+  status: RapportStatus;
+  cursusItems: Record<string, RapportItem>;
+  /** Algemene opmerking, niet gebonden aan één cursus. */
+  algemeneOpmerking: string;
+  aangemaaktOp: number;
+  aangemaaktDoor: string;
+  gewijzigdOp: number;
+  gewijzigdDoor: string;
+  afgewerktOp?: number;
+  afgewerktDoor?: string;
+}
+
+/**
+ * Sleutel voor de wijzigingsgeschiedenis van één cursus-item binnen een rapport (kleur én
+ * opmerking delen dezelfde sleutel — net als `doelSleutel` voor een badge zijn kleur/notitie).
+ * Voorvoegsel `rapport:` zodat `firestoreLayout.ts` deze entries kan onderscheiden van de
+ * badge-/deelbadge-sleutels (die resp. 3- en 2-delig zijn) en naar het juiste rapport-doc routeert.
+ */
+export const rapportItemSleutel = (rapportId: string, cursusId: string): string =>
+  `rapport:${rapportId}:${cursusId}`;
 
 /**
  * Een melding voor het meldingencentrum van de leerling: "nieuwe beoordeling(en) in cursus X".

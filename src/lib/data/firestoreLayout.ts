@@ -8,6 +8,7 @@ import type {
   Melding,
   Mentor,
   Notitie,
+  Rapport,
   Rating,
   Rubriek,
   Stroom,
@@ -24,6 +25,7 @@ import type { PersistedStore, RauweStore } from "./persistentie";
  *   leerlingen/{id}            mentoren/{id}            groepen/{id}
  *   deelbadges/{id}            (= Deelevaluatie + per-leerling scores/notities/audit)
  *   evaluaties/{schooljaar}/leerlingen/{leerlingId}   (= badge-kleuren/notities/gewist/audit)
+ *   rapporten/{id}             (= Rapport, handmatig ingevuld, `vestiging` gedenormaliseerd)
  *   meldingen/{leerlingId}     instellingen/app        instellingen/overlays
  *   curriculum/{stroom}/cursussen/{cursusId}/badges/{badgeId}
  *                             (apart geschreven via schrijfCurriculum; hier NIET in storeNaarDocs)
@@ -38,6 +40,9 @@ const EVAL_PAD = (sj: string, sid: string) => `evaluaties/${sj}/leerlingen/${sid
 
 /** Splits een audit-/gewist-sleutel. `a:b` = deelbadge (deId:sid); `a:b:c` = badge (sj:sid:badgeId). */
 const isDeelSleutel = (k: string) => k.split(":").length === 2;
+
+/** Een rapport-item-sleutel (`rapport:${rapportId}:${cursusId}`, zie `rapportItemSleutel`). */
+const isRapportSleutel = (k: string) => k.startsWith("rapport:");
 
 interface EvalDoc {
   kleuren: Record<string, Rating>;
@@ -106,6 +111,10 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     }
   }
 
+  // Gedenormaliseerd van de leerling — nodig om `deelbadges`/`rapporten` per vestiging af te
+  // schermen (zelfde reden als bij de evaluatie-docs verderop).
+  const vestigingVanLeerling = new Map(s.students.map((l) => [l.id, l.vestiging ?? ""]));
+
   // deelbadges: definitie + per-leerling scores
   for (const d of s.deelevaluaties) {
     const doc: DeelbadgeDoc = { ...d, scores: {}, scoreNotities: {}, scoreAudit: {} };
@@ -123,8 +132,22 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     m.set(`deelbadges/${d.id}`, doc as unknown as DocData);
   }
 
+  // rapporten: volledig doc, plus het gedenormaliseerde vestiging-veld en de geschiedenis per
+  // cursus-item (kleur + opmerking delen een sleutel, zie `rapportItemSleutel`).
+  for (const r of s.rapporten) {
+    const itemAudit: Record<string, AuditRegel[]> = {};
+    const voorvoegsel = `rapport:${r.id}:`;
+    for (const [k, v] of Object.entries(s.auditLog)) {
+      if (k.startsWith(voorvoegsel)) itemAudit[k] = v;
+    }
+    m.set(`rapporten/${r.id}`, {
+      ...r,
+      vestiging: vestigingVanLeerling.get(r.studentId) ?? "",
+      itemAudit,
+    } as unknown as DocData);
+  }
+
   // evaluaties per (schooljaar, leerling)
-  const vestigingVanLeerling = new Map(s.students.map((l) => [l.id, l.vestiging ?? ""]));
   const evalDocs = new Map<string, EvalDoc>();
   const evalDoc = (sj: string, sid: string): EvalDoc => {
     const p = EVAL_PAD(sj, sid);
@@ -157,6 +180,7 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   }
   for (const [k, v] of Object.entries(s.auditLog)) {
     if (isDeelSleutel(k)) continue; // hoort bij een deelbadge-doc
+    if (isRapportSleutel(k)) continue; // hoort bij een rapport-doc
     const [sj, sid] = k.split(":");
     if (sj && sid && neemJaar(sj)) evalDoc(sj, sid).auditLog[k] = v;
   }
@@ -251,6 +275,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   const mentoren: Mentor[] = [];
   const groepen: Groep[] = [];
   const deelevaluaties: Deelevaluatie[] = [];
+  const rapporten: Rapport[] = [];
   const kleuren: Record<string, Rating> = {};
   const notities: Record<string, Notitie> = {};
   const deelKleuren: Record<string, Rating> = {};
@@ -357,6 +382,14 @@ export function docsNaarStore(docs: DocMap): RauweStore {
         for (const [k, v] of Object.entries(scoreAudit ?? {})) auditLog[k] = v;
         break;
       }
+      case "rapporten": {
+        // Het doc draagt ook `vestiging` (enkel voor de regels, geen veld op `Rapport` zelf) —
+        // `storeNaarDocs` overschrijft dat bij elke save opnieuw, dus laten staan is onschadelijk.
+        const r = data as unknown as Rapport & { itemAudit?: Record<string, AuditRegel[]> };
+        rapporten.push(r as Rapport);
+        for (const [k, v] of Object.entries(r.itemAudit ?? {})) auditLog[k] = v;
+        break;
+      }
       case "evaluaties": {
         // evaluaties/{sj}/leerlingen/{sid}
         const sj = seg[1];
@@ -419,6 +452,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   r.mentoren = mentoren;
   r.groepen = groepen;
   r.deelevaluaties = deelevaluaties;
+  r.rapporten = rapporten;
   r.kleuren = kleuren;
   r.notities = notities;
   r.deelKleuren = deelKleuren;

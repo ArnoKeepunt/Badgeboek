@@ -1,19 +1,33 @@
-/** De personeelsrollen. `mentor` is vestiging-gebonden; `coordinator` en `beheerder` niet. */
-export type PersoneelRol = "beheerder" | "coordinator" | "mentor";
+/**
+ * De personeelsrollen. `mentor` en `extern` zijn vestiging-gebonden; `coordinator` en
+ * `beheerder` niet. `extern` ("externe mentor") heeft exact dezelfde rechten als `mentor` —
+ * overal waar de rechten/het gedrag bepaald wordt, tellen ze als hetzelfde (zie
+ * `isMentorachtigeRol`); het is enkel een apart label/rol om ze in de lijst te kunnen
+ * onderscheiden (bv. niet in loondienst).
+ */
+export type PersoneelRol = "beheerder" | "coordinator" | "mentor" | "extern";
 
-export const PERSONEEL_ROLLEN: PersoneelRol[] = ["mentor", "coordinator", "beheerder"];
+export const PERSONEEL_ROLLEN: PersoneelRol[] = ["mentor", "extern", "coordinator", "beheerder"];
 
 export const PERSONEEL_ROL_LABEL: Record<PersoneelRol, string> = {
   beheerder: "Beheerder",
   coordinator: "Coördinator",
   mentor: "Mentor",
+  extern: "Externe mentor",
 };
 
 export const PERSONEEL_ROL_UITLEG: Record<PersoneelRol, string> = {
   beheerder: "Volledige toegang, inclusief accountbeheer en de gegevens-/badgesinstellingen.",
   coordinator: "Alle vestigingen zien en evalueren, maar geen accountbeheer of instellingen.",
   mentor: "Enkel de leerlingen van de aangevinkte vestiging(en).",
+  extern:
+    "Exact dezelfde rechten als een mentor — enkel de leerlingen van de aangevinkte " +
+    "vestiging(en). Louter een apart label voor externe mentoren (bv. niet in loondienst).",
 };
+
+/** Gedraagt deze rol zich als mentor (vestiging-gebonden bereik, geen beheerderstoegang)? */
+export const isMentorachtigeRol = (rol: PersoneelRol): boolean =>
+  rol === "mentor" || rol === "extern";
 
 /** Eén personeelsaccount uit Firestore (`gebruikers/{email}`). Nooit een wachtwoord. */
 export interface Personeelslid {

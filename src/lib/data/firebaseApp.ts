@@ -252,7 +252,10 @@ export function abonneerGebruikers(cb: (lijst: Personeelslid[]) => void): Unsubs
 /** Voeg een personeelslid toe of werk het bij (beheerder). */
 export async function schrijfGebruiker(p: Personeelslid): Promise<void> {
   if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
-  const vestigingen = p.rol === "mentor" ? [...new Set(p.vestigingen)] : [];
+  // Altijd bewaren, ongeacht rol: bij mentor/extern bepaalt dit het echte leerlingenbereik, bij
+  // beheerder/coördinator is het enkel hún eigen "vereenvoudigde weergave"-selectie (zie
+  // `useBereik`) — maar in beide gevallen mag het opslaan het niet stilzwijgend wissen.
+  const vestigingen = [...new Set(p.vestigingen)];
   try {
     await setDoc(gebruikerRef(p.email), {
       email: p.email,

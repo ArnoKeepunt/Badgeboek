@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useBeheerderWeergave, zetVereenvoudigdeWeergave } from "../lib/beheerderWeergave";
 import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
 import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
-import { PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
+import { isMentorachtigeRol, PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
 import { useOpslagStatus } from "../lib/opslagStatus";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useBasisRol, useEffectieveRol } from "../lib/sessie";
@@ -27,6 +27,7 @@ function loadIngeklapt(): boolean {
 
 const PAGINA_TITELS: Record<string, string> = {
   "/badges": "Badgeboek — dagelijks werk",
+  "/rapport": "Rapport",
   "/deelevaluaties": "Deelbadges",
   "/rubrics": "Rubrics",
   "/doelen": "Doelen",
@@ -47,6 +48,11 @@ function paginaTitel(pathname: string, students: Student[]): string {
     const s = students.find((x) => x.id === id);
     return s ? `${s.firstName} ${s.lastName}` : "Leerling";
   }
+  if (pathname.startsWith("/rapport/")) {
+    const id = decodeURIComponent(pathname.slice("/rapport/".length));
+    const s = students.find((x) => x.id === id);
+    return s ? `Rapport — ${s.firstName} ${s.lastName}` : "Rapport";
+  }
   return PAGINA_TITELS[pathname] ?? "Badgeboek";
 }
 
@@ -66,10 +72,17 @@ const leerlingenItem: NavItem = {
 };
 const groepenItem: NavItem = { to: "/groepen", label: "Groepen", end: false, icoon: "groepen" };
 // Naslag: de rubrics-infographic (alleen-lezen voor de mentor).
-// Doelen-item is bewust uit de zijbalk gehaald (pagina/route blijft gewoon bestaan).
+// Doelen-item stond bewust niet in de mentor-zijbalk (pagina/route bleef gewoon bestaan) — de
+// beheerder krijgt 'm terug (zie `beheerderNav`), de mentor-lijst blijft ongewijzigd.
 const doelenGroep: NavGroep = {
   items: [
     { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
+  ],
+};
+const doelenGroepBeheerder: NavGroep = {
+  items: [
+    { to: "/rubrics", label: "Rubrics", end: false, icoon: "rubrics" },
+    { to: "/doelen", label: "Doelen", end: false, icoon: "doelen" },
   ],
 };
 
@@ -82,18 +95,26 @@ const devItems: NavItem[] = [
 // Mentor: badgeboek + eigen groepen + leerlingen + naslag. Iedereen maakt/bewerkt zijn eigen
 // groepen (die blijven privé, zie `Groep.prive`); de Groepen-pagina toont dus ook aan een
 // mentor enkel zijn eigen groepen + de oudere, niet-privé groepen (`useBereik`/`Groepen.tsx`).
+const rapportItem: NavItem = { to: "/rapport", label: "Rapport", end: false, icoon: "rapport" };
+
 const mentorNav: NavGroep[] = [
   overzichtGroep,
-  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }] },
+  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }, rapportItem] },
   { items: [groepenItem, leerlingenItem] },
   doelenGroep,
 ];
 
 const beheerderNav = (dev: boolean): NavGroep[] => [
   overzichtGroep,
-  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }, ...(dev ? devItems : [])] },
+  {
+    items: [
+      { to: "/badges", label: "Badges", end: false, icoon: "badges" },
+      rapportItem,
+      ...(dev ? devItems : []),
+    ],
+  },
   { items: [groepenItem, leerlingenItem] },
-  doelenGroep,
+  doelenGroepBeheerder,
   {
     items: [
       // Accountbeheer heeft de Firestore-database nodig; in local-modus geen nut.
@@ -156,17 +177,24 @@ function PaneelIcoon({ ingeklapt }: { ingeklapt: boolean }) {
 
 // De uitleg staat enkel nog in de title (hover) — de vestiging(en) zelf staan gewoon op het
 // account (Gebruikers); hier enkel de aan/uit-schakelaar, want die moet zonder herladen werken
-// en per browser gelden.
-const BEHEERDERVIEW_UITLEG =
-  "Beheerdersview uit = je ziet enkel je eigen vestiging(en), net als een mentor, en geen " +
+// en per browser gelden. Zelfde schakelaar voor beheerder én coördinator — enkel het label past
+// zich aan (Beheerdersview/Coördinatorview), de werking is identiek.
+const VEREENVOUDIGDEVIEW_LABEL: Record<"beheerder" | "coordinator", string> = {
+  beheerder: "Beheerdersview",
+  coordinator: "Coördinatorview",
+};
+
+const vereenvoudigdeViewUitleg = (label: string) =>
+  `${label} uit = je ziet enkel je eigen vestiging(en), net als een mentor, en geen ` +
   "beheerderspagina's. In te stellen bij Gebruikers. Verandert niets aan je echte rechten — " +
   "enkel op dit scherm, meteen weer aan te zetten.";
 
-function BeheerderModusSchakelaar() {
+function BeheerderModusSchakelaar({ basisRol }: { basisRol: "beheerder" | "coordinator" }) {
   const { vereenvoudigd } = useBeheerderWeergave();
+  const label = VEREENVOUDIGDEVIEW_LABEL[basisRol];
 
   return (
-    <label className="sidebar-beheerdermodus-schakelaar" title={BEHEERDERVIEW_UITLEG}>
+    <label className="sidebar-beheerdermodus-schakelaar" title={vereenvoudigdeViewUitleg(label)}>
       <input
         type="checkbox"
         className="sidebar-beheerdermodus-input"
@@ -176,7 +204,7 @@ function BeheerderModusSchakelaar() {
       <span className="sidebar-beheerdermodus-track" aria-hidden="true">
         <span className="sidebar-beheerdermodus-duim" />
       </span>
-      <span className="sidebar-beheerdermodus-tekst">Beheerdersview</span>
+      <span className="sidebar-beheerdermodus-tekst">{label}</span>
     </label>
   );
 }
@@ -196,7 +224,7 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
     ? aangemeld.rol
     : persoon
       ? PERSONEEL_ROL_LABEL[persoon.rol] +
-        (persoon.rol === "mentor" && persoon.vestigingen.length > 0
+        (isMentorachtigeRol(persoon.rol) && persoon.vestigingen.length > 0
           ? ` · ${persoon.vestigingen.join(", ")}`
           : "")
       : "volledige toegang";
@@ -212,7 +240,9 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
         </span>
       </div>
 
-      {!aangemeld && basisRol === "beheerder" && <BeheerderModusSchakelaar />}
+      {!aangemeld && (basisRol === "beheerder" || basisRol === "coordinator") && (
+        <BeheerderModusSchakelaar basisRol={basisRol} />
+      )}
 
       {aangemeld && (
         <button
@@ -273,7 +303,10 @@ export function Layout() {
       ? beheerderNav(dev)
       : mentorNav;
   const breed =
-    !isLeerling && (pathname.startsWith("/badges") || pathname.startsWith("/students/"));
+    !isLeerling &&
+    (pathname.startsWith("/badges") ||
+      pathname.startsWith("/students/") ||
+      pathname.startsWith("/rapport/"));
   const titel = paginaTitel(pathname, students);
   const opslag = useOpslagStatus();
 

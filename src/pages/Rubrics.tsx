@@ -65,7 +65,8 @@ export function Rubrics() {
 
   const [doelFilter, setDoelFilter] = useState("");
   const [soortFilter, setSoortFilter] = useState<Set<DoelSoort>>(new Set());
-  const [dicht, setDicht] = useState<Set<string>>(new Set()); // sleutel = `${stroom}|${cursus}`
+  // Uitgeklapte cursussen (sleutel = `${stroom}|${cursus}`) — standaard leeg = alles dicht.
+  const [uitgeklapt, setUitgeklapt] = useState<Set<string>>(new Set());
   const [leerlijnOpen, setLeerlijnOpen] = useState<Set<string>>(new Set());
   const [doelOpen, setDoelOpen] = useState<Set<string>>(new Set());
   const [bewerk, setBewerk] = useState<Rubriek | null>(null);
@@ -118,9 +119,9 @@ export function Rubrics() {
     [perStroom],
   );
 
-  const toggleCursus = (sleutel: string) => setDicht((prev) => vervang(prev, sleutel));
-  const allesOpen = () => setDicht(new Set());
-  const allesDicht = () => setDicht(new Set(alleCursusSleutels));
+  const toggleCursus = (sleutel: string) => setUitgeklapt((prev) => vervang(prev, sleutel));
+  const allesOpen = () => setUitgeklapt(new Set(alleCursusSleutels));
+  const allesDicht = () => setUitgeklapt(new Set());
   const toggleLeerlijn = (id: string) => setLeerlijnOpen((prev) => vervang(prev, id));
   const toggleDoel = (sleutel: string) => setDoelOpen((prev) => vervang(prev, sleutel));
   const toggleSoort = (s: DoelSoort) =>
@@ -228,7 +229,7 @@ export function Rubrics() {
                 )
               : perCursus.map(([cursus, lijst]) => {
                   const sleutel = `${stroom}|${cursus}`;
-                  const open = filterActief || !dicht.has(sleutel);
+                  const open = filterActief || uitgeklapt.has(sleutel);
                   return (
                     <div key={sleutel} className="doel-comp">
                       <button

@@ -9,6 +9,7 @@ import {
   type Personeelslid,
   type PersoneelRol,
   isBootstrapAdmin,
+  isMentorachtigeRol,
 } from "../lib/gebruikers";
 import { useStore } from "../lib/store";
 import { vestigingKeuzes } from "../lib/vestigingen";
@@ -75,8 +76,8 @@ export function Gebruikers() {
       setMelding("Vul een naam in.");
       return;
     }
-    if (p.rol === "mentor" && p.vestigingen.length === 0) {
-      setMelding("Vink minstens één vestiging aan voor een mentor.");
+    if (isMentorachtigeRol(p.rol) && p.vestigingen.length === 0) {
+      setMelding(`Vink minstens één vestiging aan voor een ${PERSONEEL_ROL_LABEL[p.rol].toLowerCase()}.`);
       return;
     }
     try {
@@ -207,13 +208,13 @@ export function Gebruikers() {
               <span
                 className="gebruikers-rol"
                 title={
-                  p.rol === "mentor" && p.vestigingen.length > 0
+                  isMentorachtigeRol(p.rol) && p.vestigingen.length > 0
                     ? p.vestigingen.join(", ")
                     : undefined
                 }
               >
                 {PERSONEEL_ROL_LABEL[p.rol]}
-                {p.rol === "mentor" && p.vestigingen.length > 0 && (
+                {isMentorachtigeRol(p.rol) && p.vestigingen.length > 0 && (
                   <span className="gebruikers-rol-vestiging">
                     {" · "}
                     {p.vestigingen.length <= 2
@@ -332,7 +333,7 @@ function GebruikerForm({
         </select>
       </label>
       <p className="gebruikers-roluitleg">{PERSONEEL_ROL_UITLEG[p.rol]}</p>
-      {(p.rol === "mentor" || p.rol === "beheerder") && (
+      {(isMentorachtigeRol(p.rol) || p.rol === "beheerder") && (
         <div className="de-veld">
           <span>Vestigingen</span>
           {vestigingen.length === 0 ? (
@@ -342,7 +343,7 @@ function GebruikerForm({
           ) : (
             <ul
               className="keuzelijst"
-              aria-label={`Vestigingen voor deze ${p.rol === "mentor" ? "mentor" : "beheerder"}`}
+              aria-label={`Vestigingen voor deze ${PERSONEEL_ROL_LABEL[p.rol].toLowerCase()}`}
             >
               {vestigingen.map((v) => {
                 const aan = p.vestigingen.includes(v);
@@ -370,7 +371,7 @@ function GebruikerForm({
               })}
             </ul>
           )}
-          {p.rol === "mentor" && vestigingen.length > 0 && p.vestigingen.length === 0 && (
+          {isMentorachtigeRol(p.rol) && vestigingen.length > 0 && p.vestigingen.length === 0 && (
             <p className="gebruikers-roluitleg">Kies minstens één vestiging.</p>
           )}
           {p.rol === "beheerder" && (

@@ -56,6 +56,8 @@ import type {
   Mentor,
   Notitie,
   Notities,
+  Rapport,
+  RapportItem,
   Rating,
   Rubriek,
   Sessie,
@@ -63,11 +65,13 @@ import type {
   Student,
 } from "./types";
 import {
+  LEEG_RAPPORTITEM,
   LEGE_NOTITIE,
   STROMEN,
   deelSleutel,
   doelSleutel,
   notitieSleutel,
+  rapportItemSleutel,
 } from "./types";
 
 /**
@@ -120,6 +124,7 @@ const seed = (): PersistedStore => ({
   meldingen: seedMeldingen,
   meldingGezien: {},
   gewist: [],
+  rapporten: [],
 });
 
 /**
@@ -160,6 +165,7 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   }
   if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
   if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
+  basis.rapporten = Array.isArray(bewaard.rapporten) ? bewaard.rapporten : [];
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
   basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
   zetCurriculum(basis.curriculumOverride);
@@ -850,10 +856,17 @@ function samengevoegdeLeerling(bestaand: Student | undefined, nieuw: Student): S
  * Voeg leerlingen toe of werk ze bij op basis van hun `id`. Bestaande leerlingen die niet in
  * de lijst zitten, blijven staan — zo gaan bij een jaarovergang geen evaluaties verloren.
  */
-export function upsertStudenten(nieuwe: Student[]) {
+export function upsertStudenten(nieuwe: Student[]): { toegevoegd: number; bijgewerkt: number } {
   const perId = new Map(state.students.map((s) => [s.id, s]));
-  for (const s of nieuwe) perId.set(s.id, samengevoegdeLeerling(perId.get(s.id), s));
+  let toegevoegd = 0;
+  let bijgewerkt = 0;
+  for (const s of nieuwe) {
+    if (perId.has(s.id)) bijgewerkt += 1;
+    else toegevoegd += 1;
+    perId.set(s.id, samengevoegdeLeerling(perId.get(s.id), s));
+  }
   commit({ ...state, students: [...perId.values()] });
+  return { toegevoegd, bijgewerkt };
 }
 
 /** Vervang de volledige leerlingenlijst (evaluaties van verdwenen id's blijven wel bewaard). */
@@ -1132,6 +1145,16 @@ export function wisRubriekenOverride() {
   commit({ ...state, rubriekenOverride: null });
 }
 
+/**
+ * Zet een geïmporteerde rubrics-lijst (bv. een CSV-upload op /gegevens) meteen als de nieuwe
+ * database-versie — zelfde effect als `zetRubriekenInDatabase`, maar met vers geïmporteerde
+ * data i.p.v. de huidige bundel/database-stand. Losse patches (`rubriekWijzigingen`) vervallen:
+ * de import is voortaan de bron.
+ */
+export function zetRubriekenUitImport(rubrieken: Rubriek[]) {
+  commit({ ...state, rubriekenOverride: rubrieken, rubriekWijzigingen: {} });
+}
+
 /** Bewaar een bewerking aan één uitgeschreven rubric (op basis van zijn id). */
 export function wijzigRubriek(id: string, patch: Partial<Omit<Rubriek, "id" | "cursus" | "stroom">>) {
   if (state.rubriekenOverride) {
@@ -1346,6 +1369,185 @@ export function setDeelKleurBulk(
     auditLog: metAudit(state.auditLog, wijzigingen),
     meldingen,
     gewist,
+  });
+}
+
+// --- Rapporten --------------------------------------------------------------
+//
+// Eén rapport per leerling per rapportmoment, volledig handmatig ingevuld (kleur + opmerking
+// per cursus, geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt het rapport —
+// `wijzigRapportItem`/`zetRapportAlgemeneOpmerking` negeren dan stil, net als bij een afgesloten
+// schooljaar. Enkel `heropenRapport` mag dat ongedaan maken; de UI toont die knop enkel aan een
+// beheerder (`useEffectieveRol`), Firestore-regels dwingen het ook server-side af.
+
+/** De rapporten van één leerling in één schooljaar, nieuwste eerst. */
+export const rapportenVoorStudent = (
+  rapporten: Rapport[],
+  studentId: string,
+  schooljaar: string,
+): Rapport[] =>
+  rapporten
+    .filter((r) => r.studentId === studentId && r.schooljaar === schooljaar)
+    .sort((a, b) => b.aangemaaktOp - a.aangemaaktOp);
+
+const rapport = (id: string) => state.rapporten.find((r) => r.id === id);
+const rapportVergrendeld = (id: string): boolean => rapport(id)?.status === "afgewerkt";
+
+/** Maak een nieuw (leeg, concept) rapport voor één leerling/rapportmoment en geef de id terug. */
+export function maakRapport(studentId: string, schooljaar: string, naam: string): string {
+  const nu = Date.now();
+  const id = `rap${nu.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const wie = huidigeGebruiker();
+  const nieuw: Rapport = {
+    id,
+    studentId,
+    schooljaar,
+    naam: naam.trim() || "Rapport",
+    status: "concept",
+    cursusItems: {},
+    algemeneOpmerking: "",
+    aangemaaktOp: nu,
+    aangemaaktDoor: wie,
+    gewijzigdOp: nu,
+    gewijzigdDoor: wie,
+  };
+  commit({ ...state, rapporten: [...state.rapporten, nieuw] });
+  return id;
+}
+
+/**
+ * Maak hetzelfde (nieuwe, lege, concept) rapportmoment aan voor meerdere leerlingen tegelijk, in
+ * één opslagbeurt — zo hoeft een mentor niet per leerling apart op "+ Nieuw rapportmoment" te
+ * klikken wanneer bv. een hele vestiging/klas op hetzelfde moment ("Rapport 1") moet starten.
+ * Slaat een leerling over die al een rapport met die naam heeft in dat schooljaar, zodat dit
+ * veilig herhaald kan worden (bv. na een laattijdige inschrijving). Geeft de nieuwe id's terug.
+ */
+export function maakRapportenBulk(
+  studentIds: string[],
+  schooljaar: string,
+  naam: string,
+): string[] {
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const naamGetrimd = naam.trim() || "Rapport";
+  const heeftAl = (studentId: string) =>
+    state.rapporten.some(
+      (r) => r.studentId === studentId && r.schooljaar === schooljaar && r.naam === naamGetrimd,
+    );
+  const nieuw: Rapport[] = [];
+  studentIds.forEach((studentId, i) => {
+    if (heeftAl(studentId) || nieuw.some((r) => r.studentId === studentId)) return;
+    nieuw.push({
+      id: `rap${nu.toString(36)}${i}${Math.random().toString(36).slice(2, 6)}`,
+      studentId,
+      schooljaar,
+      naam: naamGetrimd,
+      status: "concept",
+      cursusItems: {},
+      algemeneOpmerking: "",
+      aangemaaktOp: nu,
+      aangemaaktDoor: wie,
+      gewijzigdOp: nu,
+      gewijzigdDoor: wie,
+    });
+  });
+  if (nieuw.length > 0) commit({ ...state, rapporten: [...state.rapporten, ...nieuw] });
+  return nieuw.map((r) => r.id);
+}
+
+/** Verwijder een rapport volledig. */
+export function verwijderRapport(id: string) {
+  commit({ ...state, rapporten: state.rapporten.filter((r) => r.id !== id) });
+}
+
+/** De kleur/opmerking van één cursus binnen een rapport (leeg als er nog niets is). */
+export function getRapportItem(rapport_: Rapport, cursusId: string): RapportItem {
+  return rapport_.cursusItems[cursusId] ?? LEEG_RAPPORTITEM;
+}
+
+/** Zet (patch) de kleur en/of opmerking van één cursus binnen een rapport. */
+export function wijzigRapportItem(id: string, cursusId: string, patch: Partial<RapportItem>) {
+  if (rapportVergrendeld(id)) return;
+  const target = state.rapporten.find((r) => r.id === id);
+  if (!target) return;
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const huidig = target.cursusItems[cursusId] ?? LEEG_RAPPORTITEM;
+  const item: RapportItem = { ...huidig, ...patch };
+  // Kleur en opmerking delen dezelfde sleutel (net als een badge zijn kleur/notitie) — het
+  // paneel toont dus één gemengde geschiedenis voor deze cursus-cel.
+  const sleutel = rapportItemSleutel(id, cursusId);
+  const wijzigingen: Wijziging[] = [];
+  if (patch.kleur !== undefined && patch.kleur !== huidig.kleur) {
+    wijzigingen.push({ sleutel, veld: "kleur", van: huidig.kleur ?? "", naar: item.kleur ?? "" });
+  }
+  if (patch.opmerking !== undefined && patch.opmerking !== huidig.opmerking) {
+    wijzigingen.push({ sleutel, veld: "opmerking", van: huidig.opmerking, naar: item.opmerking });
+  }
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? { ...r, cursusItems: { ...r.cursusItems, [cursusId]: item }, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
+    auditLog: metAudit(state.auditLog, wijzigingen),
+  });
+}
+
+/** Zet de algemene opmerking (niet gebonden aan één cursus) van een rapport. */
+export function zetRapportAlgemeneOpmerking(id: string, tekst: string) {
+  if (rapportVergrendeld(id)) return;
+  const target = state.rapporten.find((r) => r.id === id);
+  if (!target) return;
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const gewijzigd = target.algemeneOpmerking !== tekst;
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? { ...r, algemeneOpmerking: tekst, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
+    auditLog: gewijzigd
+      ? metAudit(state.auditLog, [
+          {
+            sleutel: rapportItemSleutel(id, "algemeen"),
+            veld: "opmerking",
+            van: target.algemeneOpmerking,
+            naar: tekst,
+          },
+        ])
+      : state.auditLog,
+  });
+}
+
+/** Zet een rapport op "afgewerkt" — vergrendelt het (zie boven). */
+export function rondRapportAf(id: string) {
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? { ...r, status: "afgewerkt", afgewerktOp: nu, afgewerktDoor: wie, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
+  });
+}
+
+/** Heropen een afgewerkt rapport (terug naar concept). De UI gate dit tot een beheerder. */
+export function heropenRapport(id: string) {
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? { ...r, status: "concept", afgewerktOp: undefined, afgewerktDoor: undefined, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
   });
 }
 

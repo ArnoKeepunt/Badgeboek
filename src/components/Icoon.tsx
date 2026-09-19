@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 export type IcoonNaam =
   | "overzicht"
   | "badges"
+  | "rapport"
   | "deelevaluaties"
   | "rubrics"
   | "doelen"
@@ -42,6 +43,14 @@ const paden: Record<IcoonNaam, ReactNode> = {
     <>
       <circle cx="12" cy="9" r="5" />
       <path d="M8.5 13.5 7 21l5-2.5L17 21l-1.5-7.5" />
+    </>
+  ),
+  // Rapport — een blad met regels en een kleurstip (het rapportmoment) rechtsboven.
+  rapport: (
+    <>
+      <path d="M6 3h9l3 3v15H6z" />
+      <path d="M9 11h6M9 14.5h6M9 18h4" />
+      <circle cx="16.5" cy="6.5" r="1.4" fill="currentColor" stroke="none" />
     </>
   ),
   // Deelevaluaties — een afgevinkte checklist.

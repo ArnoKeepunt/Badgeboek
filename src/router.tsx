@@ -16,6 +16,12 @@ import { NotFound } from "./pages/NotFound";
 // oxlint-disable-next-line react/only-export-components
 const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.Badges })));
 // oxlint-disable-next-line react/only-export-components
+const Rapport = lazy(() => import("./pages/Rapport").then((m) => ({ default: m.Rapport })));
+// oxlint-disable-next-line react/only-export-components
+const RapportDetail = lazy(() =>
+  import("./pages/RapportDetail").then((m) => ({ default: m.RapportDetail })),
+);
+// oxlint-disable-next-line react/only-export-components
 const Deelevaluaties = lazy(() =>
   import("./pages/Deelevaluaties").then((m) => ({ default: m.Deelevaluaties })),
 );
@@ -55,6 +61,8 @@ export const router = createHashRouter([
       { path: "aanmelden", element: <AlleenBeheerder>{<Aanmelden />}</AlleenBeheerder> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
+      { path: "rapport", element: traag(<Rapport />) },
+      { path: "rapport/:studentId", element: traag(<RapportDetail />) },
       { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
       { path: "rubrics", element: traag(<Rubrics />) },
       { path: "doelen", element: traag(<Doelen />) },
