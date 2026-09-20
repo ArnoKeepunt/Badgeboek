@@ -61,8 +61,13 @@ export const router = createHashRouter([
       { path: "aanmelden", element: <AlleenBeheerder>{<Aanmelden />}</AlleenBeheerder> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
       { path: "badges", element: traag(<Badges />) },
-      { path: "rapport", element: traag(<Rapport />) },
-      { path: "rapport/:studentId", element: traag(<RapportDetail />) },
+      // TIJDELIJK (2026-09-20, op vraag van Arno): enkel de beheerder mag het rapport zien —
+      // zet terug naar de kale `traag(...)`-vorm (zoals bv. /badges) om dit weer open te zetten.
+      { path: "rapport", element: <AlleenBeheerder>{traag(<Rapport />)}</AlleenBeheerder> },
+      {
+        path: "rapport/:studentId",
+        element: <AlleenBeheerder>{traag(<RapportDetail />)}</AlleenBeheerder>,
+      },
       { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
       { path: "rubrics", element: traag(<Rubrics />) },
       { path: "doelen", element: traag(<Doelen />) },
