@@ -165,7 +165,19 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   }
   if (!Array.isArray(bewaard.meldingen)) basis.meldingen = standaard.meldingen;
   if (!bewaard.meldingGezien) basis.meldingGezien = standaard.meldingGezien;
-  basis.rapporten = Array.isArray(bewaard.rapporten) ? bewaard.rapporten : [];
+  // Migratie: `Rapport.cursusItems` (kleur/opmerking per cursus) is op 2026-09-22 vervangen door
+  // `rubriekItems` (kleur per rubric) + `cursusOpmerkingen` (opmerking per cursus, zie
+  // `getRapportItem`/`zetRapportRubriekKleur`/`zetRapportCursusOpmerking`). Een rapport dat van
+  // vóór (een van) die wijzigingen bewaard is gebleven (localStorage of Firestore) mist dus
+  // mogelijk één van beide velden — zonder deze normalisatie crasht de rapportpagina op een
+  // ontbrekend veld. Er is geen zinvolle automatische omzetting (één cursuskleur → welke rubric
+  // precies?), dus zo'n oud rapport start gewoon leeg voor de rubrics/opmerkingen; de oude
+  // `cursusItems` (indien aanwezig) wordt genegeerd.
+  basis.rapporten = (Array.isArray(bewaard.rapporten) ? bewaard.rapporten : []).map((r) => ({
+    ...r,
+    rubriekItems: r.rubriekItems ?? {},
+    cursusOpmerkingen: r.cursusOpmerkingen ?? {},
+  }));
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
   basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
   zetCurriculum(basis.curriculumOverride);
@@ -388,12 +400,18 @@ opslag.abonneer?.((rauw) => {
       rubriekenOverride: behoudRubrieken ? state.rubriekenOverride : rauw.rubriekenOverride,
     };
     // `matrixStromen`/`matrixCursus` zijn per-browser en leven buiten `verwerkRauw` — een
-    // live update van elders mag de lokale voorkeur niet overschrijven.
+    // live update van elders mag de lokale voorkeur niet overschrijven. `schooljaar` (het
+    // **bekeken** jaar, via de `SchooljaarKiezer`) is ook per-browser (zie `storeNaarDocs`) en
+    // rijdt dus wél door `verwerkRauw` (blijft op `PersistedStore` staan, `bewaar()` heeft het
+    // intern nodig), maar moet hier expliciet behouden blijven: `gehydrateerd.schooljaar` komt
+    // niet meer uit `instellingen/app`, dus zonder dit zou elke live snapshot het terugzetten
+    // op `HUIDIG_SCHOOLJAAR` i.p.v. het bekeken jaar te laten staan.
     state = {
       ...verwerkRauw(gehydrateerd),
       sessie: state.sessie,
       matrixStromen: state.matrixStromen,
       matrixCursus: state.matrixCursus,
+      schooljaar: state.schooljaar,
     };
     listeners.forEach((notify) => notify());
   } catch {
@@ -1374,11 +1392,12 @@ export function setDeelKleurBulk(
 
 // --- Rapporten --------------------------------------------------------------
 //
-// Eén rapport per leerling per rapportmoment, volledig handmatig ingevuld (kleur + opmerking
-// per cursus, geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt het rapport —
-// `wijzigRapportItem`/`zetRapportAlgemeneOpmerking` negeren dan stil, net als bij een afgesloten
-// schooljaar. Enkel `heropenRapport` mag dat ongedaan maken; de UI toont die knop enkel aan een
-// beheerder (`useEffectieveRol`), Firestore-regels dwingen het ook server-side af.
+// Eén rapport per leerling per rapportmoment, volledig handmatig ingevuld: kleur per rubric,
+// opmerking per cursus (geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt het
+// rapport — `zetRapportRubriekKleur`/`zetRapportCursusOpmerking`/`zetRapportAlgemeneOpmerking`
+// negeren dan stil, net als bij een afgesloten schooljaar. Enkel `heropenRapport` mag dat
+// ongedaan maken; de UI toont die knop enkel aan een beheerder (`useEffectieveRol`),
+// Firestore-regels dwingen het ook server-side af.
 
 /** De rapporten van één leerling in één schooljaar, nieuwste eerst. */
 export const rapportenVoorStudent = (
@@ -1404,7 +1423,8 @@ export function maakRapport(studentId: string, schooljaar: string, naam: string)
     schooljaar,
     naam: naam.trim() || "Rapport",
     status: "concept",
-    cursusItems: {},
+    rubriekItems: {},
+    cursusOpmerkingen: {},
     algemeneOpmerking: "",
     aangemaaktOp: nu,
     aangemaaktDoor: wie,
@@ -1443,7 +1463,8 @@ export function maakRapportenBulk(
       schooljaar,
       naam: naamGetrimd,
       status: "concept",
-      cursusItems: {},
+      rubriekItems: {},
+      cursusOpmerkingen: {},
       algemeneOpmerking: "",
       aangemaaktOp: nu,
       aangemaaktDoor: wie,
@@ -1460,38 +1481,67 @@ export function verwijderRapport(id: string) {
   commit({ ...state, rapporten: state.rapporten.filter((r) => r.id !== id) });
 }
 
-/** De kleur/opmerking van één cursus binnen een rapport (leeg als er nog niets is). */
-export function getRapportItem(rapport_: Rapport, cursusId: string): RapportItem {
-  return rapport_.cursusItems[cursusId] ?? LEEG_RAPPORTITEM;
+/** De kleur van één rubric binnen een rapport (leeg als er nog niets gekozen is). */
+export function getRapportItem(rapport_: Rapport, rubriekId: string): RapportItem {
+  return rapport_.rubriekItems[rubriekId] ?? LEEG_RAPPORTITEM;
 }
 
-/** Zet (patch) de kleur en/of opmerking van één cursus binnen een rapport. */
-export function wijzigRapportItem(id: string, cursusId: string, patch: Partial<RapportItem>) {
+/** Zet de kleur van één rubric binnen een rapport. */
+export function zetRapportRubriekKleur(id: string, rubriekId: string, kleur: Rating | null) {
   if (rapportVergrendeld(id)) return;
   const target = state.rapporten.find((r) => r.id === id);
   if (!target) return;
   const nu = Date.now();
   const wie = huidigeGebruiker();
-  const huidig = target.cursusItems[cursusId] ?? LEEG_RAPPORTITEM;
-  const item: RapportItem = { ...huidig, ...patch };
-  // Kleur en opmerking delen dezelfde sleutel (net als een badge zijn kleur/notitie) — het
-  // paneel toont dus één gemengde geschiedenis voor deze cursus-cel.
-  const sleutel = rapportItemSleutel(id, cursusId);
-  const wijzigingen: Wijziging[] = [];
-  if (patch.kleur !== undefined && patch.kleur !== huidig.kleur) {
-    wijzigingen.push({ sleutel, veld: "kleur", van: huidig.kleur ?? "", naar: item.kleur ?? "" });
-  }
-  if (patch.opmerking !== undefined && patch.opmerking !== huidig.opmerking) {
-    wijzigingen.push({ sleutel, veld: "opmerking", van: huidig.opmerking, naar: item.opmerking });
-  }
+  const huidig = target.rubriekItems[rubriekId] ?? LEEG_RAPPORTITEM;
+  if (kleur === huidig.kleur) return;
+  const sleutel = rapportItemSleutel(id, rubriekId);
   commit({
     ...state,
     rapporten: state.rapporten.map((r) =>
       r.id === id
-        ? { ...r, cursusItems: { ...r.cursusItems, [cursusId]: item }, gewijzigdOp: nu, gewijzigdDoor: wie }
+        ? {
+            ...r,
+            rubriekItems: { ...r.rubriekItems, [rubriekId]: { kleur } },
+            gewijzigdOp: nu,
+            gewijzigdDoor: wie,
+          }
         : r,
     ),
-    auditLog: metAudit(state.auditLog, wijzigingen),
+    auditLog: metAudit(state.auditLog, [
+      { sleutel, veld: "kleur", van: huidig.kleur ?? "", naar: kleur ?? "" },
+    ]),
+  });
+}
+
+/** De opmerking van één cursus binnen een rapport (leeg als er nog niets is). */
+export function getRapportCursusOpmerking(rapport_: Rapport, cursusId: string): string {
+  return rapport_.cursusOpmerkingen[cursusId] ?? "";
+}
+
+/** Zet de opmerking van één cursus binnen een rapport (niet per rubric — bewuste keuze). */
+export function zetRapportCursusOpmerking(id: string, cursusId: string, tekst: string) {
+  if (rapportVergrendeld(id)) return;
+  const target = state.rapporten.find((r) => r.id === id);
+  if (!target) return;
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const huidig = target.cursusOpmerkingen[cursusId] ?? "";
+  if (tekst === huidig) return;
+  const sleutel = rapportItemSleutel(id, cursusId);
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            cursusOpmerkingen: { ...r.cursusOpmerkingen, [cursusId]: tekst },
+            gewijzigdOp: nu,
+            gewijzigdDoor: wie,
+          }
+        : r,
+    ),
+    auditLog: metAudit(state.auditLog, [{ sleutel, veld: "opmerking", van: huidig, naar: tekst }]),
   });
 }
 

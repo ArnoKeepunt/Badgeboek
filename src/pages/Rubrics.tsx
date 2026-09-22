@@ -14,9 +14,10 @@ import {
   codeMatchtPrefix,
   zoekDoel,
 } from "../lib/rubriekDoelen";
+import { KLEUR_KEY, KLEUREN } from "../lib/rubrieken";
 import { useEffectieveRol } from "../lib/sessie";
 import { rubriekIsBewerkt, rubriekenLijst, setMatrixCursus, useStore } from "../lib/store";
-import { STROOM_LABEL, type Kleurcriteria, type Rubriek } from "../lib/types";
+import { STROOM_LABEL, type Rubriek } from "../lib/types";
 
 function PotloodIcoon() {
   return (
@@ -30,17 +31,6 @@ function PotloodIcoon() {
     </svg>
   );
 }
-
-/** Rubrics beschrijven enkel de vier kleuren (geen witte statussen). */
-const KLEUREN = ["blue", "green", "yellow", "red"] as const;
-
-/** Kleur → sleutel in `Kleurcriteria`. */
-const KLEUR_KEY: Record<(typeof KLEUREN)[number], keyof Kleurcriteria> = {
-  red: "rood",
-  yellow: "geel",
-  green: "groen",
-  blue: "blauw",
-};
 
 interface KaartItem {
   r: Rubriek;

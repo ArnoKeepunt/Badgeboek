@@ -12,6 +12,12 @@ export interface MatrixVoorkeur {
  * `firestoreLayout.ts`, `instellingen/app`) — maar leeft per browser in `localStorage`. Zo
  * bepaalt de laatste klik van de ene mentor niet mee wat een andere mentor of de beheerder te
  * zien krijgt. Vergelijkbaar met `sessieOpslag`, die de sessie zelf per browsertab houdt.
+ *
+ * Het **bekeken** schooljaar (`SchooljaarKiezer`) is om dezelfde reden een per-browser voorkeur,
+ * maar heeft geen eigen bestand zoals dit: `schooljaar` blijft op `PersistedStore` staan (de
+ * firebase-persistentielaag heeft het intern nodig om te weten welk jaar te synchroniseren), enkel
+ * `storeNaarDocs`/`docsNaarStore` (`firestoreLayout.ts`) laten het bewust weg uit het gedeelde
+ * `instellingen/app`-document.
  */
 const MATRIX_VOORKEUR_KEY = "keerpunt-badgeboek:matrix-voorkeur";
 

@@ -103,15 +103,15 @@ beforeEach(async () => {
       db.doc("deelbadges/de-oud").set({ titel: "Oude toets", schooljaar: OUD, scores: {}, vestiging: "Gent" }),
       db.doc("rapporten/rap-concept").set({
         studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 1", status: "concept",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Gent",
       }),
       db.doc("rapporten/rap-afgewerkt").set({
         studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 0", status: "afgewerkt",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Gent",
       }),
       db.doc("rapporten/rap-molenbeek").set({
         studentId: "ll-molenbeek", schooljaar: JAAR, naam: "Rapport 1", status: "concept",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
       }),
       db.doc("curriculum/1A").set({}),
       db.doc("curriculum/1A/cursussen/c1").set({ naam: "Cursus", volgorde: 0 }),
@@ -344,13 +344,13 @@ describe("rapporten — handmatige rapporten per leerling", () => {
     await assertFails(
       mentor.doc("rapporten/rap-nieuw").set({
         studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 2", status: "concept",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Gent",
       }),
     );
     await assertSucceeds(
       beheerder.doc("rapporten/rap-nieuw").set({
         studentId: "ll-gent", schooljaar: JAAR, naam: "Rapport 2", status: "concept",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Gent",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Gent",
       }),
     );
     // En ook de beheerder niet voor een niet-bestaande vestiging (magVestiging faalt niet voor
@@ -358,7 +358,7 @@ describe("rapporten — handmatige rapporten per leerling", () => {
     await assertSucceeds(
       beheerder.doc("rapporten/rap-nieuw2").set({
         studentId: "ll-molenbeek", schooljaar: JAAR, naam: "Rapport", status: "concept",
-        cursusItems: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
+        rubriekItems: {}, cursusOpmerkingen: {}, algemeneOpmerking: "", vestiging: "Molenbeek",
       }),
     );
   });

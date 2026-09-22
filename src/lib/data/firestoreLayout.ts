@@ -41,7 +41,7 @@ const EVAL_PAD = (sj: string, sid: string) => `evaluaties/${sj}/leerlingen/${sid
 /** Splits een audit-/gewist-sleutel. `a:b` = deelbadge (deId:sid); `a:b:c` = badge (sj:sid:badgeId). */
 const isDeelSleutel = (k: string) => k.split(":").length === 2;
 
-/** Een rapport-item-sleutel (`rapport:${rapportId}:${cursusId}`, zie `rapportItemSleutel`). */
+/** Een rapport-item-sleutel (`rapport:${rapportId}:${rubriekId}`, zie `rapportItemSleutel`). */
 const isRapportSleutel = (k: string) => k.startsWith("rapport:");
 
 interface EvalDoc {
@@ -133,7 +133,7 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   }
 
   // rapporten: volledig doc, plus het gedenormaliseerde vestiging-veld en de geschiedenis per
-  // cursus-item (kleur + opmerking delen een sleutel, zie `rapportItemSleutel`).
+  // rubric-item (kleur + opmerking delen een sleutel, zie `rapportItemSleutel`).
   for (const r of s.rapporten) {
     const itemAudit: Record<string, AuditRegel[]> = {};
     const voorvoegsel = `rapport:${r.id}:`;
@@ -203,12 +203,15 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   }
   for (const [p, d] of meldDocs) m.set(p, d as unknown as DocData);
 
-  // Let op: de stroom-/cursusfilter van de matrix-pagina's (`matrixStromen`/`matrixCursus`)
-  // rijdt hier bewust NIET mee — dat is een per-browser UI-voorkeur (`matrixVoorkeur.ts`), geen
-  // personeel-brede instelling. Anders bepaalt de laatste klik van de ene mentor wat een ander
-  // te zien krijgt.
+  // Let op: de stroom-/cursusfilter van de matrix-pagina's (`matrixStromen`/`matrixCursus`) én
+  // het **bekeken** schooljaar (de `SchooljaarKiezer`) rijden hier bewust NIET mee — dat zijn
+  // per-browser UI-voorkeuren, geen personeel-brede instelling. Anders bepaalt de laatste klik
+  // van de ene mentor wat een ander live te zien krijgt (bv. iedereen die mee terugspringt naar
+  // een archiefjaar zodra één mentor dat even bekijkt). `s.schooljaar` blijft wel gewoon op
+  // `PersistedStore` staan — `bewaar()` in `firebasePersistentie.ts` heeft dat intern nodig om te
+  // weten op welk schooljaar de `evaluaties/…`-luisteraar moet draaien — het wordt hier alleen
+  // niet mee weggeschreven naar dit gedeelde document.
   m.set("instellingen/app", {
-    schooljaar: s.schooljaar,
     afgeslotenSchooljaren: s.afgeslotenSchooljaren ?? null,
   });
   m.set("instellingen/overlays", overlaysNaarDoc(s));
@@ -410,7 +413,8 @@ export function docsNaarStore(docs: DocMap): RauweStore {
       }
       case "instellingen": {
         if (seg[1] === "app") {
-          r.schooljaar = data.schooljaar as string;
+          // Geen `r.schooljaar` hier: dat is een per-browser voorkeur en rijdt bewust niet mee
+          // in dit gedeelde document, zie de comment bij `storeNaarDocs` hierboven.
           r.afgeslotenSchooljaren = (data.afgeslotenSchooljaren as string[] | null) ?? null;
         } else if (seg[1] === "overlays") {
           r.doelWijzigingen = data.doelWijzigingen as RauweStore["doelWijzigingen"];

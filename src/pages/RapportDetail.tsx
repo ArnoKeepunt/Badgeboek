@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ColorBar } from "../components/ColorBar";
 import { usePopover } from "../lib/popover";
+import { NotitieVeld } from "../components/NotitieVeld";
 import { RapportOpmerkingVeld } from "../components/RapportOpmerkingVeld";
 import { RatingCell } from "../components/RatingCell";
 import { cursussenVoorStroom, leerdoelenVoorCursus } from "../lib/curriculum";
+import { deelevaluatiesVoorBadge } from "../lib/deelevaluaties";
 import { groepLeden } from "../lib/groepen";
 import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import {
@@ -19,17 +21,25 @@ import {
 } from "../lib/leerlingen";
 import { RATING_EMPTY_LABEL, RATING_KORT, RATING_LABEL } from "../lib/ratings";
 import { magLeerlingZien, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { downloadRapportPdf } from "../lib/rapportPdf";
+import { KLEUR_KEY, KLEUREN, rubriekenVoorCursus } from "../lib/rubrieken";
 import { useEffectieveRol } from "../lib/sessie";
 import {
+  getDeelKleur,
+  getDeelNotitie,
   getDoelKleur,
+  getNotitie,
+  getRapportCursusOpmerking,
   getRapportItem,
   heropenRapport,
   rapportenVoorStudent,
   rondRapportAf,
+  rubriekenLijst,
   useStore,
   verwijderRapport,
-  wijzigRapportItem,
   zetRapportAlgemeneOpmerking,
+  zetRapportCursusOpmerking,
+  zetRapportRubriekKleur,
 } from "../lib/store";
 import type { Rapport } from "../lib/types";
 import { rapportItemSleutel } from "../lib/types";
@@ -92,16 +102,55 @@ function PijlIcoon({ richting }: { richting: "links" | "rechts" }) {
 }
 
 /**
- * Rapport voor één leerling: links het rapport zelf (kleur + opmerking per **cursus**, volledig
- * handmatig), rechts een alleen-lezen naslagpaneel met alle badges van de leerling — zodat de
- * mentor bij het kiezen van een cursuskleur meteen de onderliggende badges kan bekijken, zonder
- * naar een andere pagina te moeten springen. Een rapport is per rapportmoment (bv. "Rapport 1")
- * en kan afgewerkt/vergrendeld worden; een `printweergave` (enkel zichtbaar bij het afdrukken)
- * maakt er een printbaar/pdf-baar document van via de browser (Ctrl/Cmd+P → "Opslaan als pdf").
+ * Rapport voor één leerling: links het rapport zelf, rechts een alleen-lezen naslagpaneel met
+ * alle badges van de leerling — zodat de mentor bij het kiezen van een rubric-kleur meteen de
+ * onderliggende badges (en, enkel hier, de deelbadges erachter) kan bekijken, zonder naar een
+ * andere pagina te moeten springen. De bestaande opmerking (`NotitieVeld`) bij een badge/deelbadge
+ * is daar ook zichtbaar (alleen-lezen, achter hetzelfde bubbel-knopje als op de badgematrix) —
+ * dat schrijf je nog altijd aan op `/badges`/`/deelevaluaties` zelf.
+ *
+ * Links staan per cursus de uitgeschreven rubrics (dezelfde als op de Rubrics-pagina, zie
+ * `lib/rubrieken.ts` — een aanpassing daar werkt hier automatisch door): de mentor leest de
+ * criteria per kleur en kiest per **rubric** blauw/groen/geel/rood, volledig handmatig (geen
+ * afleiding uit de badges). Zolang er geen kleur gekozen is, staan alle 4 criteria erbij om uit
+ * te kiezen; eens gekozen blijft enkel die ene criteriumtekst nog staan (de rest is dan niet
+ * meer relevant). De opmerking staat bewust per **cursus** (niet per rubric, dat werd als te
+ * fijnmazig ervaren) — in de cursuskop, naast de rubrics. Een cursus zonder uitgeschreven rubric
+ * toont dat expliciet i.p.v. een kleur te laten kiezen. De cursusfilter bovenaan filtert beide
+ * panelen.
+ *
+ * Een rapport is per rapportmoment (bv. "Rapport 1") en kan afgewerkt/vergrendeld worden. Twee
+ * manieren om het als document naar buiten te krijgen, allebei op dezelfde `printweergave`-node
+ * (`.rapport-print`, `printRef`, onderaan — enkel zichtbaar bij het afdrukken, `@media print` in
+ * `index.css`), dus met exact dezelfde opmaak: "Printen" opent het browser-printvenster
+ * (Ctrl/Cmd+P) — daar kan de mentor zelf nog "Opslaan als pdf" als bestemming kiezen. "Opslaan
+ * als pdf" downloadt rechtstreeks een pdf-bestand (`lib/rapportPdf.ts`, `jspdf`, dynamisch
+ * geladen) door diezelfde node met `html2canvas` over te nemen, zonder dat printvenster. Beide
+ * tonen standaard enkel de rubrics die effectief een kleur hebben — een nog niet
+ * ingevulde/gekozen rubric staat er niet bij (op het scherm zelf blijft die gewoon zichtbaar).
  */
 export function RapportDetail() {
   const { studentId } = useParams();
-  const { students, groepen, kleuren, rapporten, schooljaar } = useStore();
+  const {
+    students,
+    groepen,
+    kleuren,
+    notities,
+    rapporten,
+    schooljaar,
+    deelevaluaties,
+    deelKleuren,
+    deelNotities,
+    rubriekenOverride,
+    rubriekWijzigingen,
+  } = useStore();
+  // rubriekenLijst() leest de store (bundel + overrides/patches); herbereken als die wijzigen —
+  // zelfde patroon als op de Rubrics-pagina, zodat een aanpassing daar hier automatisch doorwerkt.
+  const alleRubrieken = useMemo(
+    () => rubriekenLijst(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rubriekenOverride, rubriekWijzigingen],
+  );
   const bereik = useBereik();
   const rol = useEffectieveRol();
   const wijzigingLabel = useWijzigingLabel();
@@ -115,6 +164,10 @@ export function RapportDetail() {
   const geenToegang = Boolean(student && !magLeerlingZien(bereik, student));
 
   const [fold, setFold] = useState<string[]>(loadFold);
+  // Uitgeklapte deelbadges (leerdoel-id's) in het naslagpaneel rechts — enkel hier in het rapport
+  // is een badge uitklapbaar tot zijn deelbadges; niet bewaard (net als bv. `doelOpen` op
+  // Rubrics.tsx), telkens dicht bij het openen van de pagina.
+  const [deelOpen, setDeelOpen] = useState<Set<string>>(new Set());
   const [gekozenId, setGekozenId] = useState<string | null>(null);
   // Cursusfilter — zelfde idee als op Badges/Deelevaluaties, maar hier lokaal (niet de gedeelde
   // `matrixCursus`): dit is een enkele-leerling-pagina, geen matrix over meerdere leerlingen.
@@ -126,6 +179,9 @@ export function RapportDetail() {
   const [kiesZoek, setKiesZoek] = useState("");
   const kiesTrigger = useRef<HTMLButtonElement>(null);
   const kiesPaneel = useRef<HTMLDivElement>(null);
+  // De printweergave-node (`.rapport-print` verderop) — "Opslaan als pdf" neemt die letterlijk
+  // over, zie `opslaanAlsPdf` hieronder.
+  const printRef = useRef<HTMLDivElement>(null);
   const kiesPos = usePopover(kiesOpen, kiesTrigger, () => setKiesOpen(false), {
     breedte: 300,
     hoogte: 360,
@@ -200,6 +256,17 @@ export function RapportDetail() {
   const vergrendeld = gekozen?.status === "afgewerkt";
   const magHeropenen = rol === "beheerder";
 
+  // Printweergave: enkel de rubrics die effectief een kleur hebben — een leeg/niet-gekozen
+  // rubric staat er standaard niet bij (dat is ballast op een rapport dat de deur uit gaat; het
+  // volledige overzicht incl. lege rubrics blijft gewoon op het scherm staan).
+  const printRijen = gekozen
+    ? cursussen.flatMap((cursus) =>
+        rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam)
+          .map((r) => ({ cursus, r, item: getRapportItem(gekozen, r.id) }))
+          .filter(({ item }) => item.kleur !== null),
+      )
+    : [];
+
   // Positie van deze leerling binnen de gefilterde lijst (-1 = buiten de huidige filter, bv. via
   // een rechtstreekse link geopend — dan tonen we geen vorige/volgende).
   const huidigeIndex = navigeerbareLeerlingen.findIndex((s) => s.id === student.id);
@@ -224,6 +291,69 @@ export function RapportDetail() {
     setFold((f) => (f.includes(id) ? zonder(f, id) : met(f, id)));
   const allesDicht = () => setFold([]);
   const allesOpen = () => setFold(cursussen.map((c) => c.id));
+  // Filter je op één cursus, dan staat die sowieso open (zelfde gedrag als de cursusfilter op
+  // Badges/Deelevaluaties) — geldt voor beide panelen, ze groeperen allebei per cursus.
+  const cursusOpen = (cursusId: string) => Boolean(gekozenCursusFilter) || fold.includes(cursusId);
+  const toggleDeel = (leerdoelId: string) =>
+    setDeelOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(leerdoelId)) next.delete(leerdoelId);
+      else next.add(leerdoelId);
+      return next;
+    });
+
+  // Bestandsnaam voor "Opslaan als pdf": "naamRapport-vestiging-schooljaar-voornaamNaam" (zonder
+  // ".pdf" — de browser voegt die zelf toe aan `document.title` bij "Opslaan als pdf"; zet je die
+  // erbij, dan krijg je "….pdf.pdf"). Filenaam-onveilige tekens (bv. "/" in een vrij getypte
+  // rapportnaam) eruit gefilterd.
+  const veiligVoorBestandsnaam = (s: string) => s.replace(/[\\/:*?"<>|]/g, "").trim();
+  const downloadBestandsnaam = (rapport: Rapport): string => {
+    const naamRapport = veiligVoorBestandsnaam(rapport.naam) || "Rapport";
+    const vestiging = veiligVoorBestandsnaam(student.vestiging) || "onbekend";
+    const voornaamNaam =
+      veiligVoorBestandsnaam(`${student.firstName}${student.lastName}`) || "leerling";
+    return `${naamRapport}-${vestiging}-${rapport.schooljaar}-${voornaamNaam}`;
+  };
+  // Het printvenster gebruikt `document.title` als voorgestelde bestandsnaam (bv. kiest de
+  // mentor daar zelf "Opslaan als pdf" als bestemming) — tijdelijk wisselen, en terugzetten
+  // zodra het venster weer sluit (`afterprint`, vuurt zowel bij printen als annuleren).
+  const printen = () => {
+    if (!gekozen) return;
+    const vorigeTitel = document.title;
+    document.title = downloadBestandsnaam(gekozen);
+    const herstelTitel = () => {
+      document.title = vorigeTitel;
+      window.removeEventListener("afterprint", herstelTitel);
+    };
+    window.addEventListener("afterprint", herstelTitel);
+    window.print();
+  };
+
+  // Zelfde tekst als in de printweergave onderaan (`.rapport-print-meta`) — ook gebruikt in de
+  // rechtstreekse pdf-download hieronder, zodat beide identiek blijven.
+  const rapportMetaTekst = `${student.firstName} ${student.lastName} · ${student.vestiging} · ${GRAAD_LABEL[graadDitJaar]} · ${student.leerjaar}e jaar · groep ${student.klasgroep} · schooljaar ${schooljaar}`;
+
+  // "Opslaan als pdf": in tegenstelling tot "Printen" géén browser-printvenster — rechtstreeks
+  // een pdf-bestand genereren en downloaden (zie `lib/rapportPdf.ts`), met exact de gevraagde
+  // bestandsnaam. Neemt letterlijk dezelfde `.rapport-print`-node als de printweergave over (via
+  // `printRef`), zodat beide manieren exact dezelfde opmaak geven — `.rapport-print--pdf-render`
+  // (`index.css`) zet dat blad daarvoor eventjes zichtbaar, buiten beeld.
+  const opslaanAlsPdf = async () => {
+    if (!gekozen) return;
+    const element = printRef.current;
+    if (!element) return;
+    element.classList.add("rapport-print--pdf-render");
+    try {
+      await downloadRapportPdf(element, downloadBestandsnaam(gekozen));
+    } catch (error) {
+      // Best-effort — geen aparte foutmelding-UI voor dit rapport (zie `store.ts`-conventie bij
+      // opslagfouten); de mentor kan het gewoon opnieuw proberen of via "Printen" → "Opslaan als
+      // pdf" in het browservenster gaan.
+      console.error("Rapport-pdf genereren mislukt:", error);
+    } finally {
+      element.classList.remove("rapport-print--pdf-render");
+    }
+  };
 
   return (
     <section>
@@ -410,7 +540,7 @@ export function RapportDetail() {
                   <button
                     type="button"
                     className="knop-secundair rapport-icoonknop"
-                    onClick={() => window.print()}
+                    onClick={printen}
                   >
                     <PrinterIcoon />
                     Printen
@@ -418,8 +548,8 @@ export function RapportDetail() {
                   <button
                     type="button"
                     className="knop-secundair rapport-icoonknop"
-                    title="Opent het printvenster — kies daar 'Opslaan als pdf' als bestemming."
-                    onClick={() => window.print()}
+                    title="Downloadt meteen een pdf-bestand van dit rapport."
+                    onClick={opslaanAlsPdf}
                   >
                     <PdfIcoon />
                     Opslaan als pdf
@@ -481,59 +611,112 @@ export function RapportDetail() {
                     </div>
                   </div>
 
-                  <div className="grid-wrap">
-                    <table className="grid grid--rustig">
-                      <thead>
-                        <tr>
-                          <th className="grid-col-doel">Cursus</th>
-                          <th className="grid-col-kleur">Kleur</th>
-                          <th className="rapport-col-opmerking">Opmerking</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cursussenGefilterd.map((cursus) => {
-                          const item = getRapportItem(gekozen, cursus.id);
-                          const sleutel = rapportItemSleutel(gekozen.id, cursus.id);
-                          const wLabel = wijzigingLabel(sleutel) ?? undefined;
-                          return (
-                            <tr key={cursus.id}>
-                              <td className="grid-col-doel grid-doel" style={{ fontWeight: 600 }}>
-                                {cursus.naam}
-                              </td>
-                              <td className="grid-cel" title={wLabel}>
-                                <div className={`grid-cel-inhoud rating-${item.kleur ?? "empty"}`}>
-                                  <RatingCell
-                                    label={`${cursus.naam} — rapportkleur`}
-                                    readonly={vergrendeld}
-                                    value={item.kleur}
-                                    geschiedenis={geschiedenis(sleutel)}
-                                    onChange={(next) =>
-                                      wijzigRapportItem(gekozen.id, cursus.id, { kleur: next })
-                                    }
-                                  />
-                                  <RapportOpmerkingVeld
-                                    label={`Opmerking bij ${cursus.naam}`}
-                                    opmerking={item.opmerking}
-                                    readonly={vergrendeld}
-                                    onSave={(tekst) =>
-                                      wijzigRapportItem(gekozen.id, cursus.id, {
-                                        opmerking: tekst,
-                                      })
-                                    }
-                                  />
-                                </div>
-                              </td>
-                              <td className="rapport-col-opmerking-tekst">
-                                {item.opmerking || (
-                                  <span className="sd-deel-geen">— geen opmerking —</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  {cursussenGefilterd.map((cursus) => {
+                    const rubrieken = rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam);
+                    const open = cursusOpen(cursus.id);
+                    const t = telKleuren(
+                      rubrieken.map((r) => getRapportItem(gekozen, r.id).kleur),
+                    );
+                    const cursusOpmerking = getRapportCursusOpmerking(gekozen, cursus.id);
+                    const opmerkingSleutel = rapportItemSleutel(gekozen.id, cursus.id);
+                    return (
+                      <div key={cursus.id} className="doel-comp">
+                        <div className="rapport-cursus-kop">
+                          <button
+                            type="button"
+                            className="rapport-cursus-toggle"
+                            onClick={() => toggleCursus(cursus.id)}
+                          >
+                            <span className="grid-caret">{open ? "▾" : "▸"}</span>
+                            {cursus.naam}
+                          </button>
+                          <span className="rapport-cursus-samenvatting-wrap">
+                            {rubrieken.length === 0 ? (
+                              <span className="rapport-geen-rubrics-tag">geen rubric</span>
+                            ) : (
+                              <>
+                                <span className="grid-count">{rubrieken.length}</span>
+                                <span className="rapport-cursus-balk">
+                                  <ColorBar telling={t} />
+                                </span>
+                              </>
+                            )}
+                          </span>
+                          <span title={wijzigingLabel(opmerkingSleutel) ?? undefined}>
+                            <RapportOpmerkingVeld
+                              label={`Opmerking bij ${cursus.naam}`}
+                              opmerking={cursusOpmerking}
+                              readonly={vergrendeld}
+                              onSave={(tekst) =>
+                                zetRapportCursusOpmerking(gekozen.id, cursus.id, tekst)
+                              }
+                            />
+                          </span>
+                        </div>
+
+                        {cursusOpmerking && (
+                          <p className="rapport-opmerking-tekst">{cursusOpmerking}</p>
+                        )}
+
+                        {open &&
+                          (rubrieken.length === 0 ? (
+                            <p className="lege-staat rapport-geen-rubrics">
+                              Nog geen rubric uitgeschreven voor {cursus.naam} — zodra die er is
+                              (via de Rubrics-pagina), kies je hier de kleur.
+                            </p>
+                          ) : (
+                            <div className="rubriek-lijst">
+                              {rubrieken.map((r) => {
+                                const item = getRapportItem(gekozen, r.id);
+                                const sleutel = rapportItemSleutel(gekozen.id, r.id);
+                                const wLabel = wijzigingLabel(sleutel) ?? undefined;
+                                // Nog geen (kleur)keuze: alle 4 criteria tonen om uit te kiezen.
+                                // Eens een kleur gekozen is: enkel die ene criteriumtekst nog
+                                // tonen — de rest is dan niet meer relevant voor dit rapport.
+                                const kleurGekozen =
+                                  item.kleur !== null &&
+                                  (KLEUREN as readonly string[]).includes(item.kleur);
+                                const teTonenKleuren = kleurGekozen
+                                  ? [item.kleur as (typeof KLEUREN)[number]]
+                                  : KLEUREN;
+                                return (
+                                  <article key={r.id} className="rubriek" title={wLabel}>
+                                    <div className="rubriek-kop">
+                                      <h3 className="rubriek-naam">{r.naam}</h3>
+                                      <RatingCell
+                                        label={`${cursus.naam} — ${r.naam}`}
+                                        readonly={vergrendeld}
+                                        value={item.kleur}
+                                        geschiedenis={geschiedenis(sleutel)}
+                                        onChange={(next) =>
+                                          zetRapportRubriekKleur(gekozen.id, r.id, next)
+                                        }
+                                      />
+                                    </div>
+
+                                    <dl className="rubriek-criteria">
+                                      {teTonenKleuren.map((kleur) => (
+                                        <div
+                                          key={kleur}
+                                          className={`rubriek-criterium rating-${kleur}`}
+                                        >
+                                          <dt className="rubriek-criterium-kleur">
+                                            {RATING_LABEL[kleur]}
+                                          </dt>
+                                          <dd className="rubriek-criterium-tekst">
+                                            {r.criteria[KLEUR_KEY[kleur]] || "—"}
+                                          </dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          ))}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <aside className="badges-deelpaneel no-print">
@@ -561,9 +744,7 @@ export function RapportDetail() {
                         </tr>
                       </thead>
                       {cursussenGefilterd.map((cursus) => {
-                        // Filter je op één cursus, dan staat die sowieso open (zelfde gedrag als
-                        // de cursusfilter op Badges/Deelevaluaties).
-                        const cursusDicht = !gekozenCursusFilter && !fold.includes(cursus.id);
+                        const open = cursusOpen(cursus.id);
                         const cursusDoelen = leerdoelenVoorCursus(cursus.id);
                         const t = telKleuren(
                           cursusDoelen.map((d) =>
@@ -579,7 +760,7 @@ export function RapportDetail() {
                                   className="grid-toggle"
                                   onClick={() => toggleCursus(cursus.id)}
                                 >
-                                  <span className="grid-caret">{cursusDicht ? "▶" : "▼"}</span>
+                                  <span className="grid-caret">{open ? "▼" : "▶"}</span>
                                   {cursus.naam}
                                   <span className="grid-count">{cursusDoelen.length}</span>
                                 </button>
@@ -596,25 +777,98 @@ export function RapportDetail() {
                                 </div>
                               </td>
                             </tr>
-                            {!cursusDicht &&
+                            {open &&
                               cursusDoelen.map((d) => {
                                 const kleur = getDoelKleur(kleuren, schooljaar, student.id, d.id);
+                                // Deelbadges: enkel in dit rapport-naslagpaneel uitklapbaar onder
+                                // hun badge (niet op Badges.tsx) — een aparte, alleen-lezen lijst
+                                // met de deelbadge-titel + kleur van deze leerling.
+                                const deel = deelevaluatiesVoorBadge(
+                                  deelevaluaties,
+                                  d.id,
+                                  schooljaar,
+                                  cursus.naam,
+                                  student.vestiging,
+                                );
+                                const deelUitgeklapt = deelOpen.has(d.id);
                                 return (
-                                  <tr key={d.id}>
-                                    <td className="grid-col-doel grid-doel grid-doel-n1">
-                                      <span className="grid-doel-tekst">{d.omschrijving}</span>
-                                    </td>
-                                    <td
-                                      className="grid-cel"
-                                      title={kleur ? RATING_LABEL[kleur] : RATING_EMPTY_LABEL}
-                                    >
-                                      <span
-                                        className={`rating-cell-btn rating-${kleur ?? "empty"} is-readonly`}
+                                  <Fragment key={d.id}>
+                                    <tr>
+                                      <td className="grid-col-doel grid-doel grid-doel-n1">
+                                        {deel.length > 0 ? (
+                                          <button
+                                            type="button"
+                                            className="grid-toggle rapport-deel-toggle"
+                                            aria-expanded={deelUitgeklapt}
+                                            onClick={() => toggleDeel(d.id)}
+                                          >
+                                            <span className="grid-caret">
+                                              {deelUitgeklapt ? "▾" : "▸"}
+                                            </span>
+                                            <span className="grid-doel-tekst">
+                                              {d.omschrijving}
+                                            </span>
+                                            <span className="grid-count">{deel.length}</span>
+                                          </button>
+                                        ) : (
+                                          <span className="grid-doel-tekst">{d.omschrijving}</span>
+                                        )}
+                                      </td>
+                                      <td
+                                        className="grid-cel"
+                                        title={kleur ? RATING_LABEL[kleur] : RATING_EMPTY_LABEL}
                                       >
-                                        {kleur ? RATING_KORT[kleur] : "–"}
-                                      </span>
-                                    </td>
-                                  </tr>
+                                        <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
+                                          <span
+                                            className={`rating-cell-btn rating-${kleur ?? "empty"} is-readonly`}
+                                          >
+                                            {kleur ? RATING_KORT[kleur] : "–"}
+                                          </span>
+                                          <NotitieVeld
+                                            notitie={getNotitie(notities, schooljaar, student.id, d.id)}
+                                            onSave={() => {}}
+                                            readonly
+                                          />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    {deelUitgeklapt &&
+                                      deel.map((dv) => {
+                                        const dKleur = getDeelKleur(deelKleuren, dv.id, student.id);
+                                        return (
+                                          <tr key={dv.id} className="rapport-deel-rij">
+                                            <td className="grid-col-doel grid-doel grid-doel-n2">
+                                              <span className="grid-doel-tekst">{dv.titel}</span>
+                                            </td>
+                                            <td
+                                              className="grid-cel"
+                                              title={
+                                                dKleur ? RATING_LABEL[dKleur] : RATING_EMPTY_LABEL
+                                              }
+                                            >
+                                              <div
+                                                className={`grid-cel-inhoud rating-${dKleur ?? "empty"}`}
+                                              >
+                                                <span
+                                                  className={`rating-cell-btn rating-${dKleur ?? "empty"} is-readonly`}
+                                                >
+                                                  {dKleur ? RATING_KORT[dKleur] : "–"}
+                                                </span>
+                                                <NotitieVeld
+                                                  notitie={getDeelNotitie(
+                                                    deelNotities,
+                                                    dv.id,
+                                                    student.id,
+                                                  )}
+                                                  onSave={() => {}}
+                                                  readonly
+                                                />
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                  </Fragment>
                                 );
                               })}
                           </tbody>
@@ -641,38 +895,49 @@ export function RapportDetail() {
 
               {/* Printweergave: enkel zichtbaar bij het afdrukken (zie @media print in index.css).
                   Statische, opgeruimde weergave — geen popovers/knoppen die toch niet printen. */}
-              <div className="rapport-print">
+              <div className="rapport-print" ref={printRef}>
                 <h1>{gekozen.naam}</h1>
-                <p className="rapport-print-meta">
-                  {student.firstName} {student.lastName} · {student.vestiging} ·{" "}
-                  {GRAAD_LABEL[graadDitJaar]} · {student.leerjaar}e jaar · groep {student.klasgroep}{" "}
-                  · schooljaar {schooljaar}
-                </p>
+                <p className="rapport-print-meta">{rapportMetaTekst}</p>
                 <table className="rapport-print-tabel">
                   <thead>
                     <tr>
                       <th>Cursus</th>
+                      <th>Rubric</th>
                       <th>Kleur</th>
-                      <th>Opmerking</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cursussen.map((cursus) => {
-                      const item = getRapportItem(gekozen, cursus.id);
-                      return (
-                        <tr key={cursus.id}>
+                    {printRijen.length === 0 ? (
+                      <tr>
+                        <td colSpan={3}>Nog geen enkele rubric ingevuld voor dit rapport.</td>
+                      </tr>
+                    ) : (
+                      printRijen.map(({ cursus, r, item }) => (
+                        <tr key={r.id}>
                           <td>{cursus.naam}</td>
+                          <td>{r.naam}</td>
                           <td>
                             <span className={`rating rating-${item.kleur ?? "empty"}`}>
                               {item.kleur ? RATING_LABEL[item.kleur] : "—"}
                             </span>
                           </td>
-                          <td>{item.opmerking}</td>
                         </tr>
-                      );
-                    })}
+                      ))
+                    )}
                   </tbody>
                 </table>
+                {cursussen.some((c) => getRapportCursusOpmerking(gekozen, c.id)) && (
+                  <div className="rapport-print-algemeen">
+                    <h2>Opmerkingen per cursus</h2>
+                    {cursussen
+                      .filter((c) => getRapportCursusOpmerking(gekozen, c.id))
+                      .map((c) => (
+                        <p key={c.id}>
+                          <strong>{c.naam}:</strong> {getRapportCursusOpmerking(gekozen, c.id)}
+                        </p>
+                      ))}
+                  </div>
+                )}
                 {gekozen.algemeneOpmerking && (
                   <div className="rapport-print-algemeen">
                     <h2>Algemene opmerking</h2>
