@@ -8,9 +8,16 @@ export const RATINGS: Rating[] = ["blue", "green", "yellow", "red"];
 
 /**
  * De witte statussen: geen kleur. Tellen niet mee als "behaald" en vallen buiten de noemer
- * van de voortgangstellers (n.v.t. = de badge is niet van toepassing op deze leerling).
+ * van de voortgangstellers (n.v.t. = de badge is niet van toepassing op deze leerling;
+ * te laat/niet ingediend = er is (nog) geen werk om te beoordelen).
  */
-export const STATUSSEN: Rating[] = ["afwezig", "vrijgesteld", "nvt"];
+export const STATUSSEN: Rating[] = [
+  "afwezig",
+  "vrijgesteld",
+  "nvt",
+  "te-laat-ingediend",
+  "niet-ingediend",
+];
 
 export const isStatus = (r: Rating): boolean => (STATUSSEN as string[]).includes(r);
 
@@ -22,6 +29,8 @@ export const RATING_LABEL: Record<Rating, string> = {
   afwezig: "Gewettigd afwezig",
   vrijgesteld: "Vrijgesteld",
   nvt: "N.v.t.",
+  "te-laat-ingediend": "Te laat ingediend",
+  "niet-ingediend": "Niet ingediend",
 };
 
 /** Korte weergave voor een cel-knop (weinig plaats). */
@@ -33,6 +42,8 @@ export const RATING_KORT: Record<Rating, string> = {
   afwezig: "Afw.",
   vrijgesteld: "Vrijg.",
   nvt: "n.v.t.",
+  "te-laat-ingediend": "Te laat",
+  "niet-ingediend": "Niet ing.",
 };
 
 export const RATING_MEANING: Record<Rating, string> = {
@@ -43,6 +54,8 @@ export const RATING_MEANING: Record<Rating, string> = {
   afwezig: "Gewettigd afwezig — telt niet mee",
   vrijgesteld: "Vrijgesteld — telt niet mee",
   nvt: "Niet van toepassing — telt niet mee",
+  "te-laat-ingediend": "Te laat ingediend — telt niet mee",
+  "niet-ingediend": "Niet ingediend — telt niet mee",
 };
 
 /** Getoond voor de lege / `null`-staat. */

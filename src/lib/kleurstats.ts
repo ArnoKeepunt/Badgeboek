@@ -11,6 +11,8 @@ const LEEG: KleurTelling = {
   afwezig: 0,
   vrijgesteld: 0,
   nvt: 0,
+  "te-laat-ingediend": 0,
+  "niet-ingediend": 0,
   leeg: 0,
 };
 

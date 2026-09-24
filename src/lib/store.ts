@@ -893,6 +893,15 @@ export function vervangStudenten(nieuwe: Student[]) {
   commit({ ...state, students: nieuwe.map((s) => samengevoegdeLeerling(oud.get(s.id), s)) });
 }
 
+/**
+ * Eén leerling verwijderen (los van de CSV-import hierboven, bv. na een verkeerde toevoeging).
+ * Gekoppelde evaluaties/rapporten die op dat id staan, blijven in de opslag staan — net als bij
+ * een leerling die uit een CSV-bestand wegvalt — maar verschijnen nergens meer.
+ */
+export function verwijderLeerling(id: string) {
+  commit({ ...state, students: state.students.filter((s) => s.id !== id) });
+}
+
 /** Voeg leerlingen én mentoren toe/bij op basis van hun `id`. */
 export function importeerGebruikers(leerlingen: Student[], mentoren: Mentor[]) {
   const perLl = new Map(state.students.map((s) => [s.id, s]));

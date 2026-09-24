@@ -18,7 +18,7 @@ export function BulkKnop({
   const trigger = useRef<HTMLButtonElement>(null);
   const pos = usePopover(open, trigger, () => setOpen(false), {
     breedte: 214,
-    hoogte: 330,
+    hoogte: 400,
     uitlijn: "rechts",
   });
 

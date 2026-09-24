@@ -66,7 +66,8 @@ export function Rubrics() {
     for (const r of alle) {
       if (matrixStromen.includes(r.stroom) && !uit.includes(r.cursus)) uit.push(r.cursus);
     }
-    return uit;
+    // De rubrics-brondata staat niet alfabetisch (volgt de bron-xlsx) — hier wél sorteren.
+    return uit.sort((a, b) => a.localeCompare(b, "nl"));
   }, [alle, matrixStromen]);
   const cursusFilter = cursusOpties.includes(matrixCursus) ? matrixCursus : "";
   const filterActief = Boolean(cursusFilter || doelFilter.trim() || soortFilter.size);
@@ -94,7 +95,7 @@ export function Rubrics() {
           stroom,
           totaal: alle.filter((r) => r.stroom === stroom).length,
           getoond: items.length,
-          perCursus: [...kaart.entries()],
+          perCursus: [...kaart.entries()].sort((a, b) => a[0].localeCompare(b[0], "nl")),
         };
       }),
     [alle, matrixStromen, cursusFilter, doelFilter, soortFilter],

@@ -39,7 +39,7 @@ export function RatingCell({
   const heeftGeschiedenis = regels.length > 0;
   const pos = usePopover(open, trigger, () => setOpen(false), {
     breedte: heeftGeschiedenis ? 264 : 188,
-    hoogte: toonGeschiedenis ? 610 : heeftGeschiedenis ? 470 : 420,
+    hoogte: toonGeschiedenis ? 680 : heeftGeschiedenis ? 540 : 490,
     uitlijn: "midden",
   });
 

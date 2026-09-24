@@ -56,8 +56,11 @@ export interface CurriculumData {
 
 /** De ruwe set → de verrijkte set die de rest van de app gebruikt. */
 export function verrijk(ruw: CurriculumRuw): CurriculumData {
+  // Cursussen alfabetisch (niet op het `volgorde`-veld uit de bron-xlsx) — zo staan ze overal
+  // (Badges, Deelevaluaties, Rapport…) in dezelfde, voorspelbare volgorde. Badges bínnen een
+  // cursus blijven wél op `volgorde` (dat is een bewuste leerlijn/progressie), zie hieronder.
   const cursussen: Cursus[] = [...ruw.cursussen]
-    .sort((a, b) => a.volgorde - b.volgorde)
+    .sort((a, b) => a.naam.localeCompare(b.naam, "nl"))
     .map((c) => ({ id: c.id, stroom: c.stroom, naam: c.naam }));
 
   const rubrics: Rubric[] = cursussen.map((c) => ({

@@ -427,7 +427,9 @@ export function Badges() {
     for (const s of matrixStromen) {
       for (const c of cursussenVoorStroom(s)) if (!uit.includes(c.naam)) uit.push(c.naam);
     }
-    return uit;
+    // `cursussenVoorStroom` is zelf al alfabetisch; bij meerdere gekozen stromen opnieuw
+    // sorteren zodat de samengevoegde lijst ook echt A–Z is.
+    return uit.sort((a, b) => a.localeCompare(b, "nl"));
   }, [matrixStromen]);
   const cursusFilter = cursusOpties.includes(matrixCursus) ? matrixCursus : "";
 

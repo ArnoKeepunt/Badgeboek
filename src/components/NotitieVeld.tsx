@@ -35,7 +35,14 @@ export function NotitieVeld({
   const heeft = Boolean(notitie.zichtbaar || notitie.verborgen);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const pos = usePopover(open, trigger, () => setOpen(false), { breedte: 360, hoogte: 260 });
+  const paneel = useRef<HTMLDivElement>(null);
+  // `paneel` meegeven: anders leest `usePopover` het interne scrollen van een tekstvak dat
+  // volloopt (de cursor duwt de inhoud omhoog) als "de pagina scrolt" en sluit het paneel toe.
+  const pos = usePopover(open, trigger, () => setOpen(false), {
+    breedte: 360,
+    hoogte: 260,
+    paneel,
+  });
 
   return (
     <span className="notitie">
@@ -61,7 +68,11 @@ export function NotitieVeld({
               aria-label="Sluiten"
               onClick={() => setOpen(false)}
             />
-            <div className="notitie-panel zwevend-menu" style={{ top: pos.top, left: pos.left }}>
+            <div
+              ref={paneel}
+              className="notitie-panel zwevend-menu"
+              style={{ top: pos.top, left: pos.left }}
+            >
               <label className="notitie-veld">
                 <span>Zichtbaar voor de leerling</span>
                 <textarea

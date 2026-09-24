@@ -134,11 +134,13 @@ th {
   background: transparent;
 }
 
-/* Witte statussen: gewettigd afwezig / vrijgesteld / n.v.t. — geen kleur,
-   witte achtergrond met een effen grijze rand. */
+/* Witte statussen: gewettigd afwezig / vrijgesteld / n.v.t. / te laat ingediend /
+   niet ingediend — geen kleur, witte achtergrond met een effen grijze rand. */
 .rating-afwezig,
 .rating-vrijgesteld,
-.rating-nvt {
+.rating-nvt,
+.rating-te-laat-ingediend,
+.rating-niet-ingediend {
   --rating-solid: #9ca3af;
   --rating-bg: #ffffff;
   --rating-fg: #6b7280;

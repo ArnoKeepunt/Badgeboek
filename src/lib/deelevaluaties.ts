@@ -12,7 +12,7 @@ export type { DeelevaluatieType } from "./curriculum";
 export const typesVoorStroom = (stroom: Stroom): DeelevaluatieType[] =>
   alleDeelevaluatieTypes().filter((t) => t.stroom === stroom);
 
-/** De cursussen (namen) die in de deelevaluatie-kapstok van een stroom voorkomen, op volgorde. */
+/** De cursussen (namen) die in de deelevaluatie-kapstok van een stroom voorkomen, alfabetisch. */
 export function cursusNamenVoorStroom(stroom: Stroom): string[] {
   const gezien = new Set<string>();
   const uit: string[] = [];
@@ -22,7 +22,7 @@ export function cursusNamenVoorStroom(stroom: Stroom): string[] {
       uit.push(t.cursus);
     }
   }
-  return uit;
+  return uit.sort((a, b) => a.localeCompare(b, "nl"));
 }
 
 export const typesVoorCursus = (stroom: Stroom, cursus: string): DeelevaluatieType[] =>

@@ -87,6 +87,26 @@ export function filterLeerlingen(
 export const unieke = <T extends string | number>(waarden: T[]): T[] =>
   [...new Set(waarden)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
+/**
+ * Stabiele id afgeleid uit voornaam + achternaam (voor een leerling die handmatig — niet via
+ * CSV — wordt toegevoegd en geen eigen id kreeg). Botst die met een bestaande id, dan komt er
+ * een oplopend cijfer bij.
+ */
+export function genereerLeerlingId(
+  voornaam: string,
+  achternaam: string,
+  bestaandeIds: Iterable<string>,
+): string {
+  const basis =
+    `${voornaam}-${achternaam}`.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") ||
+    "leerling";
+  const bezet = new Set(bestaandeIds);
+  if (!bezet.has(basis)) return basis;
+  let i = 2;
+  while (bezet.has(`${basis}-${i}`)) i += 1;
+  return `${basis}-${i}`;
+}
+
 // --- Gedeelde, lokaal bewaarde filterstand -----------------------------------
 
 const FILTER_KEY = "keerpunt-badgeboek:leerling-filter";

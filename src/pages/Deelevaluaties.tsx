@@ -169,7 +169,10 @@ export function Deelevaluaties() {
         if (!uit.includes(d.cursus)) uit.push(d.cursus);
       }
     }
-    return uit;
+    // `cursusNamenVoorStroom` is zelf al alfabetisch, maar bij meerdere gekozen stromen (of een
+    // vrij getypte cursusnaam op een deelevaluatie die niet in de kapstok zit) moet de samengevoegde
+    // lijst opnieuw gesorteerd worden om overal echt A–Z te zijn.
+    return uit.sort((a, b) => a.localeCompare(b, "nl"));
   }, [matrixStromen, deelevaluaties, schooljaar, vestiging]);
   const cursusFilter = cursusOpties.includes(matrixCursus) ? matrixCursus : "";
 
@@ -180,6 +183,7 @@ export function Deelevaluaties() {
         const mijn = deelevaluatiesVoor(deelevaluaties, stroom, schooljaar, vestiging);
         let cursussen = cursusNamenVoorStroom(stroom);
         for (const d of mijn) if (!cursussen.includes(d.cursus)) cursussen.push(d.cursus);
+        cursussen = cursussen.sort((a, b) => a.localeCompare(b, "nl"));
         if (cursusFilter) cursussen = cursussen.filter((c) => c === cursusFilter);
         const badgeTekst = new Map<string, string>();
         for (const d of leerdoelenVoorStroom(stroom)) badgeTekst.set(d.id, d.omschrijving);

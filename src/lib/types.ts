@@ -1,6 +1,6 @@
 /**
  * De evaluatiewaarde van een badge. `null` = nog niet aangeboden / geëvalueerd (de lege staat).
- * Vier kleuren (positiefste eerst) + drie witte statussen: die tellen niet mee als "behaald"
+ * Vier kleuren (positiefste eerst) + vijf witte statussen: die tellen niet mee als "behaald"
  * en vallen buiten de noemer van de tellers.
  */
 export type Rating =
@@ -11,6 +11,8 @@ export type Rating =
   | 'afwezig'
   | 'vrijgesteld'
   | 'nvt'
+  | 'te-laat-ingediend'
+  | 'niet-ingediend'
 
 /**
  * Doelcategorie (zie badgeboek):
