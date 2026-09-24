@@ -99,10 +99,7 @@ const rapportItem: NavItem = { to: "/rapport", label: "Rapport", end: false, ico
 
 const mentorNav: NavGroep[] = [
   overzichtGroep,
-  // TIJDELIJK (2026-09-20, op vraag van Arno): geen `rapportItem` hier — enkel de beheerder mag
-  // het rapport zien (route is ook `AlleenBeheerder`-gegated, zie router.tsx). Zet terug op
-  // `[{ to: "/badges", ... }, rapportItem]` om het weer voor mentor/coördinator te tonen.
-  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }] },
+  { items: [{ to: "/badges", label: "Badges", end: false, icoon: "badges" }, rapportItem] },
   { items: [groepenItem, leerlingenItem] },
   doelenGroep,
 ];

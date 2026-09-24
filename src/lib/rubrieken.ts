@@ -32,6 +32,22 @@ export const KLEUR_KEY: Record<(typeof KLEUREN)[number], keyof Kleurcriteria> = 
 // (die uit aparte bronbestanden komen, zie de rubrics-comment hieronder).
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
+// Vergelijkingssleutel: zoals `norm`, maar ook accenten weg, koppeltekens/underscores als spatie
+// en een voorloop-stroom ("1A-", "2a ") eraf. Zo valt een cursus-id ("1A-levende-wiskunde") samen
+// met zijn naam ("Levende Wiskunde") — nodig omdat een rubric uit de database als cursusnaam
+// zijn id kan dragen wanneer het cursus-doc ontbreekt (zie `docsNaarStore`).
+const sleutel = (s: string) =>
+  norm(s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
+    .replace(/[-_]+/g, " ")
+    .replace(/^[123][ab] /, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const lijktOp = (a: string, b: string) => !!a && !!b && (a === b || a.startsWith(b) || b.startsWith(a));
+
+/** Cursus-id van een rubric (`${stroom}-${cursus-slug}-r${n}` → `${stroom}-${cursus-slug}`). */
+const rubriekCursusId = (r: Rubriek) => r.id.replace(/-r\d+$/, "");
+
 /** Bewerkingsafstand (Levenshtein) tussen twee strings — voor de tikfout-vangnet hieronder. */
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
@@ -56,12 +72,15 @@ function levenshtein(a: string, b: string): number {
 /**
  * De rubrieken van één cursus (binnen een stroom), op volgorde. De cursusnaam in het
  * rubricsbestand (apart bronbestand, `docs/reference/rubrics_overzicht.xlsx`) is niet altijd
- * exact gelijk aan de badge-cursusnaam (ander bronbestand) — drie stappen, van strikt naar los:
+ * exact gelijk aan de badge-cursusnaam (ander bronbestand) — stapsgewijs, van strikt naar los:
  *
  * 1. Genormaliseerd gelijk, of het één een voorvoegsel van het ander (bv. "Actua" i.p.v.
  *    "Actuaronde", "Atelier" i.p.v. "Ateliers") — zelfde soort matching als
- *    `kapstokCursusVoorBadgeCursus` in `deelevaluaties.ts`.
- * 2. Vindt stap 1 niets: de rubric-cursusnaam in deze stroom met de kleinste tikfout-afstand
+ *    `kapstokCursusVoorBadgeCursus` in `deelevaluaties.ts`. Vergeleken op naam én cursus-id
+ *    (beide bronnen gebruiken dezelfde slug, bv. "1A-cultuur"), met `sleutel` als normalisatie.
+ * 2. Vindt stap 1 niets: een rubric-cursus van één woord die als woord in de badge-cursusnaam
+ *    voorkomt ("Atelier" ↔ "Focusateliers & vrije ateliers"), mits ondubbelzinnig.
+ * 3. Vindt stap 2 niets: de rubric-cursusnaam in deze stroom met de kleinste tikfout-afstand
  *    (Levenshtein) tot de badge-cursusnaam (bv. "levvende wiksunde" i.p.v. "Levende Wiskunde") —
  *    enkel als die afstand klein genoeg is (verhoudingsgewijs tot de lengte) **en** ondubbelzinnig
  *    de beste match is, anders geen gok en dus geen koppeling.
@@ -70,15 +89,30 @@ export function rubriekenVoorCursus(
   alle: Rubriek[],
   stroom: Stroom,
   cursusNaam: string,
+  cursusId?: string,
 ): Rubriek[] {
   const inStroom = alle.filter((r) => r.stroom === stroom);
   const doel = norm(cursusNaam);
+  const doelSleutels = [sleutel(cursusNaam), ...(cursusId ? [sleutel(cursusId)] : [])];
 
   const rechtstreeks = inStroom.filter((r) => {
-    const n = norm(r.cursus);
-    return n === doel || n.startsWith(doel) || doel.startsWith(n);
+    const rSleutels = [sleutel(r.cursus), sleutel(rubriekCursusId(r))];
+    return rSleutels.some((a) => doelSleutels.some((b) => lijktOp(a, b)));
   });
   if (rechtstreeks.length > 0) return rechtstreeks.sort((a, b) => a.volgorde - b.volgorde);
+
+  // Rubric-cursus van één woord die als woord in de badge-cursusnaam zit (bv. "Atelier" in
+  // "Focusateliers & vrije ateliers") — enkel als dat precies één rubric-cursus oplevert.
+  const woorden = sleutel(cursusNaam).split(" ");
+  const perWoord = [...new Set(inStroom.map(rubriekCursusId))].filter((id) => {
+    const k = sleutel(id);
+    return !k.includes(" ") && woorden.some((w) => w.startsWith(k));
+  });
+  if (perWoord.length === 1) {
+    return inStroom
+      .filter((r) => rubriekCursusId(r) === perWoord[0])
+      .sort((a, b) => a.volgorde - b.volgorde);
+  }
 
   const kandidaten = [...new Set(inStroom.map((r) => r.cursus))];
   let besteNaam = "";

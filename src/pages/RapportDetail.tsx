@@ -261,7 +261,7 @@ export function RapportDetail() {
   // volledige overzicht incl. lege rubrics blijft gewoon op het scherm staan).
   const printRijen = gekozen
     ? cursussen.flatMap((cursus) =>
-        rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam)
+        rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam, cursus.id)
           .map((r) => ({ cursus, r, item: getRapportItem(gekozen, r.id) }))
           .filter(({ item }) => item.kleur !== null),
       )
@@ -612,7 +612,7 @@ export function RapportDetail() {
                   </div>
 
                   {cursussenGefilterd.map((cursus) => {
-                    const rubrieken = rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam);
+                    const rubrieken = rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam, cursus.id);
                     const open = cursusOpen(cursus.id);
                     const t = telKleuren(
                       rubrieken.map((r) => getRapportItem(gekozen, r.id).kleur),
