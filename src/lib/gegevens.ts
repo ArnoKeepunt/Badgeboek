@@ -1,5 +1,5 @@
 import { alleCursussen, alleLeerdoelen, alleRubrics } from "./curriculum";
-import { kopIndex, parseCsv, toCsv } from "./csv";
+import { kopIndex, lijktOpBinairBestand, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
 import { RATING_LABEL } from "./ratings";
@@ -131,7 +131,27 @@ export function importGebruikers(csv: string): GebruikersImport {
   return { leerlingen, mentoren, fouten };
 }
 
+/**
+ * Excel exporteert een kolom die er numeriek uitziet soms als "123.0" (of, bij een echt grote
+ * of als getal opgemaakte kolom, in wetenschappelijke notatie) i.p.v. het geheel getal dat er
+ * oorspronkelijk in stond. Het ".0"-geval kunnen we probleemloos herstellen; de rest niet — dat
+ * blijft een ongeldig id (zie de kolomhint in Gegevens.tsx: zet die kolom als *tekst* op, niet
+ * als getal, om dit én verlies van voorloopnullen te vermijden).
+ */
+function schoonId(ruw: string): string {
+  const t = ruw.trim();
+  return /^\d+\.0+$/.test(t) ? t.replace(/\.0+$/, "") : t;
+}
+
 export function importLeerlingen(csv: string): ImportResultaat<Student> {
+  if (lijktOpBinairBestand(csv)) {
+    return {
+      rijen: [],
+      fouten: [
+        "Dit lijkt geen CSV-bestand te zijn (mogelijk nog een Excel-/Numbers-bestand — sla het eerst apart op als CSV en kies dat bestand).",
+      ],
+    };
+  }
   const rijen = parseCsv(csv);
   const fouten: string[] = [];
   if (rijen.length < 2) return { rijen: [], fouten: ["Geen datarijen gevonden."] };
@@ -141,17 +161,27 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
     for (const n of namen) if (n in k) return k[n];
     return -1;
   };
+  const iId = kol(["id", "nummer", "stamnummer", "leerlingnummer", "sourcedid", "source id", "leerling_id"]);
   const iVn = kol(["voornaam", "firstname", "first name"]);
-  const iAn = kol(["achternaam", "lastname", "last name", "naam"]);
-  const iId = kol(["id", "sourcedid", "source id", "leerling_id"]);
+  const iAn = kol(["achternaam", "lastname", "last name"]);
   const iVest = kol(["vestiging", "campus", "school"]);
   const iJaar = kol(["leerjaar", "jaar", "grade"]);
   const iGroep = kol(["klasgroep", "groep", "klas", "class"]);
   const iHist = kol(["leerjaarhistoriek", "leerjaar_historiek"]);
 
-  if (iVn < 0 || iAn < 0) {
-    return { rijen: [], fouten: ["Kolommen 'voornaam' en 'achternaam' zijn verplicht."] };
+  if (iId < 0 || iVn < 0 || iAn < 0) {
+    return {
+      rijen: [],
+      fouten: [
+        "Kolommen 'id' (een nummer), 'voornaam' en 'achternaam' zijn verplicht — controleer de kopregel van het bestand.",
+      ],
+    };
   }
+  // Niet-blokkerende waarschuwingen: het bestand wordt wel geïmporteerd, maar met een stille
+  // standaardwaarde voor een kolom die niet herkend werd — beter zichtbaar dan onopgemerkt.
+  if (iVest < 0) fouten.push("Kolom 'vestiging' niet gevonden — alle leerlingen kregen een lege vestiging.");
+  if (iJaar < 0) fouten.push("Kolom 'leerjaar' niet gevonden — alle leerlingen kregen leerjaar 1.");
+  if (iGroep < 0) fouten.push("Kolom 'klasgroep' niet gevonden — alle leerlingen kregen klasgroep A.");
 
   const studenten: Student[] = [];
   const gezien = new Set<string>();
@@ -163,8 +193,15 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
       fouten.push(`Rij ${nr}: voornaam of achternaam ontbreekt — overgeslagen.`);
       return;
     }
-    let id = iId >= 0 ? (r[iId] ?? "").trim() : "";
-    if (!id) id = `imp-${voornaam}-${achternaam}`.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    const id = schoonId(r[iId] ?? "");
+    if (!id) {
+      fouten.push(`Rij ${nr}: kolom 'id' is leeg — overgeslagen.`);
+      return;
+    }
+    if (!/^\d+$/.test(id)) {
+      fouten.push(`Rij ${nr}: id "${id}" is geen geldig nummer — overgeslagen.`);
+      return;
+    }
     if (gezien.has(id)) {
       fouten.push(`Rij ${nr}: dubbele id "${id}" — overgeslagen.`);
       return;

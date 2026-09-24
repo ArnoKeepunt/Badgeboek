@@ -8,9 +8,9 @@ import { leerdoelenVoorStroom } from "../lib/curriculum";
 import { alleGroepDefs, groepLeden } from "../lib/groepen";
 import {
   GRAAD_LABEL,
-  genereerLeerlingId,
   graadVan,
   filterLeerlingen,
+  isGeldigLeerlingId,
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
@@ -74,12 +74,14 @@ export function Students() {
       setMelding("Vul een klasgroep in.");
       return;
     }
-    let id = s.id.trim();
+    const id = s.id.trim();
     if (nieuw) {
-      if (!id) {
-        id = genereerLeerlingId(firstName, lastName, alleStudenten.map((x) => x.id));
-      } else if (alleStudenten.some((x) => x.id === id)) {
-        setMelding(`Id "${id}" bestaat al — kies een andere of laat het veld leeg.`);
+      if (!isGeldigLeerlingId(id)) {
+        setMelding("Vul een geldig leerlingnummer in (enkel cijfers, bv. het stamnummer) — geen naam.");
+        return;
+      }
+      if (alleStudenten.some((x) => x.id === id)) {
+        setMelding(`Nummer "${id}" bestaat al bij een andere leerling.`);
         return;
       }
     }
@@ -289,11 +291,12 @@ function LeerlingForm({
         <input value={s.lastName} onChange={(e) => setS({ ...s, lastName: e.target.value })} />
       </label>
       <label className="de-veld">
-        <span>Id</span>
+        <span>Leerlingnummer</span>
         <input
           value={s.id}
           disabled={!nieuw}
-          placeholder="optioneel — anders afgeleid uit de naam"
+          inputMode="numeric"
+          placeholder="bv. 20394 — enkel cijfers, nooit een naam"
           onChange={(e) => setS({ ...s, id: e.target.value })}
         />
       </label>

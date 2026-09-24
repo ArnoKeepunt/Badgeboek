@@ -5,6 +5,14 @@
  * - Schrijven: `;` als scheidingsteken (Excel-NL-vriendelijk), CRLF-regeleindes.
  */
 
+/**
+ * Ruwe gok of dit eigenlijk geen platte tekst is — bv. een .xlsx (zip-archief, begint met de
+ * bytes "PK") die per ongeluk als CSV gekozen werd, of hernoemd is zonder om te zetten. Geeft
+ * een duidelijkere foutmelding dan "kolommen ontbreken".
+ */
+export const lijktOpBinairBestand = (text: string): boolean =>
+  text.startsWith("PK") || text.slice(0, 2000).includes("\u0000");
+
 export function parseCsv(text: string): string[][] {
   const s = text.replace(/^﻿/, "");
   const eerste = s.split(/\r?\n/, 1)[0] ?? "";

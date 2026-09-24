@@ -261,9 +261,12 @@ export function Gegevens() {
           <p>
             De échte leerlingendata (upsert op <code>id</code>) — los van of we straks nog
             overstappen op een Smartschool-synchronisatie. Kolommen: <code>id, voornaam,
-            achternaam, vestiging, leerjaar, klasgroep</code> (<code>id</code> optioneel, wordt
-            anders afgeleid uit de naam). Bestaande leerlingen die niet in het bestand staan,
-            blijven gewoon staan.
+            achternaam, vestiging, leerjaar, klasgroep</code>. <code>id</code> is <strong>verplicht
+            en moet een nummer zijn</strong> (het stamnummer/leerlingnummer — nooit een naam), en
+            bepaalt bij een volgend bestand of een leerling bijgewerkt wordt of nieuw is. Zet die
+            kolom in Excel/Numbers als <strong>tekst</strong> op (niet als getal), anders vallen
+            voorloopnullen weg of verschijnt er "12345.0". Bestaande leerlingen die niet in het
+            bestand staan, blijven gewoon staan.
           </p>
           <label className="knop-secundair gegevens-upload-knop">
             CSV kiezen…
