@@ -36,6 +36,10 @@ export function Gegevens() {
   const {
     students,
     kleuren,
+    notities,
+    deelevaluaties,
+    deelKleuren,
+    deelNotities,
     schooljaar,
     doelWijzigingen,
     doelenImport,
@@ -204,7 +208,8 @@ export function Gegevens() {
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Evaluaties (back-up)</div>
           <p>
-            Elke ingevulde kleur, per leerling / badge — voor het <strong>geopende schooljaar
+            Elke ingevulde kleur per leerling, voor badges én deelbadges, met de notities erbij
+            (voor de leerling en enkel voor mentoren) — voor het <strong>geopende schooljaar
             ({schooljaar})</strong>. Kies bovenaan een ander schooljaar om dat te downloaden.
           </p>
           <button
@@ -213,7 +218,10 @@ export function Gegevens() {
             onClick={() =>
               downloadTekst(
                 `keerpunt-evaluaties-${schooljaar}-${datumStempel()}.csv`,
-                exportEvaluaties(students, kleuren, schooljaar),
+                exportEvaluaties(
+                  { studenten: students, kleuren, notities, deelevaluaties, deelKleuren, deelNotities },
+                  schooljaar,
+                ),
               )
             }
           >
@@ -283,9 +291,12 @@ export function Gegevens() {
           <p>
             Voor terwijl de rubrics nog volop in ontwikkeling zijn — een nieuwe versie
             rechtstreeks uploaden i.p.v. mij een nieuwe <code>rubrics_overzicht.xlsx</code> te
-            geven. Kolommen: <code>cursus, stroom, naam, doelen, blauw, groen, geel, rood,
-            leerlijn</code> (<code>doelen</code> komma-gescheiden). Wordt meteen de nieuwe
-            databaseversie, net als "Rubrics wegschrijven" hieronder.
+            geven. Kolommen: <code>cursus | stroom | naam | doelen | blauw | groen | geel | rood |
+            leerlijn</code>. Scheid de kolommen met een verticale streep <code>|</code> of een
+            puntkomma <code>;</code> — niet met een komma — zodat komma's in de uitleg gewoon
+            mogen; binnen <code>doelen</code> scheid je de codes met komma's. Het sjabloon gebruikt
+            al <code>|</code>. Wordt meteen de nieuwe databaseversie, net als "Rubrics
+            wegschrijven" hieronder.
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <label className="knop-secundair gegevens-upload-knop">

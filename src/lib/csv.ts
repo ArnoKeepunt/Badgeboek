@@ -1,8 +1,9 @@
 /**
  * Kleine CSV-hulp zonder externe afhankelijkheden.
- * - Lezen: `,` of `;` als scheidingsteken (automatisch gedetecteerd), `"..."`-velden,
- *   dubbele `""` als ontsnapt aanhalingsteken, `\n` binnen een veld, optionele BOM.
- * - Schrijven: `;` als scheidingsteken (Excel-NL-vriendelijk), CRLF-regeleindes.
+ * - Lezen: standaard `,` of `;` als scheidingsteken (automatisch gedetecteerd op de kopregel;
+ *   een import kan zelf de toegestane tekens kiezen), `"..."`-velden, dubbele `""` als
+ *   ontsnapt aanhalingsteken, `\n` binnen een veld, optionele BOM.
+ * - Schrijven: standaard `;` als scheidingsteken (Excel-NL-vriendelijk), CRLF-regeleindes.
  */
 
 /**
@@ -13,12 +14,19 @@
 export const lijktOpBinairBestand = (text: string): boolean =>
   text.startsWith("PK") || text.slice(0, 2000).includes("\u0000");
 
-export function parseCsv(text: string): string[][] {
+/** De kopregel (eerste regel, zonder BOM) — bevat enkel kolomnamen, geen vrije tekst. */
+export const kopregel = (text: string): string =>
+  text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
+
+/**
+ * Het scheidingsteken is het toegestane teken dat het vaakst in de kopregel voorkomt; bij
+ * gelijkstand wint het eerste in `toegestaan`.
+ */
+export function parseCsv(text: string, toegestaan: string[] = [",", ";"]): string[][] {
   const s = text.replace(/^﻿/, "");
-  const eerste = s.split(/\r?\n/, 1)[0] ?? "";
-  const komma = (eerste.match(/,/g) ?? []).length;
-  const puntkomma = (eerste.match(/;/g) ?? []).length;
-  const delim = puntkomma > komma ? ";" : ",";
+  const eerste = kopregel(s);
+  const tel = (t: string) => eerste.split(t).length - 1;
+  const delim = toegestaan.reduce((best, t) => (tel(t) > tel(best) ? t : best));
 
   const rijen: string[][] = [];
   let rij: string[] = [];
@@ -59,12 +67,12 @@ export function parseCsv(text: string): string[][] {
   return rijen.filter((r) => r.some((v) => v.trim() !== ""));
 }
 
-export function toCsv(rijen: (string | number | null | undefined)[][]): string {
+export function toCsv(rijen: (string | number | null | undefined)[][], delim = ";"): string {
   const esc = (v: string | number | null | undefined): string => {
     const t = v == null ? "" : String(v);
-    return /[",;\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    return /[",;|\t\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
-  return rijen.map((r) => r.map(esc).join(";")).join("\r\n");
+  return rijen.map((r) => r.map(esc).join(delim)).join("\r\n");
 }
 
 /** Maak een lookup van kolomnaam (genormaliseerd) → index op basis van de kopregel. */

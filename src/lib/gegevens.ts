@@ -1,9 +1,20 @@
 import { alleCursussen, alleLeerdoelen, alleRubrics } from "./curriculum";
-import { kopIndex, lijktOpBinairBestand, parseCsv, toCsv } from "./csv";
+import { kopIndex, kopregel, lijktOpBinairBestand, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
 import { RATING_LABEL } from "./ratings";
-import type { DoelKleuren, Kleurcriteria, Mentor, Rating, Rubriek, Stroom, Student } from "./types";
+import type {
+  DeelKleuren,
+  Deelevaluatie,
+  DeelNotities,
+  DoelKleuren,
+  Kleurcriteria,
+  Mentor,
+  Notities,
+  Rubriek,
+  Stroom,
+  Student,
+} from "./types";
 
 /**
  * Domeinspecifieke CSV-im/export. Geen backend: alles gebeurt in de browser.
@@ -241,31 +252,47 @@ const EVAL_KOP = [
   "achternaam",
   "stroom",
   "cursus",
+  "soort",
   "badge",
+  "deelbadge",
+  "datum",
   "kleur",
   "behaald",
+  "notitie_leerling",
+  "notitie_mentor",
 ];
 
+export interface EvaluatieBron {
+  studenten: Student[];
+  kleuren: DoelKleuren;
+  notities: Notities;
+  deelevaluaties: Deelevaluatie[];
+  deelKleuren: DeelKleuren;
+  deelNotities: DeelNotities;
+}
+
 /**
- * Elke ingevulde badgekleur als één rij — de "download op elk moment"-back-up. Elke sleutel
- * wijst naar één badge (leerdoel); er is geen evaluatie meer op cursus-/rubric-niveau.
+ * Elke ingevulde badge én deelbadge als één rij — de "download op elk moment"-back-up — met de
+ * notities erbij (zichtbaar voor de leerling + enkel voor mentoren). Een cel met enkel een
+ * notitie (nog geen kleur) komt ook mee. `soort` = "badge" of "deelbadge"; bij een deelbadge
+ * staan de gekoppelde badges in `badge` (gescheiden door " | ") en blijft `behaald` leeg, want
+ * een deelbadge keurt de badge niet automatisch goed.
  *
  * `alleenSchooljaar`: enkel de rijen van dat schooljaar meenemen (afgesloten jaren blijven uit
  * de back-up). Weglaten = alle schooljaren.
  */
-export function exportEvaluaties(
-  studenten: Student[],
-  kleuren: DoelKleuren,
-  alleenSchooljaar?: string,
-): string {
-  const studById = new Map(studenten.map((s) => [s.id, s]));
+export function exportEvaluaties(bron: EvaluatieBron, alleenSchooljaar?: string): string {
+  const studById = new Map(bron.studenten.map((s) => [s.id, s]));
   const doelById = new Map(alleLeerdoelen().map((d) => [d.id, d]));
   const rubById = new Map(alleRubrics().map((r) => [r.id, r]));
   const curById = new Map(alleCursussen().map((c) => [c.id, c]));
+  const deelById = new Map(bron.deelevaluaties.map((d) => [d.id, d]));
+  const badgeNaam = (id: string) => doelById.get(id)?.omschrijving ?? id;
 
-  const rijen: (string | number)[][] = [EVAL_KOP];
-  for (const [sleutel, kleur] of Object.entries(kleuren)) {
-    // Sleutel = `${schooljaar}:${studentId}:${nodeId}`.
+  const rijen: string[][] = [];
+
+  // Badges — sleutel = `${schooljaar}:${studentId}:${nodeId}`.
+  for (const sleutel of new Set([...Object.keys(bron.kleuren), ...Object.keys(bron.notities)])) {
     const i1 = sleutel.indexOf(":");
     const i2 = sleutel.indexOf(":", i1 + 1);
     const schooljaar = sleutel.slice(0, i1);
@@ -273,6 +300,8 @@ export function exportEvaluaties(
     const studentId = sleutel.slice(i1 + 1, i2);
     const nodeId = sleutel.slice(i2 + 1);
     const s = studById.get(studentId);
+    const kleur = bron.kleuren[sleutel];
+    const notitie = bron.notities[sleutel];
 
     const d = doelById.get(nodeId);
     const rub = d ? rubById.get(d.rubricId) : undefined;
@@ -285,12 +314,65 @@ export function exportEvaluaties(
       s?.lastName ?? "",
       cur?.stroom ?? "",
       cur?.naam ?? "",
-      d?.omschrijving ?? nodeId,
-      RATING_LABEL[kleur as Rating],
-      kleur === "green" || kleur === "blue" ? "ja" : "nee",
+      "badge",
+      badgeNaam(nodeId),
+      "",
+      "",
+      kleur ? RATING_LABEL[kleur] : "",
+      kleur ? (kleur === "green" || kleur === "blue" ? "ja" : "nee") : "",
+      notitie?.zichtbaar ?? "",
+      notitie?.verborgen ?? "",
     ]);
   }
-  return toCsv(rijen);
+
+  // Deelbadges — sleutel = `${deelevaluatieId}:${studentId}`.
+  for (const sleutel of new Set([
+    ...Object.keys(bron.deelKleuren),
+    ...Object.keys(bron.deelNotities),
+  ])) {
+    const i = sleutel.lastIndexOf(":");
+    const de = deelById.get(sleutel.slice(0, i));
+    if (!de) continue;
+    if (alleenSchooljaar && de.schooljaar !== alleenSchooljaar) continue;
+    const studentId = sleutel.slice(i + 1);
+    const s = studById.get(studentId);
+    const kleur = bron.deelKleuren[sleutel];
+    const notitie = bron.deelNotities[sleutel];
+
+    rijen.push([
+      de.schooljaar,
+      studentId,
+      s?.firstName ?? "",
+      s?.lastName ?? "",
+      de.stroom,
+      de.cursus,
+      "deelbadge",
+      de.leerdoelIds.map(badgeNaam).join(" | "),
+      de.titel,
+      de.datum,
+      kleur ? RATING_LABEL[kleur] : "",
+      "",
+      notitie?.zichtbaar ?? "",
+      notitie?.verborgen ?? "",
+    ]);
+  }
+
+  // Per leerling gegroepeerd, binnen een cursus eerst de badges en dan de deelbadges.
+  const nl = (a: string, b: string) => a.localeCompare(b, "nl");
+  rijen.sort(
+    (a, b) =>
+      nl(a[0], b[0]) ||
+      nl(a[3], b[3]) ||
+      nl(a[2], b[2]) ||
+      nl(a[1], b[1]) ||
+      nl(a[4], b[4]) ||
+      nl(a[5], b[5]) ||
+      nl(a[6], b[6]) ||
+      nl(a[9], b[9]) ||
+      nl(a[8], b[8]) ||
+      nl(a[7], b[7]),
+  );
+  return toCsv([EVAL_KOP, ...rijen]);
 }
 
 // --- Doelen (minimumdoelen / eindtermen) --------------------------------
@@ -417,7 +499,7 @@ export function exportRubrieken(rubrieken: Rubriek[]): string {
       r.criteria.rood,
       r.leerlijn,
     ]),
-  ]);
+  ], "|");
 }
 
 /** Leesbare, ascii-veilige id-component — zelfde algoritme als scripts/extract_rubrics.py. */
@@ -437,7 +519,15 @@ function slug(s: string): string {
  * `scripts/extract_rubrics.py`, zodat een import hier dezelfde id's oplevert als het script.
  */
 export function importRubrieken(csv: string): ImportResultaat<Rubriek> {
-  const rijen = parseCsv(csv);
+  // Geen komma als kolomscheiding: die zit te vaak in de criteria- en leerlijnteksten.
+  const kop = kopregel(csv);
+  if (!kop.includes("|") && !kop.includes(";")) {
+    return {
+      rijen: [],
+      fouten: ["Scheid de kolommen met een verticale streep | of een puntkomma ; (geen komma)."],
+    };
+  }
+  const rijen = parseCsv(csv, ["|", ";"]);
   const fouten: string[] = [];
   if (rijen.length < 2) return { rijen: [], fouten: ["Geen datarijen gevonden."] };
 
