@@ -36,9 +36,35 @@ export function RapportOpmerkingVeld({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const paneel = useRef<HTMLDivElement>(null);
+  const vak = useRef<HTMLTextAreaElement>(null);
+  /** Wat er laatst bewaard is (of bij het openen al stond) — om dubbel bewaren te vermijden. */
+  const bewaard = useRef(opmerking);
+
+  const bewaar = (tekst: string) => {
+    if (readonly || tekst === bewaard.current) return;
+    bewaard.current = tekst;
+    onSave(tekst);
+  };
+
+  const openen = () => {
+    bewaard.current = opmerking;
+    setOpen(true);
+  };
+
+  /**
+   * Sluiten bewaart altijd eerst wat er in het vak staat. Op `onBlur` alleen rekenen volstaat
+   * niet: sluiten via de achtergrond (Safari/iPad focust een knop niet bij een klik), Escape of
+   * scrollen haalt het tekstvak weg zonder blur-event — dan ging een aanvulling van een tweede
+   * mentor verloren en bleef enkel de oorspronkelijke opmerking staan.
+   */
+  const sluit = () => {
+    if (vak.current) bewaar(vak.current.value);
+    setOpen(false);
+  };
+
   // `paneel` meegeven: anders leest `usePopover` het interne scrollen van het tekstvak dat
   // volloopt (de cursor duwt de inhoud omhoog) als "de pagina scrolt" en sluit het paneel toe.
-  const pos = usePopover(open, trigger, () => setOpen(false), {
+  const pos = usePopover(open, trigger, sluit, {
     breedte: 360,
     hoogte: 180,
     paneel,
@@ -53,7 +79,7 @@ export function RapportOpmerkingVeld({
         aria-expanded={open}
         title={heeft ? "Opmerking bekijken/bewerken" : "Opmerking toevoegen"}
         aria-label={label}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? sluit() : openen())}
       >
         <BubbelIcoon />
       </button>
@@ -66,7 +92,7 @@ export function RapportOpmerkingVeld({
               type="button"
               className="rating-cell-backdrop"
               aria-label="Sluiten"
-              onClick={() => setOpen(false)}
+              onClick={sluit}
             />
             <div
               ref={paneel}
@@ -78,11 +104,12 @@ export function RapportOpmerkingVeld({
                 <textarea
                   rows={4}
                   readOnly={readonly}
+                  ref={vak}
                   defaultValue={opmerking}
-                  onBlur={(e) => onSave(e.target.value)}
+                  onBlur={(e) => bewaar(e.target.value)}
                 />
               </label>
-              <button type="button" className="linkknop" onClick={() => setOpen(false)}>
+              <button type="button" className="linkknop" onClick={sluit}>
                 Sluiten
               </button>
             </div>

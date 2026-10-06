@@ -184,8 +184,9 @@ export function DeelevaluatieEditor({
       )}
 
       <p className="de-editor-info">
-        Wil je verschillende cursussen apart als evaluatie beoordelen? Maak dan telkens een
-        nieuwe deelbadge aan.
+        Hieronder kun je de deelbadge koppelen aan meer dan één cursus. Je kunt wel maar één
+        evaluatie per deelbadge ingeven. Wil je de verschillende cursussen apart beoordelen? Maak
+        dan in elke cursus een deelbadge aan.
       </p>
 
       <div className="de-veld">

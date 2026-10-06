@@ -641,6 +641,23 @@ th {
   margin-right: auto;
 }
 
+/* In het rapport staat de kleurknop altijd rechtsboven naast de rubricnaam — ook bij een lange
+ * naam, die dan zelf over meer regels loopt i.p.v. de knop naar een nieuwe regel te duwen. */
+.rapport-rubriek-kop {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  padding-right: 0;
+}
+
+.rapport-rubriek-kop .rubriek-naam {
+  flex: 1;
+  min-width: 0;
+}
+
+.rapport-rubriek-kop > :not(.rubriek-naam) {
+  flex-shrink: 0;
+}
+
 .rubriek-legende {
   display: flex;
   flex-wrap: wrap;
@@ -782,6 +799,22 @@ th {
   border-radius: 6px;
   background: var(--rating-bg);
   font-size: 13px;
+}
+
+/* Rapport: een criterium is aanklikbaar om die kleur te kiezen (zolang er nog niets gekozen is). */
+.rubriek-criterium.is-klikbaar {
+  cursor: pointer;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+
+.rubriek-criterium.is-klikbaar:hover,
+.rubriek-criterium.is-klikbaar:focus-visible {
+  box-shadow: 0 0 0 2px var(--rating-solid);
+  outline: none;
+}
+
+.rubriek-criterium.is-klikbaar:active {
+  transform: scale(0.995);
 }
 
 .rubriek-criterium-kleur {
@@ -3998,6 +4031,22 @@ th {
   gap: 16px;
 }
 
+/* Actieknoppen van het rapport: altijd uiterst rechts in de toolbar (ook als die op een smal
+ * scherm naar een nieuwe regel loopt), zie RapportDetail.tsx. */
+.rapport-acties {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* Vaste breedte: "Rapport afwerken" / "Heropenen" / "Afgewerkt" wisselen elkaar af op dezelfde
+ * plek, zonder dat de knoppen links ervan verschuiven. */
+.rapport-afwerk-knop {
+  min-width: 150px;
+  text-align: center;
+}
+
 .rapport-toolbar-kies {
   display: flex;
   flex-direction: column;
@@ -4065,6 +4114,12 @@ th {
 
 /* Groepje van bij-elkaar-horende acties (bv. printen + pdf, of afwerken + heropenen) — een
    dun lijntje tussen groepen onderling houdt losse knoppen leesbaar geclusterd. */
+.rapport-pdf-tip {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .rapport-knopgroep {
   display: flex;
   align-items: center;
@@ -4385,12 +4440,7 @@ th {
 /* Printweergave: enkel getoond in `@media print` hieronder — op het scherm blijft de
    interactieve editor (`.no-print`) staan, niet dit statische blad. De opmaak van de inhoud zelf
    (h1/tabel/opmerkingen) staat bewust BUITEN `@media print`: een browser past die media-query
-   enkel toe tijdens een echte afdruk/printvoorbeeld, niet bij een gewone schermweergave. De
-   rechtstreekse pdf-download ("Opslaan als pdf", zie `rapportPdf.ts`) zet dit blad via
-   `.rapport-print--pdf-render` hieronder even zichtbaar (buiten beeld) om het over te nemen met
-   `html2canvas` — dat gebeurt in een gewone schermcontext, dus zonder deze opmaak hier los te
-   trekken van `@media print` zou die render de stijling missen en er dus anders uitzien dan het
-   printvenster. Zo geven beide knoppen exact dezelfde opmaak. */
+   enkel toe tijdens een echte afdruk/printvoorbeeld, niet bij een gewone schermweergave. */
 .rapport-print {
   display: none;
 }
@@ -4419,6 +4469,24 @@ th {
   vertical-align: top;
 }
 
+/* Cursus/rubric/kleur smal houden, de rubric-tekst bij de kleur krijgt de rest van de breedte. */
+.rapport-print-tabel th:nth-child(1),
+.rapport-print-tabel td:nth-child(1):not(:last-child),
+.rapport-print-tabel th:nth-child(3),
+.rapport-print-tabel td:nth-child(3) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.rapport-print-tabel th:nth-child(2),
+.rapport-print-tabel td:nth-child(2) {
+  width: 25%;
+}
+
+.rapport-print-tabel td.rapport-print-betekenis {
+  white-space: pre-line;
+}
+
 .rapport-print-algemeen {
   margin-top: 20px;
 }
@@ -4431,20 +4499,6 @@ th {
 .rapport-print-algemeen p {
   white-space: pre-wrap;
   margin: 0;
-}
-
-/* Tijdelijk (JS zet/verwijdert deze klasse rond de `html2canvas`-opname in `rapportPdf.ts`):
-   dwingt het printblad zichtbaar en gelayout, maar buiten beeld — op een vaste breedte, zodat de
-   pdf-opname niet afhangt van hoe breed het browservenster toevallig openstaat. */
-.rapport-print--pdf-render {
-  display: block !important;
-  position: fixed;
-  top: 0;
-  left: -10000px;
-  width: 800px;
-  padding: 24px;
-  background: #fff;
-  color: #1a1a1a;
 }
 
 @media print {

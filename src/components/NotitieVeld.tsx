@@ -36,9 +36,36 @@ export function NotitieVeld({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const paneel = useRef<HTMLDivElement>(null);
+  const zichtbaarVak = useRef<HTMLTextAreaElement>(null);
+  const verborgenVak = useRef<HTMLTextAreaElement>(null);
+  /** Wat er laatst bewaard is (of bij het openen al stond) — om dubbel bewaren te vermijden. */
+  const bewaard = useRef<Notitie>(notitie);
+
+  const bewaarVeld = (veld: keyof Notitie, waarde: string) => {
+    if (readonly || waarde === bewaard.current[veld]) return;
+    bewaard.current = { ...bewaard.current, [veld]: waarde };
+    onSave({ [veld]: waarde });
+  };
+
+  const openen = () => {
+    bewaard.current = notitie;
+    setOpen(true);
+  };
+
+  /**
+   * Sluiten bewaart altijd eerst wat er in de vakken staat. Op `onBlur` alleen rekenen volstaat
+   * niet: sluiten via de achtergrond (Safari/iPad focust een knop niet bij een klik), Escape of
+   * scrollen haalt het tekstvak weg zonder blur-event, en dan ging de nieuwe tekst verloren.
+   */
+  const sluit = () => {
+    if (zichtbaarVak.current) bewaarVeld("zichtbaar", zichtbaarVak.current.value);
+    if (verborgenVak.current) bewaarVeld("verborgen", verborgenVak.current.value);
+    setOpen(false);
+  };
+
   // `paneel` meegeven: anders leest `usePopover` het interne scrollen van een tekstvak dat
   // volloopt (de cursor duwt de inhoud omhoog) als "de pagina scrolt" en sluit het paneel toe.
-  const pos = usePopover(open, trigger, () => setOpen(false), {
+  const pos = usePopover(open, trigger, sluit, {
     breedte: 360,
     hoogte: 260,
     paneel,
@@ -53,7 +80,7 @@ export function NotitieVeld({
         aria-expanded={open}
         title={heeft ? "Notitie bekijken/bewerken" : "Notitie toevoegen"}
         aria-label={heeft ? "Notitie bekijken/bewerken" : "Notitie toevoegen"}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? sluit() : openen())}
       >
         <BubbelIcoon />
       </button>
@@ -66,7 +93,7 @@ export function NotitieVeld({
               type="button"
               className="rating-cell-backdrop"
               aria-label="Sluiten"
-              onClick={() => setOpen(false)}
+              onClick={sluit}
             />
             <div
               ref={paneel}
@@ -78,8 +105,9 @@ export function NotitieVeld({
                 <textarea
                   rows={2}
                   readOnly={readonly}
+                  ref={zichtbaarVak}
                   defaultValue={notitie.zichtbaar}
-                  onBlur={(e) => onSave({ zichtbaar: e.target.value })}
+                  onBlur={(e) => bewaarVeld("zichtbaar", e.target.value)}
                 />
               </label>
               <label className="notitie-veld">
@@ -87,11 +115,12 @@ export function NotitieVeld({
                 <textarea
                   rows={2}
                   readOnly={readonly}
+                  ref={verborgenVak}
                   defaultValue={notitie.verborgen}
-                  onBlur={(e) => onSave({ verborgen: e.target.value })}
+                  onBlur={(e) => bewaarVeld("verborgen", e.target.value)}
                 />
               </label>
-              <button type="button" className="linkknop" onClick={() => setOpen(false)}>
+              <button type="button" className="linkknop" onClick={sluit}>
                 Sluiten
               </button>
             </div>

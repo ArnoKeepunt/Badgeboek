@@ -1485,7 +1485,7 @@ export function maakRapportenBulk(
   return nieuw.map((r) => r.id);
 }
 
-/** Verwijder een rapport volledig. */
+/** Verwijder een rapport volledig. Enkel voor de beheerder — de UI en de Firestore-regels gaten dit. */
 export function verwijderRapport(id: string) {
   commit({ ...state, rapporten: state.rapporten.filter((r) => r.id !== id) });
 }

@@ -21,7 +21,6 @@ import {
 } from "../lib/leerlingen";
 import { RATING_EMPTY_LABEL, RATING_KORT, RATING_LABEL } from "../lib/ratings";
 import { magLeerlingZien, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
-import { downloadRapportPdf } from "../lib/rapportPdf";
 import { KLEUR_KEY, KLEUREN, rubriekenVoorCursus } from "../lib/rubrieken";
 import { useEffectieveRol } from "../lib/sessie";
 import {
@@ -102,6 +101,71 @@ function PijlIcoon({ richting }: { richting: "links" | "rechts" }) {
 }
 
 /**
+ * Klik op een rubric-criterium = meteen die kleur kiezen. Enkel als de klik het einde is van
+ * tekst selecteren (slepen), kiezen we niets — zo blijft de tekst kopieerbaar.
+ */
+function kiesNaKlik(kies: () => void) {
+  if (window.getSelection()?.toString()) return;
+  kies();
+}
+
+/**
+ * Het vak "Algemene opmerking". Gecontroleerd i.p.v. `defaultValue`: zo verschijnt een
+ * opmerking die een andere mentor intussen bewaarde ook hier (zolang je zelf niet aan het typen
+ * bent), en overschrijf je die niet met een verouderde tekst. Bewaart bij blur én bij het
+ * verlaten van de pagina/rapport — een klik op een link geeft in Safari geen blur-event.
+ */
+function AlgemeneOpmerkingVeld({
+  opmerking,
+  onSave,
+  readonly,
+  title,
+}: {
+  opmerking: string;
+  onSave: (tekst: string) => void;
+  readonly: boolean;
+  title?: string;
+}) {
+  const [tekst, setTekst] = useState(opmerking);
+  const [bezig, setBezig] = useState(false);
+  const [gezien, setGezien] = useState(opmerking);
+  // Een wijziging van elders overnemen, maar niet terwijl de gebruiker zelf typt.
+  if (opmerking !== gezien && !bezig) {
+    setGezien(opmerking);
+    setTekst(opmerking);
+  }
+
+  const laatste = useRef({ tekst, opmerking, readonly, onSave });
+  useEffect(() => {
+    laatste.current = { tekst, opmerking, readonly, onSave };
+  });
+
+  // Bij het weggaan (andere pagina of ander rapport) nog niet bewaarde tekst wegschrijven.
+  useEffect(
+    () => () => {
+      const l = laatste.current;
+      if (!l.readonly && l.tekst !== l.opmerking) l.onSave(l.tekst);
+    },
+    [],
+  );
+
+  return (
+    <textarea
+      rows={4}
+      readOnly={readonly}
+      value={tekst}
+      title={title}
+      onFocus={() => setBezig(true)}
+      onChange={(e) => setTekst(e.target.value)}
+      onBlur={() => {
+        setBezig(false);
+        if (!readonly && tekst !== opmerking) onSave(tekst);
+      }}
+    />
+  );
+}
+
+/**
  * Rapport voor één leerling: links het rapport zelf, rechts een alleen-lezen naslagpaneel met
  * alle badges van de leerling — zodat de mentor bij het kiezen van een rubric-kleur meteen de
  * onderliggende badges (en, enkel hier, de deelbadges erachter) kan bekijken, zonder naar een
@@ -119,13 +183,11 @@ function PijlIcoon({ richting }: { richting: "links" | "rechts" }) {
  * toont dat expliciet i.p.v. een kleur te laten kiezen. De cursusfilter bovenaan filtert beide
  * panelen.
  *
- * Een rapport is per rapportmoment (bv. "Rapport 1") en kan afgewerkt/vergrendeld worden. Twee
- * manieren om het als document naar buiten te krijgen, allebei op dezelfde `printweergave`-node
- * (`.rapport-print`, `printRef`, onderaan — enkel zichtbaar bij het afdrukken, `@media print` in
- * `index.css`), dus met exact dezelfde opmaak: "Printen" opent het browser-printvenster
- * (Ctrl/Cmd+P) — daar kan de mentor zelf nog "Opslaan als pdf" als bestemming kiezen. "Opslaan
- * als pdf" downloadt rechtstreeks een pdf-bestand (`lib/rapportPdf.ts`, `jspdf`, dynamisch
- * geladen) door diezelfde node met `html2canvas` over te nemen, zonder dat printvenster. Beide
+ * Een rapport is per rapportmoment (bv. "Rapport 1") en kan afgewerkt/vergrendeld worden. Naar
+ * buiten brengen gebeurt via het browser-printvenster op de printweergave-node (`.rapport-print`,
+ * onderaan — enkel zichtbaar bij het afdrukken, `@media print` in `index.css`): "Printen" en
+ * "Opslaan als pdf" openen allebei dat venster (bij de tweede kiest de mentor daar "Opslaan als
+ * pdf" als bestemming). Een eigen pdf-generator (jspdf/html2canvas) werkte niet betrouwbaar. Beide
  * tonen standaard enkel de rubrics die effectief een kleur hebben — een nog niet
  * ingevulde/gekozen rubric staat er niet bij (op het scherm zelf blijft die gewoon zichtbaar).
  */
@@ -179,9 +241,6 @@ export function RapportDetail() {
   const [kiesZoek, setKiesZoek] = useState("");
   const kiesTrigger = useRef<HTMLButtonElement>(null);
   const kiesPaneel = useRef<HTMLDivElement>(null);
-  // De printweergave-node (`.rapport-print` verderop) — "Opslaan als pdf" neemt die letterlijk
-  // over, zie `opslaanAlsPdf` hieronder.
-  const printRef = useRef<HTMLDivElement>(null);
   const kiesPos = usePopover(kiesOpen, kiesTrigger, () => setKiesOpen(false), {
     breedte: 300,
     hoogte: 360,
@@ -255,6 +314,8 @@ export function RapportDetail() {
   const gekozen: Rapport | undefined = mijnRapporten.find((r) => r.id === gekozenId);
   const vergrendeld = gekozen?.status === "afgewerkt";
   const magHeropenen = rol === "beheerder";
+  // Verwijderen is beheerder-only (ook in de Firestore-regels), zowel concept als afgewerkt.
+  const magVerwijderen = rol === "beheerder";
 
   // Printweergave: enkel de rubrics die effectief een kleur hebben — een leeg/niet-gekozen
   // rubric staat er standaard niet bij (dat is ballast op een rapport dat de deur uit gaat; het
@@ -329,31 +390,8 @@ export function RapportDetail() {
     window.print();
   };
 
-  // Zelfde tekst als in de printweergave onderaan (`.rapport-print-meta`) — ook gebruikt in de
-  // rechtstreekse pdf-download hieronder, zodat beide identiek blijven.
+  // De metaregel van de printweergave onderaan (`.rapport-print-meta`).
   const rapportMetaTekst = `${student.firstName} ${student.lastName} · ${student.vestiging} · ${GRAAD_LABEL[graadDitJaar]} · ${student.leerjaar}e jaar · groep ${student.klasgroep} · schooljaar ${schooljaar}`;
-
-  // "Opslaan als pdf": in tegenstelling tot "Printen" géén browser-printvenster — rechtstreeks
-  // een pdf-bestand genereren en downloaden (zie `lib/rapportPdf.ts`), met exact de gevraagde
-  // bestandsnaam. Neemt letterlijk dezelfde `.rapport-print`-node als de printweergave over (via
-  // `printRef`), zodat beide manieren exact dezelfde opmaak geven — `.rapport-print--pdf-render`
-  // (`index.css`) zet dat blad daarvoor eventjes zichtbaar, buiten beeld.
-  const opslaanAlsPdf = async () => {
-    if (!gekozen) return;
-    const element = printRef.current;
-    if (!element) return;
-    element.classList.add("rapport-print--pdf-render");
-    try {
-      await downloadRapportPdf(element, downloadBestandsnaam(gekozen));
-    } catch (error) {
-      // Best-effort — geen aparte foutmelding-UI voor dit rapport (zie `store.ts`-conventie bij
-      // opslagfouten); de mentor kan het gewoon opnieuw proberen of via "Printen" → "Opslaan als
-      // pdf" in het browservenster gaan.
-      console.error("Rapport-pdf genereren mislukt:", error);
-    } finally {
-      element.classList.remove("rapport-print--pdf-render");
-    }
-  };
 
   return (
     <section>
@@ -505,8 +543,6 @@ export function RapportDetail() {
                 </label>
               )}
 
-              <span style={{ flex: 1 }} />
-
               <label className="rapport-toolbar-kies">
                 <span>Cursus</span>
                 <select
@@ -521,6 +557,81 @@ export function RapportDetail() {
                   ))}
                 </select>
               </label>
+
+              <span style={{ flex: 1 }} />
+
+              {/* Altijd uiterst rechts boven en in een vaste volgorde, zodat de knoppen niet
+                  verspringen naargelang de status: wat er al dan niet is (Verwijderen) staat
+                  links, de afwerk-knop staat altijd op de laatste plek met een vaste breedte —
+                  ook als er niets meer af te werken valt (dan uitgeschakeld). */}
+              {gekozen && (
+                <div className="rapport-acties">
+                  {magVerwijderen && (
+                    <button
+                      type="button"
+                      className="linkknop linkknop-gevaar"
+                      onClick={() => {
+                        if (confirm(`Rapport "${gekozen.naam}" definitief verwijderen?`)) {
+                          verwijderRapport(gekozen.id);
+                        }
+                      }}
+                    >
+                      Verwijderen
+                    </button>
+                  )}
+                  <div className="rapport-knopgroep">
+                    <button
+                      type="button"
+                      className="knop-secundair rapport-icoonknop"
+                      onClick={printen}
+                    >
+                      <PrinterIcoon />
+                      Printen
+                    </button>
+                    <button
+                      type="button"
+                      className="knop-secundair rapport-icoonknop"
+                      title='Opent het printvenster — kies daar "Opslaan als pdf" als bestemming.'
+                      onClick={printen}
+                    >
+                      <PdfIcoon />
+                      Opslaan als pdf
+                    </button>
+                  </div>
+                  <div className="rapport-knopgroep">
+                    {!vergrendeld ? (
+                      <button
+                        type="button"
+                        className="knop-secundair rapport-afwerk-knop"
+                        onClick={() => {
+                          if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
+                            rondRapportAf(gekozen.id);
+                          }
+                        }}
+                      >
+                        Rapport afwerken
+                      </button>
+                    ) : magHeropenen ? (
+                      <button
+                        type="button"
+                        className="knop-secundair rapport-afwerk-knop"
+                        onClick={() => heropenRapport(gekozen.id)}
+                      >
+                        Heropenen
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="knop-secundair rapport-afwerk-knop"
+                        disabled
+                        title="Enkel een beheerder kan een afgewerkt rapport heropenen."
+                      >
+                        Afgewerkt
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {gekozen && (
@@ -534,68 +645,12 @@ export function RapportDetail() {
                     {magHeropenen && " Enkel een beheerder kan het heropenen."}
                   </span>
                 )}
-                <span style={{ flex: 1 }} />
-
-                <div className="rapport-knopgroep">
-                  <button
-                    type="button"
-                    className="knop-secundair rapport-icoonknop"
-                    onClick={printen}
-                  >
-                    <PrinterIcoon />
-                    Printen
-                  </button>
-                  <button
-                    type="button"
-                    className="knop-secundair rapport-icoonknop"
-                    title="Downloadt meteen een pdf-bestand van dit rapport."
-                    onClick={opslaanAlsPdf}
-                  >
-                    <PdfIcoon />
-                    Opslaan als pdf
-                  </button>
-                </div>
-
-                {(!vergrendeld || magHeropenen) && (
-                  <div className="rapport-knopgroep">
-                    {!vergrendeld && (
-                      <button
-                        type="button"
-                        className="knop-secundair"
-                        onClick={() => {
-                          if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
-                            rondRapportAf(gekozen.id);
-                          }
-                        }}
-                      >
-                        Rapport afwerken
-                      </button>
-                    )}
-                    {vergrendeld && magHeropenen && (
-                      <button
-                        type="button"
-                        className="knop-secundair"
-                        onClick={() => heropenRapport(gekozen.id)}
-                      >
-                        Heropenen
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {(!vergrendeld || magHeropenen) && (
-                  <button
-                    type="button"
-                    className="linkknop linkknop-gevaar"
-                    onClick={() => {
-                      if (confirm(`Rapport "${gekozen.naam}" definitief verwijderen?`)) {
-                        verwijderRapport(gekozen.id);
-                      }
-                    }}
-                  >
-                    Verwijderen
-                  </button>
-                )}
+                {/* De bestemming in het printvenster kan een website niet zelf kiezen — Chrome/
+                    Edge onthouden wel de laatste keuze, dus meestal is dit eenmalig per toestel. */}
+                <span className="rapport-pdf-tip">
+                  Pdf nodig? Kies in het printvenster bij <strong>Bestemming</strong> de optie{" "}
+                  <strong>Opslaan als PDF</strong>.
+                </span>
               </div>
             )}
           </div>
@@ -681,7 +736,7 @@ export function RapportDetail() {
                                   : KLEUREN;
                                 return (
                                   <article key={r.id} className="rubriek" title={wLabel}>
-                                    <div className="rubriek-kop">
+                                    <div className="rubriek-kop rapport-rubriek-kop">
                                       <h3 className="rubriek-naam">{r.naam}</h3>
                                       <RatingCell
                                         label={`${cursus.naam} — ${r.naam}`}
@@ -695,19 +750,41 @@ export function RapportDetail() {
                                     </div>
 
                                     <dl className="rubriek-criteria">
-                                      {teTonenKleuren.map((kleur) => (
-                                        <div
-                                          key={kleur}
-                                          className={`rubriek-criterium rating-${kleur}`}
-                                        >
-                                          <dt className="rubriek-criterium-kleur">
-                                            {RATING_LABEL[kleur]}
-                                          </dt>
-                                          <dd className="rubriek-criterium-tekst">
-                                            {r.criteria[KLEUR_KEY[kleur]] || "—"}
-                                          </dd>
-                                        </div>
-                                      ))}
+                                      {teTonenKleuren.map((kleur) => {
+                                        // Zolang er nog geen kleur gekozen is, kies je ook
+                                        // rechtstreeks door op een criterium te klikken
+                                        // (sneller dan via de kleurknop).
+                                        const klikbaar = !kleurGekozen && !vergrendeld;
+                                        const kies = () =>
+                                          zetRapportRubriekKleur(gekozen.id, r.id, kleur);
+                                        return (
+                                          <div
+                                            key={kleur}
+                                            className={`rubriek-criterium rating-${kleur}${
+                                              klikbaar ? " is-klikbaar" : ""
+                                            }`}
+                                            {...(klikbaar && {
+                                              role: "button",
+                                              tabIndex: 0,
+                                              title: `Kies ${RATING_LABEL[kleur].toLowerCase()}`,
+                                              onClick: () => kiesNaKlik(kies),
+                                              onKeyDown: (e: React.KeyboardEvent) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                  e.preventDefault();
+                                                  kies();
+                                                }
+                                              },
+                                            })}
+                                          >
+                                            <dt className="rubriek-criterium-kleur">
+                                              {RATING_LABEL[kleur]}
+                                            </dt>
+                                            <dd className="rubriek-criterium-tekst">
+                                              {r.criteria[KLEUR_KEY[kleur]] || "—"}
+                                            </dd>
+                                          </div>
+                                        );
+                                      })}
                                     </dl>
                                   </article>
                                 );
@@ -884,18 +961,18 @@ export function RapportDetail() {
                   langer wordt dan de rapport-editor links. */}
               <label className="rapport-algemeen no-print">
                 <span>Algemene opmerking</span>
-                <textarea
-                  rows={4}
-                  readOnly={vergrendeld}
-                  defaultValue={gekozen.algemeneOpmerking}
+                <AlgemeneOpmerkingVeld
+                  key={gekozen.id}
+                  opmerking={gekozen.algemeneOpmerking}
+                  readonly={vergrendeld}
                   title={wijzigingLabel(rapportItemSleutel(gekozen.id, "algemeen")) ?? undefined}
-                  onBlur={(e) => zetRapportAlgemeneOpmerking(gekozen.id, e.target.value)}
+                  onSave={(tekst) => zetRapportAlgemeneOpmerking(gekozen.id, tekst)}
                 />
               </label>
 
               {/* Printweergave: enkel zichtbaar bij het afdrukken (zie @media print in index.css).
                   Statische, opgeruimde weergave — geen popovers/knoppen die toch niet printen. */}
-              <div className="rapport-print" ref={printRef}>
+              <div className="rapport-print">
                 <h1>{gekozen.naam}</h1>
                 <p className="rapport-print-meta">{rapportMetaTekst}</p>
                 <table className="rapport-print-tabel">
@@ -904,12 +981,13 @@ export function RapportDetail() {
                       <th>Cursus</th>
                       <th>Rubric</th>
                       <th>Kleur</th>
+                      <th>Betekenis</th>
                     </tr>
                   </thead>
                   <tbody>
                     {printRijen.length === 0 ? (
                       <tr>
-                        <td colSpan={3}>Nog geen enkele rubric ingevuld voor dit rapport.</td>
+                        <td colSpan={4}>Nog geen enkele rubric ingevuld voor dit rapport.</td>
                       </tr>
                     ) : (
                       printRijen.map(({ cursus, r, item }) => (
@@ -920,6 +998,13 @@ export function RapportDetail() {
                             <span className={`rating rating-${item.kleur ?? "empty"}`}>
                               {item.kleur ? RATING_LABEL[item.kleur] : "—"}
                             </span>
+                          </td>
+                          {/* De rubric-tekst bij de gekozen kleur — enkel de 4 kleuren hebben er
+                              een, een witte status (bv. vrijgesteld) niet. */}
+                          <td className="rapport-print-betekenis">
+                            {item.kleur && item.kleur in KLEUR_KEY
+                              ? r.criteria[KLEUR_KEY[item.kleur as keyof typeof KLEUR_KEY]] || "—"
+                              : "—"}
                           </td>
                         </tr>
                       ))
