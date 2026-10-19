@@ -2,6 +2,7 @@ import { alleCursussen, alleLeerdoelen, alleRubrics } from "./curriculum";
 import { kopIndex, kopregel, lijktOpBinairBestand, parseCsv, toCsv } from "./csv";
 import type { DoelSoort, Minimumdoel } from "./minimumdoelen";
 import { STROMEN } from "./types";
+import { actieveVestigingen, alleVestigingen } from "./vestigingen";
 import { RATING_LABEL } from "./ratings";
 import type {
   DeelKleuren,
@@ -31,6 +32,7 @@ const LEERLING_KOP = [
   "vestiging",
   "leerjaar",
   "klasgroep",
+  "gebruikersnaam",
   "leerjaarhistoriek",
 ];
 
@@ -44,6 +46,7 @@ export function exportLeerlingen(studenten: Student[]): string {
       s.vestiging,
       s.leerjaar,
       s.klasgroep,
+      s.gebruikersnaam ?? "",
       s.leerjaarHistoriek ? JSON.stringify(s.leerjaarHistoriek) : "",
     ]),
   ]);
@@ -154,7 +157,55 @@ function schoonId(ruw: string): string {
   return /^\d+\.0+$/.test(t) ? t.replace(/\.0+$/, "") : t;
 }
 
-export function importLeerlingen(csv: string): ImportResultaat<Student> {
+/**
+ * De vestigingnaam uit een klasnaam halen en op de vestigingenlijst afbeelden. Smartschool kapt
+ * lange groepsnamen af ("Geraardsberge") en zet er soms iets achter ("Hasselt Maas"), dus:
+ * eerst exact, dan een afgekapte naam (≥ 4 tekens) als begin van een gekende vestiging, dan een
+ * gekende vestiging + spatie als begin van de tekst (langste wint). Niets gevonden → de tekst
+ * zelf; die verschijnt dan als "ongekoppeld" op /vestigingen.
+ */
+export function zoekVestiging(ruw: string, namen: string[]): string {
+  const t = ruw.trim().replace(/\s+/g, " ");
+  if (!t) return "";
+  const k = t.toLowerCase();
+  const exact = namen.find((n) => n.toLowerCase() === k);
+  if (exact) return exact;
+  const kandidaten = namen.filter((n) => {
+    const nk = n.toLowerCase();
+    return (k.length >= 4 && nk.startsWith(k)) || k.startsWith(`${nk} `);
+  });
+  if (kandidaten.length === 0) return t;
+  return kandidaten.reduce((best, n) => (n.length > best.length ? n : best));
+}
+
+/**
+ * Smartschool-klasnaam "2B Molenbeek" → leerjaar 2, klasgroep "B", vestiging "Molenbeek".
+ * `null` als er vooraan geen leerjaar (1–6) staat.
+ */
+export function splitsKlasnaam(
+  klas: string,
+): { leerjaar: number; klasgroep: string; vestiging: string } | null {
+  const m = klas.trim().match(/^([1-6])\s*([A-Za-z])?\b\s*(.*)$/);
+  if (!m) return null;
+  return {
+    leerjaar: parseInt(m[1], 10),
+    klasgroep: (m[2] ?? "A").toUpperCase(),
+    vestiging: m[3].trim(),
+  };
+}
+
+/**
+ * Leerlingen-CSV → leerlingen. Twee vormen worden herkend:
+ * - de Smartschool-export: `Intern nummer; Gebruikersnaam; Voornaam; Naam; Klas- of groepsnaam`
+ *   (leerjaar, klasgroep en vestiging zitten samen in de klasnaam, bv. "4A Hasselt");
+ * - de eigen export van /gegevens: `id; voornaam; achternaam; vestiging; leerjaar; klasgroep`.
+ * Aparte kolommen `vestiging`/`leerjaar`/`klasgroep` winnen van wat uit de klasnaam komt.
+ * `vestigingNamen` = de gekende vestigingen om de vestiging uit de klasnaam op af te beelden.
+ */
+export function importLeerlingen(
+  csv: string,
+  vestigingNamen: string[] = alleVestigingen().map((v) => v.naam),
+): ImportResultaat<Student> {
   if (lijktOpBinairBestand(csv)) {
     return {
       rijen: [],
@@ -172,9 +223,22 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
     for (const n of namen) if (n in k) return k[n];
     return -1;
   };
-  const iId = kol(["id", "nummer", "stamnummer", "leerlingnummer", "sourcedid", "source id", "leerling_id"]);
+  const iId = kol([
+    "id",
+    "intern nummer",
+    "internnummer",
+    "nummer",
+    "stamnummer",
+    "leerlingnummer",
+    "sourcedid",
+    "source id",
+    "leerling_id",
+  ]);
+  const iGn = kol(["gebruikersnaam", "username"]);
   const iVn = kol(["voornaam", "firstname", "first name"]);
-  const iAn = kol(["achternaam", "lastname", "last name"]);
+  // "naam" = de achternaam in de Smartschool-export.
+  const iAn = kol(["achternaam", "lastname", "last name", "naam"]);
+  const iKlas = kol(["klas- of groepsnaam", "klas of groepsnaam", "klasnaam", "groepsnaam"]);
   const iVest = kol(["vestiging", "campus", "school"]);
   const iJaar = kol(["leerjaar", "jaar", "grade"]);
   const iGroep = kol(["klasgroep", "groep", "klas", "class"]);
@@ -184,22 +248,27 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
     return {
       rijen: [],
       fouten: [
-        "Kolommen 'id' (een nummer), 'voornaam' en 'achternaam' zijn verplicht — controleer de kopregel van het bestand.",
+        "Kolommen 'Intern nummer' (of 'id'), 'Voornaam' en 'Naam' (of 'achternaam') zijn verplicht — controleer de kopregel van het bestand.",
       ],
     };
   }
   // Niet-blokkerende waarschuwingen: het bestand wordt wel geïmporteerd, maar met een stille
   // standaardwaarde voor een kolom die niet herkend werd — beter zichtbaar dan onopgemerkt.
-  if (iVest < 0) fouten.push("Kolom 'vestiging' niet gevonden — alle leerlingen kregen een lege vestiging.");
-  if (iJaar < 0) fouten.push("Kolom 'leerjaar' niet gevonden — alle leerlingen kregen leerjaar 1.");
-  if (iGroep < 0) fouten.push("Kolom 'klasgroep' niet gevonden — alle leerlingen kregen klasgroep A.");
+  if (iKlas < 0) {
+    if (iVest < 0) fouten.push("Kolom 'vestiging' niet gevonden — alle leerlingen kregen een lege vestiging.");
+    if (iJaar < 0) fouten.push("Kolom 'leerjaar' niet gevonden — alle leerlingen kregen leerjaar 1.");
+    if (iGroep < 0) fouten.push("Kolom 'klasgroep' niet gevonden — alle leerlingen kregen klasgroep A.");
+  }
 
+  const actief = new Set(actieveVestigingen().map((v) => v.naam));
+  const bekend = new Set(vestigingNamen);
   const studenten: Student[] = [];
   const gezien = new Set<string>();
   rijen.slice(1).forEach((r, idx) => {
     const nr = idx + 2;
-    const voornaam = (r[iVn] ?? "").trim();
-    const achternaam = (r[iAn] ?? "").trim();
+    const veld = (i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
+    const voornaam = veld(iVn);
+    const achternaam = veld(iAn);
     if (!voornaam || !achternaam) {
       fouten.push(`Rij ${nr}: voornaam of achternaam ontbreekt — overgeslagen.`);
       return;
@@ -218,9 +287,30 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
       return;
     }
     gezien.add(id);
-    const leerjaar = iJaar >= 0 ? parseInt((r[iJaar] ?? "").trim(), 10) : NaN;
+
+    const klasRuw = veld(iKlas);
+    const uitKlas = klasRuw ? splitsKlasnaam(klasRuw) : null;
+    if (klasRuw && !uitKlas) {
+      fouten.push(`Rij ${nr}: klasnaam "${klasRuw}" begint niet met een leerjaar (1–6) — leerjaar 1 gebruikt.`);
+    }
+
+    const leerjaarKol = parseInt(veld(iJaar), 10);
+    const leerjaar = Number.isFinite(leerjaarKol) ? leerjaarKol : (uitKlas?.leerjaar ?? 1);
+    const klasgroep = (veld(iGroep) || uitKlas?.klasgroep || "A").toUpperCase();
+
+    const vestRuw = veld(iVest) || uitKlas?.vestiging || "";
+    const vestiging = zoekVestiging(vestRuw, vestigingNamen);
+    if (vestRuw && vestiging !== vestRuw) {
+      fouten.push(`Rij ${nr}: vestiging "${vestRuw}" gelezen als "${vestiging}".`);
+    } else if (vestRuw && !bekend.has(vestiging)) {
+      fouten.push(`Rij ${nr}: vestiging "${vestiging}" staat niet in de lijst — voeg ze toe op Vestigingen.`);
+    }
+    if (vestiging && bekend.has(vestiging) && !actief.has(vestiging)) {
+      fouten.push(`Rij ${nr}: vestiging "${vestiging}" staat op inactief — zet ze weer actief op Vestigingen.`);
+    }
+
     let leerjaarHistoriek: Record<string, number> | undefined;
-    if (iHist >= 0 && (r[iHist] ?? "").trim()) {
+    if (veld(iHist)) {
       try {
         const p = JSON.parse(r[iHist]) as Record<string, unknown>;
         const schoon: Record<string, number> = {};
@@ -230,14 +320,16 @@ export function importLeerlingen(csv: string): ImportResultaat<Student> {
         fouten.push(`Rij ${nr}: 'leerjaarhistoriek' is geen geldige JSON — genegeerd.`);
       }
     }
+    const gebruikersnaam = veld(iGn) || undefined;
     studenten.push({
       id,
       firstName: voornaam,
       lastName: achternaam,
-      vestiging: iVest >= 0 ? (r[iVest] ?? "").trim() : "",
-      leerjaar: Number.isFinite(leerjaar) ? leerjaar : 1,
-      leerjaarHistoriek,
-      klasgroep: iGroep >= 0 ? (r[iGroep] ?? "").trim().toUpperCase() : "A",
+      vestiging,
+      leerjaar,
+      ...(leerjaarHistoriek ? { leerjaarHistoriek } : {}),
+      klasgroep,
+      ...(gebruikersnaam ? { gebruikersnaam } : {}),
     });
   });
   return { rijen: studenten, fouten };

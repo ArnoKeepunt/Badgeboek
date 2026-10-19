@@ -106,6 +106,8 @@ export interface Student {
   leerjaarHistoriek?: Record<string, number>;
   /** Klasgroep binnen het leerjaar, bv. "A" of "B". */
   klasgroep: string;
+  /** Smartschool-gebruikersnaam (bv. "emma.janssens") — enkel informatief, niet de sleutel. */
+  gebruikersnaam?: string;
   email?: string;
   /** Fictief wachtwoord (enkel voor de demo-login; nooit een echt geheim). */
   wachtwoord?: string;
@@ -254,9 +256,9 @@ export type RapportStatus = "concept" | "afgewerkt";
  * Eén rapport voor één leerling op één rapportmoment (bv. "Rapport 1"), volledig handmatig
  * door de mentor ingevuld — geen afleiding uit de badges. Een rapport toont per cursus de
  * uitgeschreven rubrics (`Rubriek`, zie `lib/rubrieken.ts`/`Rubrics.tsx`): de **kleur** kies je
- * per **rubric** (`rubriekItems`, map rubric-id → kleur), de **opmerking** per **cursus**
- * (`cursusOpmerkingen`, map cursus-id → tekst) — bewust niet allebei per rubric, dat werd als te
- * fijnmazig ervaren. Dezelfde rubrics als op de Rubrics-pagina — een aanpassing daar (tekst per
+ * per **rubric** (`rubriekItems`, map rubric-id → kleur), en per **cursus** een eigen kleur
+ * (`cursusKleuren`) + **opmerking** (`cursusOpmerkingen`, map cursus-id → tekst) — bewust geen
+ * opmerking per rubric, dat werd als te fijnmazig ervaren. Dezelfde rubrics als op de Rubrics-pagina — een aanpassing daar (tekst per
  * kleur) werkt hier automatisch door, enkel de `id` (en dus welk rapport-item erbij hoort) blijft
  * gelijk zolang de rubric niet verwijderd wordt. `status: "afgewerkt"` vergrendelt het rapport
  * (enkel een beheerder heropent, zie `heropenRapport` in `store.ts`) zodat het niet meer wijzigt
@@ -270,6 +272,11 @@ export interface Rapport {
   naam: string;
   status: RapportStatus;
   rubriekItems: Record<string, RapportItem>;
+  /**
+   * Kleur per cursus (cursus-id → kleur), manueel gekozen naast de rubric-kleuren — een
+   * samenvattend oordeel voor de hele cursus, geen berekening uit de rubrics.
+   */
+  cursusKleuren: Record<string, RapportItem>;
   /** Opmerking per cursus (cursus-id → tekst) — niet per rubric, zie hierboven. */
   cursusOpmerkingen: Record<string, string>;
   /** Algemene opmerking, niet gebonden aan één cursus/rubric. */
@@ -284,7 +291,7 @@ export interface Rapport {
 
 /**
  * Sleutel voor de wijzigingsgeschiedenis van één item binnen een rapport — net als `doelSleutel`
- * voor een badge zijn kleur/notitie. `deelId` is een rubric-id (kleur), een cursus-id (opmerking)
+ * voor een badge zijn kleur/notitie. `deelId` is een rubric-id (kleur), een cursus-id (kleur én opmerking)
  * of `"algemeen"` (de algemene opmerking); die drie id-ruimtes overlappen nooit. Voorvoegsel
  * `rapport:` zodat `firestoreLayout.ts` deze entries kan onderscheiden van de badge-/
  * deelbadge-sleutels (die resp. 3- en 2-delig zijn) en naar het juiste rapport-doc routeert.

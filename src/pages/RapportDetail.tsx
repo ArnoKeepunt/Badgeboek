@@ -28,6 +28,7 @@ import {
   getDeelNotitie,
   getDoelKleur,
   getNotitie,
+  getRapportCursusKleur,
   getRapportCursusOpmerking,
   getRapportItem,
   heropenRapport,
@@ -37,6 +38,7 @@ import {
   useStore,
   verwijderRapport,
   zetRapportAlgemeneOpmerking,
+  zetRapportCursusKleur,
   zetRapportCursusOpmerking,
   zetRapportRubriekKleur,
 } from "../lib/store";
@@ -697,6 +699,19 @@ export function RapportDetail() {
                               </>
                             )}
                           </span>
+                          {/* Kleur voor de hele cursus — manueel, naast de rubric-kleuren
+                              (geen berekening). Deelt de geschiedenis met de opmerking. */}
+                          <span title={wijzigingLabel(opmerkingSleutel) ?? undefined}>
+                            <RatingCell
+                              label={`Kleur voor ${cursus.naam}`}
+                              readonly={vergrendeld}
+                              value={getRapportCursusKleur(gekozen, cursus.id).kleur}
+                              geschiedenis={geschiedenis(opmerkingSleutel)}
+                              onChange={(next) =>
+                                zetRapportCursusKleur(gekozen.id, cursus.id, next)
+                              }
+                            />
+                          </span>
                           <span title={wijzigingLabel(opmerkingSleutel) ?? undefined}>
                             <RapportOpmerkingVeld
                               label={`Opmerking bij ${cursus.naam}`}
@@ -1011,16 +1026,30 @@ export function RapportDetail() {
                     )}
                   </tbody>
                 </table>
-                {cursussen.some((c) => getRapportCursusOpmerking(gekozen, c.id)) && (
+                {/* Per cursus: de cursuskleur en -opmerking, enkel voor cursussen waar
+                    minstens één van beide ingevuld is. */}
+                {cursussen.some(
+                  (c) =>
+                    getRapportCursusKleur(gekozen, c.id).kleur ||
+                    getRapportCursusOpmerking(gekozen, c.id),
+                ) && (
                   <div className="rapport-print-algemeen">
-                    <h2>Opmerkingen per cursus</h2>
-                    {cursussen
-                      .filter((c) => getRapportCursusOpmerking(gekozen, c.id))
-                      .map((c) => (
+                    <h2>Per cursus</h2>
+                    {cursussen.map((c) => {
+                      const kleur = getRapportCursusKleur(gekozen, c.id).kleur;
+                      const opmerking = getRapportCursusOpmerking(gekozen, c.id);
+                      if (!kleur && !opmerking) return null;
+                      return (
                         <p key={c.id}>
-                          <strong>{c.naam}:</strong> {getRapportCursusOpmerking(gekozen, c.id)}
+                          <strong>{c.naam}:</strong>{" "}
+                          {kleur && (
+                            <span className={`rating rating-${kleur}`}>{RATING_LABEL[kleur]}</span>
+                          )}
+                          {kleur && opmerking && " "}
+                          {opmerking}
                         </p>
-                      ))}
+                      );
+                    })}
                   </div>
                 )}
                 {gekozen.algemeneOpmerking && (

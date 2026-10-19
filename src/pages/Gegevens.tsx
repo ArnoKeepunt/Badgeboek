@@ -13,10 +13,12 @@ import {
 import { alleMinimumdoelen, metWijzigingen } from "../lib/minimumdoelen";
 import { HUIDIG_SCHOOLJAAR, SCHOOLJAREN, isAfgesloten } from "../lib/schooljaar";
 import {
+  fictieveLeerlingen,
   gebundeldCurriculum,
   rubriekenLijst,
   upsertStudenten,
   useStore,
+  verwijderFictieveData,
   vestigingenLijst,
   wisRubriekenOverride,
   zetCurriculumOverride,
@@ -48,6 +50,8 @@ export function Gegevens() {
     vestigingen,
   } = useStore();
   const [melding, setMelding] = useState<Melding>(null);
+  // `students` hierboven zorgt dat dit bij elke wijziging opnieuw berekend wordt.
+  const aantalFictief = students.length > 0 ? fictieveLeerlingen().length : 0;
 
   const doelen = metWijzigingen(doelenImport ?? alleMinimumdoelen, doelWijzigingen);
 
@@ -116,6 +120,20 @@ export function Gegevens() {
       soort: "ok",
       tekst: `Leerlingen geïmporteerd: ${toegevoegd} nieuw, ${bijgewerkt} bijgewerkt.`,
       details: fouten.length > 0 ? fouten : undefined,
+    });
+  };
+
+  const ruimFictieveDataOp = () => {
+    if (
+      !confirm(
+        `${aantalFictief} fictieve leerling(en) verwijderen, met al hun kleuren, notities, deelbadge-scores, meldingen en rapporten?\n\nEchte leerlingen (met een intern nummer als id) blijven staan. Dit kan niet ongedaan gemaakt worden.`,
+      )
+    )
+      return;
+    const { leerlingen, deelbadges } = verwijderFictieveData();
+    setMelding({
+      soort: "ok",
+      tekst: `Demodata opgeruimd: ${leerlingen} fictieve leerling(en) en ${deelbadges} voorbeeld-deelbadge(s) verwijderd.`,
     });
   };
 
@@ -231,7 +249,7 @@ export function Gegevens() {
 
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Leerlingen</div>
-          <p>{students.length} leerlingen — id, naam, vestiging, leerjaar, klasgroep.</p>
+          <p>{students.length} leerlingen — id, naam, vestiging, leerjaar, klasgroep, gebruikersnaam.</p>
           <button
             type="button"
             className="knop-primair"
@@ -267,14 +285,18 @@ export function Gegevens() {
         <div className="gegevens-kaart">
           <div className="gegevens-kaart-naam">Leerlingen</div>
           <p>
-            De échte leerlingendata (upsert op <code>id</code>) — los van of we straks nog
-            overstappen op een Smartschool-synchronisatie. Kolommen: <code>id, voornaam,
-            achternaam, vestiging, leerjaar, klasgroep</code>. <code>id</code> is <strong>verplicht
-            en moet een nummer zijn</strong> (het stamnummer/leerlingnummer — nooit een naam), en
-            bepaalt bij een volgend bestand of een leerling bijgewerkt wordt of nieuw is. Zet die
-            kolom in Excel/Numbers als <strong>tekst</strong> op (niet als getal), anders vallen
-            voorloopnullen weg of verschijnt er "12345.0". Bestaande leerlingen die niet in het
-            bestand staan, blijven gewoon staan.
+            De échte leerlingen, rechtstreeks uit de <strong>Smartschool-export</strong>. Kolommen:{" "}
+            <code>Intern nummer; Gebruikersnaam; Voornaam; Naam; Klas- of groepsnaam</code>. Uit de
+            klasnaam (bv. <code>2B Molenbeek</code>) haalt de app het leerjaar (2), de klasgroep
+            (B) en de vestiging (Molenbeek); een afgekapte vestigingnaam zoals{" "}
+            <code>Geraardsberge</code> wordt herkend. De eigen leerlingen-export van hierboven
+            werkt ook.
+          </p>
+          <p>
+            Het <strong>intern nummer</strong> is de sleutel: een volgend bestand werkt
+            bestaande leerlingen bij, nieuwe komen erbij en leerlingen die niet in het bestand
+            staan, blijven gewoon staan. Zet die kolom in Excel/Numbers als{" "}
+            <strong>tekst</strong> op (niet als getal), anders vallen voorloopnullen weg.
           </p>
           <label className="knop-secundair gegevens-upload-knop">
             CSV kiezen…
@@ -322,6 +344,26 @@ export function Gegevens() {
           </div>
         </div>
       </div>
+
+      {aantalFictief > 0 && (
+        <>
+          <h2 style={{ marginTop: 32 }}>Fictieve leerlingen opruimen</h2>
+          <div className="gegevens-kaarten">
+            <div className="gegevens-kaart">
+              <div className="gegevens-kaart-naam">{aantalFictief} fictieve leerlingen</div>
+              <p>
+                Er staan nog fictieve demo-leerlingen in de database (herkenbaar aan een naam als
+                id i.p.v. een intern nummer). Verwijder ze samen met hun kleuren, notities,
+                deelbadge-scores, meldingen en rapporten, en met de voorbeeld-deelbadges. Echte
+                leerlingen blijven staan.
+              </p>
+              <button type="button" className="knop-primair" onClick={ruimFictieveDataOp}>
+                Fictieve leerlingen verwijderen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       <h2 style={{ marginTop: 32 }}>Badges, rubrics en vestigingen in de database</h2>
       <div className="gegevens-kaarten">

@@ -28,7 +28,7 @@ export const vestigingSlug = (naam: string): string =>
 
 export const GEBUNDELDE_VESTIGINGEN: Vestiging[] = [
   { id: "gent", naam: "Gent", actief: true, volgorde: 0 },
-  { id: "molenbeek", naam: "Molenbeek", actief: false, volgorde: 1 },
+  { id: "molenbeek", naam: "Molenbeek", actief: true, volgorde: 1 },
   { id: "oudenaarde", naam: "Oudenaarde", actief: true, volgorde: 2 },
   { id: "brussel", naam: "Brussel", actief: true, volgorde: 3 },
   { id: "geraardsbergen", naam: "Geraardsbergen", actief: true, volgorde: 4 },

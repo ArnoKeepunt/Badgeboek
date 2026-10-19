@@ -17,16 +17,9 @@ import {
   matrixVoorkeurOpslag,
   sessieOpslag,
 } from "./data";
-import {
-  deelKleuren as seedDeelKleuren,
-  seedDeelevaluaties,
-  doelKleuren as seedKleuren,
-  seedMeldingen,
-  mentoren as seedMentoren,
-  students as seedStudents,
-} from "./mockData";
+import { mentoren as seedMentoren } from "./mockData";
 import type { Minimumdoel } from "./minimumdoelen";
-import { stroomVan } from "./leerlingen";
+import { isGeldigLeerlingId, stroomVan } from "./leerlingen";
 import { metRubriekWijzigingen, rubrieken as GEBUNDELDE_RUBRIEKEN } from "./rubrieken";
 import {
   AFGESLOTEN_SCHOOLJAREN,
@@ -102,12 +95,15 @@ interface State extends PersistedStore {
 const MAX_MELDINGEN = 120;
 const MAX_GEWIST = 1000;
 
-/** De seed-/demodata. Dit is de `PersistedStore`, dus zonder `sessie`. */
+/**
+ * De startstand. Dit is de `PersistedStore`, dus zonder `sessie`. Enkel de demo-mentoren:
+ * leerlingen (en dus evaluaties) komen uitsluitend uit de CSV-import op /gegevens.
+ */
 const seed = (): PersistedStore => ({
-  students: seedStudents,
+  students: [],
   mentoren: seedMentoren,
   vestigingen: null,
-  kleuren: seedKleuren,
+  kleuren: {},
   notities: {},
   groepen: [],
   schooljaar: HUIDIG_SCHOOLJAAR,
@@ -117,11 +113,11 @@ const seed = (): PersistedStore => ({
   rubriekWijzigingen: {},
   rubriekenOverride: null,
   curriculumOverride: null,
-  deelevaluaties: seedDeelevaluaties,
-  deelKleuren: seedDeelKleuren,
+  deelevaluaties: [],
+  deelKleuren: {},
   deelNotities: {},
   auditLog: {},
-  meldingen: seedMeldingen,
+  meldingen: [],
   meldingGezien: {},
   gewist: [],
   rapporten: [],
@@ -176,6 +172,8 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   basis.rapporten = (Array.isArray(bewaard.rapporten) ? bewaard.rapporten : []).map((r) => ({
     ...r,
     rubriekItems: r.rubriekItems ?? {},
+    // `cursusKleuren` (kleur per cursus) kwam er op 2026-10-19 bij — oudere rapporten: leeg.
+    cursusKleuren: r.cursusKleuren ?? {},
     cursusOpmerkingen: r.cursusOpmerkingen ?? {},
   }));
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
@@ -902,6 +900,65 @@ export function verwijderLeerling(id: string) {
   commit({ ...state, students: state.students.filter((s) => s.id !== id) });
 }
 
+/**
+ * De fictieve demo-leerlingen die nog in de opslag staan (van vóór de échte import). Die zijn
+ * herkenbaar aan hun id: een naam ("cilou.aerts") i.p.v. een intern nummer.
+ */
+export const fictieveLeerlingen = (): Student[] =>
+  state.students.filter((s) => !isGeldigLeerlingId(s.id));
+
+/**
+ * Ruim de demodata op: de fictieve leerlingen (zie hierboven) mét hun kleuren, notities,
+ * deelbadge-scores, geschiedenis, meldingen, rapporten en groepslidmaatschap, plus de
+ * voorbeeld-deelbadges (`seed-de-…`) en -meldingen (`seed-m…`). Echte leerlingen blijven
+ * ongemoeid. In firebase-modus raakt dit enkel het actieve schooljaar (zoals elke save) —
+ * oude evaluatie-docs van fictieve leerlingen in vorige jaren blijven onzichtbaar liggen.
+ */
+export function verwijderFictieveData(): { leerlingen: number; deelbadges: number } {
+  const weg = new Set(fictieveLeerlingen().map((s) => s.id));
+  const deelWeg = new Set(
+    state.deelevaluaties.filter((d) => d.id.startsWith("seed-de-")).map((d) => d.id),
+  );
+  // `${schooljaar}:${leerling}:${badge}` (badge) of `${deelbadge}:${leerling}` (deelbadge).
+  const hoortWeg = (sleutel: string): boolean => {
+    if (sleutel.startsWith("rapport:")) return false;
+    const delen = sleutel.split(":");
+    if (delen.length >= 3) return weg.has(delen[1]);
+    return weg.has(delen[1]) || deelWeg.has(delen[0]);
+  };
+  const filterMap = <T,>(map: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(Object.entries(map).filter(([k]) => !hoortWeg(k)));
+  const rapportenWeg = new Set(
+    state.rapporten.filter((r) => weg.has(r.studentId)).map((r) => r.id),
+  );
+
+  commit({
+    ...state,
+    students: state.students.filter((s) => !weg.has(s.id)),
+    kleuren: filterMap(state.kleuren),
+    notities: filterMap(state.notities),
+    deelevaluaties: state.deelevaluaties.filter((d) => !deelWeg.has(d.id)),
+    deelKleuren: filterMap(state.deelKleuren),
+    deelNotities: filterMap(state.deelNotities),
+    auditLog: Object.fromEntries(
+      Object.entries(state.auditLog).filter(([k]) =>
+        k.startsWith("rapport:") ? !rapportenWeg.has(k.split(":")[1]) : !hoortWeg(k),
+      ),
+    ),
+    meldingen: state.meldingen.filter((m) => !weg.has(m.studentId) && !m.id.startsWith("seed-m")),
+    meldingGezien: Object.fromEntries(
+      Object.entries(state.meldingGezien).filter(([id]) => !weg.has(id)),
+    ),
+    rapporten: state.rapporten.filter((r) => !rapportenWeg.has(r.id)),
+    groepen: state.groepen.map((g) => ({
+      ...g,
+      leerlingIds: g.leerlingIds.filter((id) => !weg.has(id)),
+    })),
+    gewist: state.gewist.filter((k) => !hoortWeg(k)),
+  });
+  return { leerlingen: weg.size, deelbadges: deelWeg.size };
+}
+
 /** Voeg leerlingen én mentoren toe/bij op basis van hun `id`. */
 export function importeerGebruikers(leerlingen: Student[], mentoren: Mentor[]) {
   const perLl = new Map(state.students.map((s) => [s.id, s]));
@@ -1402,8 +1459,9 @@ export function setDeelKleurBulk(
 // --- Rapporten --------------------------------------------------------------
 //
 // Eén rapport per leerling per rapportmoment, volledig handmatig ingevuld: kleur per rubric,
-// opmerking per cursus (geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt het
-// rapport — `zetRapportRubriekKleur`/`zetRapportCursusOpmerking`/`zetRapportAlgemeneOpmerking`
+// kleur + opmerking per cursus (geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt
+// het rapport — `zetRapportRubriekKleur`/`zetRapportCursusKleur`/`zetRapportCursusOpmerking`/
+// `zetRapportAlgemeneOpmerking`
 // negeren dan stil, net als bij een afgesloten schooljaar. Enkel `heropenRapport` mag dat
 // ongedaan maken; de UI toont die knop enkel aan een beheerder (`useEffectieveRol`),
 // Firestore-regels dwingen het ook server-side af.
@@ -1433,6 +1491,7 @@ export function maakRapport(studentId: string, schooljaar: string, naam: string)
     naam: naam.trim() || "Rapport",
     status: "concept",
     rubriekItems: {},
+    cursusKleuren: {},
     cursusOpmerkingen: {},
     algemeneOpmerking: "",
     aangemaaktOp: nu,
@@ -1473,6 +1532,7 @@ export function maakRapportenBulk(
       naam: naamGetrimd,
       status: "concept",
       rubriekItems: {},
+      cursusKleuren: {},
       cursusOpmerkingen: {},
       algemeneOpmerking: "",
       aangemaaktOp: nu,
@@ -1519,6 +1579,46 @@ export function zetRapportRubriekKleur(id: string, rubriekId: string, kleur: Rat
     ),
     auditLog: metAudit(state.auditLog, [
       { sleutel, veld: "kleur", van: huidig.kleur ?? "", naar: kleur ?? "" },
+    ]),
+  });
+}
+
+/** De kleur van één cursus binnen een rapport (leeg als er nog niets gekozen is). */
+export function getRapportCursusKleur(rapport_: Rapport, cursusId: string): RapportItem {
+  return rapport_.cursusKleuren?.[cursusId] ?? LEEG_RAPPORTITEM;
+}
+
+/**
+ * Zet de kleur van een hele cursus binnen een rapport — los van de rubric-kleuren (geen
+ * berekening). Deelt de geschiedenis-sleutel met de cursusopmerking (`veld` onderscheidt ze).
+ */
+export function zetRapportCursusKleur(id: string, cursusId: string, kleur: Rating | null) {
+  if (rapportVergrendeld(id)) return;
+  const target = state.rapporten.find((r) => r.id === id);
+  if (!target) return;
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const huidig = getRapportCursusKleur(target, cursusId);
+  if (kleur === huidig.kleur) return;
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            cursusKleuren: { ...r.cursusKleuren, [cursusId]: { kleur } },
+            gewijzigdOp: nu,
+            gewijzigdDoor: wie,
+          }
+        : r,
+    ),
+    auditLog: metAudit(state.auditLog, [
+      {
+        sleutel: rapportItemSleutel(id, cursusId),
+        veld: "kleur",
+        van: huidig.kleur ?? "",
+        naar: kleur ?? "",
+      },
     ]),
   });
 }

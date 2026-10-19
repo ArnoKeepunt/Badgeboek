@@ -5,20 +5,30 @@ herkend aan de kopregel. UTF-8, met of zonder BOM. Velden met `; , " \n` mogen t
 
 ## Leerlingen — import & export
 
+Import leest rechtstreeks de **Smartschool-export** (voorbeeld: `leerlingen.csv`, fictieve namen):
+
 | Kolom | Verplicht | Opmerking |
 |---|---|---|
-| `id` | nee* | De **vaste sleutel**. Bij voorkeur de OneRoster `sourcedId` uit Smartschool. Ontbreekt hij, dan wordt er één afgeleid uit de naam. |
-| `voornaam` | **ja** | |
-| `achternaam` | **ja** | |
-| `vestiging` | nee | Gent / Oudenaarde / Molenbeek |
-| `leerjaar` | nee | 1 t/m 6 (default 1) |
-| `klasgroep` | nee | bv. A of B (default A) |
+| `Intern nummer` | **ja** | De **vaste sleutel** — enkel cijfers. Zet de kolom in Excel als tekst op. |
+| `Gebruikersnaam` | nee | Smartschool-gebruikersnaam, informatief (`gebruikersnaam` op de leerling). |
+| `Voornaam` | **ja** | |
+| `Naam` | **ja** | De achternaam. |
+| `Klas- of groepsnaam` | nee | bv. `2B Molenbeek` → leerjaar 2, klasgroep B, vestiging Molenbeek. |
+
+De vestiging uit de klasnaam wordt op de vestigingenlijst afgebeeld: exact, of een afgekapte
+naam (`Geraardsberge` → Geraardsbergen), of een gekende vestiging met iets erachter
+(`Hasselt Maas` → Hasselt). Elke zo'n omzetting staat in het importverslag; een onbekende
+naam blijft letterlijk staan en verschijnt als "ongekoppeld" op Vestigingen.
+
+De eigen **export** gebruikt `id; voornaam; achternaam; vestiging; leerjaar; klasgroep;
+gebruikersnaam; leerjaarhistoriek` en kan zo ook weer ingelezen worden. Aparte kolommen
+`vestiging`/`leerjaar`/`klasgroep` winnen van wat uit de klasnaam komt.
 
 Import = **upsert op `id`**: bestaande leerlingen worden bijgewerkt (naam, klas, vestiging),
 nieuwe toegevoegd, de rest blijft staan. Zo raken evaluaties nooit los bij een jaarovergang.
 
-Alternatieve kolomnamen die ook gelezen worden: `firstname`, `lastname`, `naam`, `sourcedid`,
-`jaar`, `grade`, `groep`, `klas`, `class`.
+Er zitten geen fictieve leerlingen meer in de app. Oude demo-leerlingen (id = een naam i.p.v.
+een nummer) ruim je op met "Fictieve leerlingen verwijderen" op Gegevens.
 
 ## Doelen — import & export
 
