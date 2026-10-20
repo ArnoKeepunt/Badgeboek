@@ -175,6 +175,8 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
     // `cursusKleuren` (kleur per cursus) kwam er op 2026-10-19 bij — oudere rapporten: leeg.
     cursusKleuren: r.cursusKleuren ?? {},
     cursusOpmerkingen: r.cursusOpmerkingen ?? {},
+    // `klassenraadCommentaar` kwam er op 2026-10-20 bij — oudere rapporten: leeg.
+    klassenraadCommentaar: r.klassenraadCommentaar ?? "",
   }));
   // De database-versie van de badges (alleen door de beheerder bewerkbaar, `null` = de bundel).
   basis.curriculumOverride = geldigCurriculum(bewaard.curriculumOverride) ?? null;
@@ -1461,7 +1463,7 @@ export function setDeelKleurBulk(
 // Eén rapport per leerling per rapportmoment, volledig handmatig ingevuld: kleur per rubric,
 // kleur + opmerking per cursus (geen afleiding uit de badges). `status: "afgewerkt"` vergrendelt
 // het rapport — `zetRapportRubriekKleur`/`zetRapportCursusKleur`/`zetRapportCursusOpmerking`/
-// `zetRapportAlgemeneOpmerking`
+// `zetRapportAlgemeneOpmerking`/`zetRapportKlassenraadCommentaar`
 // negeren dan stil, net als bij een afgesloten schooljaar. Enkel `heropenRapport` mag dat
 // ongedaan maken; de UI toont die knop enkel aan een beheerder (`useEffectieveRol`),
 // Firestore-regels dwingen het ook server-side af.
@@ -1494,6 +1496,7 @@ export function maakRapport(studentId: string, schooljaar: string, naam: string)
     cursusKleuren: {},
     cursusOpmerkingen: {},
     algemeneOpmerking: "",
+    klassenraadCommentaar: "",
     aangemaaktOp: nu,
     aangemaaktDoor: wie,
     gewijzigdOp: nu,
@@ -1535,6 +1538,7 @@ export function maakRapportenBulk(
       cursusKleuren: {},
       cursusOpmerkingen: {},
       algemeneOpmerking: "",
+      klassenraadCommentaar: "",
       aangemaaktOp: nu,
       aangemaaktDoor: wie,
       gewijzigdOp: nu,
@@ -1679,6 +1683,33 @@ export function zetRapportAlgemeneOpmerking(id: string, tekst: string) {
           },
         ])
       : state.auditLog,
+  });
+}
+
+/** Zet het commentaar van de klassenraad (bovenaan het rapport). */
+export function zetRapportKlassenraadCommentaar(id: string, tekst: string) {
+  if (rapportVergrendeld(id)) return;
+  const target = state.rapporten.find((r) => r.id === id);
+  if (!target) return;
+  const huidig = target.klassenraadCommentaar ?? "";
+  if (tekst === huidig) return;
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id
+        ? { ...r, klassenraadCommentaar: tekst, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
+    auditLog: metAudit(state.auditLog, [
+      {
+        sleutel: rapportItemSleutel(id, "klassenraad"),
+        veld: "opmerking",
+        van: huidig,
+        naar: tekst,
+      },
+    ]),
   });
 }
 

@@ -281,6 +281,8 @@ export interface Rapport {
   cursusOpmerkingen: Record<string, string>;
   /** Algemene opmerking, niet gebonden aan één cursus/rubric. */
   algemeneOpmerking: string;
+  /** Commentaar van de klassenraad — bovenaan het rapport, los van de algemene opmerking. */
+  klassenraadCommentaar: string;
   aangemaaktOp: number;
   aangemaaktDoor: string;
   gewijzigdOp: number;
@@ -292,7 +294,8 @@ export interface Rapport {
 /**
  * Sleutel voor de wijzigingsgeschiedenis van één item binnen een rapport — net als `doelSleutel`
  * voor een badge zijn kleur/notitie. `deelId` is een rubric-id (kleur), een cursus-id (kleur én opmerking)
- * of `"algemeen"` (de algemene opmerking); die drie id-ruimtes overlappen nooit. Voorvoegsel
+ * `"algemeen"` (de algemene opmerking) of `"klassenraad"` (het klassenraadcommentaar); die
+ * id-ruimtes overlappen nooit. Voorvoegsel
  * `rapport:` zodat `firestoreLayout.ts` deze entries kan onderscheiden van de badge-/
  * deelbadge-sleutels (die resp. 3- en 2-delig zijn) en naar het juiste rapport-doc routeert.
  */

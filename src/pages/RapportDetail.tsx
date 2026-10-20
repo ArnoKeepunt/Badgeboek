@@ -40,6 +40,7 @@ import {
   zetRapportAlgemeneOpmerking,
   zetRapportCursusKleur,
   zetRapportCursusOpmerking,
+  zetRapportKlassenraadCommentaar,
   zetRapportRubriekKleur,
 } from "../lib/store";
 import type { Rapport } from "../lib/types";
@@ -659,6 +660,19 @@ export function RapportDetail() {
 
           {gekozen ? (
             <>
+              {/* Bovenaan, boven het hele rapport: het commentaar van de klassenraad. Zelfde
+                  rechten als de rest van het rapport (alleen-lezen zodra het afgewerkt is). */}
+              <label className="rapport-algemeen rapport-klassenraad no-print">
+                <span>Commentaar klassenraad</span>
+                <AlgemeneOpmerkingVeld
+                  key={gekozen.id}
+                  opmerking={gekozen.klassenraadCommentaar ?? ""}
+                  readonly={vergrendeld}
+                  title={wijzigingLabel(rapportItemSleutel(gekozen.id, "klassenraad")) ?? undefined}
+                  onSave={(tekst) => zetRapportKlassenraadCommentaar(gekozen.id, tekst)}
+                />
+              </label>
+
               <div className="sd-split rapport-split">
                 <div className="sd-badges no-print">
                   <div className="badges-deelpaneel-kop">
@@ -990,6 +1004,12 @@ export function RapportDetail() {
               <div className="rapport-print">
                 <h1>{gekozen.naam}</h1>
                 <p className="rapport-print-meta">{rapportMetaTekst}</p>
+                {gekozen.klassenraadCommentaar && (
+                  <div className="rapport-print-algemeen">
+                    <h2>Commentaar klassenraad</h2>
+                    <p>{gekozen.klassenraadCommentaar}</p>
+                  </div>
+                )}
                 <table className="rapport-print-tabel">
                   <thead>
                     <tr>

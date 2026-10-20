@@ -14,19 +14,25 @@ export interface FirebaseBereik {
   alles: boolean;
   /** Als `!alles`: de campussen die opgehaald mogen worden. Leeg = niets zichtbaar. */
   vestigingen: string[];
+  /**
+   * Beheerder (of bootstrap-admin): mag ook de beheerder-only collecties schrijven die in
+   * `bewaar()` meerijden (`vestigingen`, `rubrieken`, afgewerkte `rapporten`). Een coördinator
+   * heeft wél `alles`, maar niet dit.
+   */
+  beheerder: boolean;
 }
 
-let bereik: FirebaseBereik = { bekend: false, alles: false, vestigingen: [] };
+let bereik: FirebaseBereik = { bekend: false, alles: false, vestigingen: [], beheerder: false };
 const luisteraars = new Set<() => void>();
 
 const sleutel = (b: FirebaseBereik) =>
-  `${b.bekend ? "?" : ""}${b.alles ? "*" : ""}|${[...b.vestigingen].sort().join(",")}`;
+  `${b.bekend ? "?" : ""}${b.alles ? "*" : ""}${b.beheerder ? "!" : ""}|${[...b.vestigingen].sort().join(",")}`;
 
 export function zetFirebaseBereik(next: Omit<FirebaseBereik, "bekend"> | null): void {
   // `null` = terug naar "onbekend" (bij afmelden / auth-reset).
   const nieuw: FirebaseBereik = next
     ? { bekend: true, ...next }
-    : { bekend: false, alles: false, vestigingen: [] };
+    : { bekend: false, alles: false, vestigingen: [], beheerder: false };
   if (sleutel(nieuw) === sleutel(bereik)) return;
   bereik = nieuw;
   luisteraars.forEach((fn) => fn());

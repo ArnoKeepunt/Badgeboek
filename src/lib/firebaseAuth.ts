@@ -51,13 +51,14 @@ if (PERSISTENTIE_MODUS === "firebase") {
         // bootstrap-admin: alles. Mentor: enkel de eigen vestigingen. Anders: niets.
         zetFirebaseBereik(
           isBootstrapAdmin(u.email)
-            ? { alles: true, vestigingen: [] }
+            ? { alles: true, vestigingen: [], beheerder: true }
             : p?.actief
               ? {
                   alles: p.rol === "beheerder" || p.rol === "coordinator",
                   vestigingen: p.vestigingen,
+                  beheerder: p.rol === "beheerder",
                 }
-              : { alles: false, vestigingen: [] },
+              : { alles: false, vestigingen: [], beheerder: false },
         );
         meld();
       });

@@ -488,6 +488,7 @@ export function normaliseerRapportDoc(d: DocData): DocData {
     rubriekItems: d.rubriekItems ?? {},
     cursusKleuren: d.cursusKleuren ?? {},
     cursusOpmerkingen: d.cursusOpmerkingen ?? {},
+    klassenraadCommentaar: d.klassenraadCommentaar ?? "",
   };
 }
 

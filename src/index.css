@@ -4426,6 +4426,12 @@ th {
   color: var(--text-muted);
 }
 
+/* Boven het rapport i.p.v. eronder: ruimte naar onder, niet naar boven. */
+.rapport-klassenraad {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
 .rapport-algemeen textarea {
   font: inherit;
   font-weight: 400;

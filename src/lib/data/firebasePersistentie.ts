@@ -70,6 +70,46 @@ const magBewarenSchrijven = (pad: string, actiefSchooljaar: string): boolean => 
     : BEHEERD.test(pad);
 };
 
+/** Collecties die enkel de beheerder mag schrijven, maar die wel in `bewaar()` meerijden. */
+const BEHEERDER_ONLY = /^(vestigingen|rubrieken)\//;
+
+/**
+ * Haal uit de diff wat de regels deze (niet-beheerder) gebruiker hoe dan ook weigeren. Eén
+ * geweigerd doc laat Firestore de hele batch afwijzen — dus ook de eigenlijke wijziging van
+ * een mentor (bv. een cursuskleur op het rapport). Zulke docs komen enkel in de diff door een
+ * onschuldig verschil tussen de store-vorm en de serverstand (volgorde, standaardwaarden…):
+ * een mentor kán ze in de UI niet wijzigen. Spiegelt `firestore.rules`.
+ */
+function zonderVerbodenVoorNietBeheerder(
+  schrijf: DocMap,
+  verwijder: string[],
+  server: DocMap | null,
+): { schrijf: DocMap; verwijder: string[]; overgeslagen: string[] } {
+  const overgeslagen: string[] = [];
+  const verboden = (pad: string, isVerwijder: boolean): boolean => {
+    if (BEHEERDER_ONLY.test(pad)) return true;
+    // Zonder serverstand (eerste save vóór de eerste snapshot) valt er niets te beoordelen.
+    if (pad.startsWith("rapporten/") && server) {
+      if (isVerwijder) return true;
+      const opServer = server?.get(pad);
+      // Nieuw rapportmoment aanmaken of een afgewerkt rapport wijzigen: beheerder-only.
+      if (!opServer || opServer.status === "afgewerkt") return true;
+    }
+    return false;
+  };
+  const schrijfOk: DocMap = new Map();
+  for (const [pad, data] of schrijf) {
+    if (verboden(pad, false)) overgeslagen.push(pad);
+    else schrijfOk.set(pad, data);
+  }
+  const verwijderOk = verwijder.filter((pad) => {
+    if (!verboden(pad, true)) return true;
+    overgeslagen.push(pad);
+    return false;
+  });
+  return { schrijf: schrijfOk, verwijder: verwijderOk, overgeslagen };
+}
+
 type GescoopteBron =
   | { modus: "wacht" } // bereik nog onbekend → nog niet abonneren, bron blijft undefined
   | { modus: "leeg" } // mentor zonder vestiging → lege bron
@@ -178,9 +218,19 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     // wist/overschrijft het.
     const nu = beheerd(volledigNu);
     const vorigeBeheerd = vorigeDocs ? beheerd(vorigeDocs) : null;
-    const { schrijf, verwijder } = vorigeBeheerd
+    let { schrijf, verwijder } = vorigeBeheerd
       ? diffDocs(vorigeBeheerd, nu)
       : { schrijf: nu, verwijder: [] };
+    if (!huidigBereik().beheerder) {
+      const gefilterd = zonderVerbodenVoorNietBeheerder(schrijf, verwijder, vorigeBeheerd);
+      ({ schrijf, verwijder } = gefilterd);
+      if (gefilterd.overgeslagen.length > 0) {
+        console.warn(
+          "Firestore: beheerder-only docs niet meegestuurd (anders weigert de hele batch):",
+          gefilterd.overgeslagen,
+        );
+      }
+    }
     if (schrijf.size === 0 && verwijder.length === 0) {
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
       return;
