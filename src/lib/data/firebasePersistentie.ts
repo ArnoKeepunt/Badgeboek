@@ -18,7 +18,14 @@ import {
   schrijfDocMap,
 } from "./firebaseApp";
 import { duidOpslagFout, zetOpslagStatus } from "../opslagStatus";
-import { type DocData, type DocMap, diffDocs, docsNaarStore, storeNaarDocs } from "./firestoreLayout";
+import {
+  type DocData,
+  type DocMap,
+  diffDocs,
+  docsNaarStore,
+  normaliseerRapportDoc,
+  storeNaarDocs,
+} from "./firestoreLayout";
 import type { CurriculumRuw } from "../curriculum";
 import type { BadgeboekPersistentie, Overlays, PersistedStore, RauweStore } from "./persistentie";
 
@@ -331,7 +338,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
           bron_.ref,
           (snap) => {
             const frag: DocMap = new Map();
-            snap.forEach((d) => frag.set(padVoor(d.id), zonderMeta(d.data())));
+            snap.forEach((d) => {
+              const data = zonderMeta(d.data());
+              frag.set(padVoor(d.id), naam === "rapporten" ? normaliseerRapportDoc(data) : data);
+            });
             bron[naam] = frag;
             emit();
           },

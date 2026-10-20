@@ -142,7 +142,12 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     }
     m.set(`rapporten/${r.id}`, {
       ...r,
-      vestiging: vestigingVanLeerling.get(r.studentId) ?? "",
+      // Leerling (nog) niet geladen → de vestiging van het doc zelf behouden; "" zou de regels
+      // laten weigeren (en daarmee de hele gebundelde save van deze gebruiker).
+      vestiging:
+        vestigingVanLeerling.get(r.studentId) ??
+        (r as Rapport & { vestiging?: string }).vestiging ??
+        "",
       itemAudit,
     } as unknown as DocData);
   }
@@ -469,6 +474,22 @@ export function docsNaarStore(docs: DocMap): RauweStore {
 }
 
 // --- diff -------------------------------------------------------------------
+
+/**
+ * Een rapport-doc zoals de server het geeft, aangevuld met dezelfde standaardvelden die
+ * `verwerkRauw` (store.ts) op elk rapport zet. Zonder dit ziet de diff in `bewaar()` élk ouder
+ * rapport (bv. zonder `cursusKleuren`, sinds 2026-10-19) als gewijzigd en schrijft het mee —
+ * ook een afgewerkt rapport, dat een mentor niet mag wijzigen. Firestore weigert dan de hele
+ * batch, dus ook de eigenlijke wijziging van de mentor.
+ */
+export function normaliseerRapportDoc(d: DocData): DocData {
+  return {
+    ...d,
+    rubriekItems: d.rubriekItems ?? {},
+    cursusKleuren: d.cursusKleuren ?? {},
+    cursusOpmerkingen: d.cursusOpmerkingen ?? {},
+  };
+}
 
 /**
  * Stabiele JSON: objectsleutels gesorteerd. Firestore geeft map-sleutels in een andere volgorde
