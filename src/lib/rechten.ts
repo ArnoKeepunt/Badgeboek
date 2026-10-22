@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useBeheerderWeergave } from "./beheerderWeergave";
 import { useHuidigPersoneelslid } from "./firebaseAuth";
+import { opAchternaam } from "./leerlingen";
 import { useAangemeld, useBasisRol } from "./sessie";
 import { useStore } from "./store";
 import type { Student } from "./types";
@@ -100,12 +101,16 @@ export function magLeerlingZien(bereik: Bereik, leerling: Student): boolean {
 export const leerlingenBinnenBereik = (bereik: Bereik, students: Student[]): Student[] =>
   students.filter((s) => magLeerlingZien(bereik, s));
 
-/** Hook: de leerlingen die de huidige gebruiker mag zien (gebruik dit i.p.v. `store.students`). */
+/**
+ * Hook: de leerlingen die de huidige gebruiker mag zien (gebruik dit i.p.v. `store.students`),
+ * alfabetisch op achternaam — zo staan alle lijsten, vorige/volgende en het bulkprinten in
+ * dezelfde volgorde.
+ */
 export function useZichtbareLeerlingen(): Student[] {
   const { students } = useStore();
   const bereik = useBereik();
   return useMemo(
-    () => leerlingenBinnenBereik(bereik, students),
+    () => leerlingenBinnenBereik(bereik, students).sort(opAchternaam),
     // `bereik` wisselt van identiteit bij elke render; de primitieven vatten de inhoud samen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [students, bereik.allesZichtbaar, bereik.vestigingen.join(","), bereik.eigenLeerlingId],

@@ -5,6 +5,7 @@ import { ColorBar } from "../components/ColorBar";
 import { usePopover } from "../lib/popover";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RapportOpmerkingVeld } from "../components/RapportOpmerkingVeld";
+import { RapportPrint } from "../components/RapportPrint";
 import { RatingCell } from "../components/RatingCell";
 import { cursussenVoorStroom, leerdoelenVoorCursus } from "../lib/curriculum";
 import { deelevaluatiesVoorBadge } from "../lib/deelevaluaties";
@@ -322,16 +323,6 @@ export function RapportDetail() {
   // Verwijderen is beheerder-only (ook in de Firestore-regels), zowel concept als afgewerkt.
   const magVerwijderen = rol === "beheerder";
 
-  // Printweergave: enkel de rubrics die effectief een kleur hebben — een leeg/niet-gekozen
-  // rubric staat er standaard niet bij (dat is ballast op een rapport dat de deur uit gaat; het
-  // volledige overzicht incl. lege rubrics blijft gewoon op het scherm staan).
-  const printRijen = gekozen
-    ? cursussen.flatMap((cursus) =>
-        rubriekenVoorCursus(alleRubrieken, stroom, cursus.naam, cursus.id)
-          .map((r) => ({ cursus, r, item: getRapportItem(gekozen, r.id) }))
-          .filter(({ item }) => item.kleur !== null),
-      )
-    : [];
 
   // Positie van deze leerling binnen de gefilterde lijst (-1 = buiten de huidige filter, bv. via
   // een rechtstreekse link geopend — dan tonen we geen vorige/volgende).
@@ -394,9 +385,6 @@ export function RapportDetail() {
     window.addEventListener("afterprint", herstelTitel);
     window.print();
   };
-
-  // De metaregel van de printweergave onderaan (`.rapport-print-meta`).
-  const rapportMetaTekst = `${student.firstName} ${student.lastName} · ${student.vestiging} · ${GRAAD_LABEL[graadDitJaar]} · ${student.leerjaar}e jaar · groep ${student.klasgroep} · schooljaar ${schooljaar}`;
 
   return (
     <section>
@@ -723,6 +711,7 @@ export function RapportDetail() {
                             <RatingCell
                               label={`Kleur voor ${cursus.naam}`}
                               readonly={vergrendeld}
+                              readonlyTitel="Vergrendeld — dit rapport is afgewerkt"
                               value={getRapportCursusKleur(gekozen, cursus.id).kleur}
                               geschiedenis={geschiedenis(opmerkingSleutel)}
                               onChange={(next) =>
@@ -774,6 +763,7 @@ export function RapportDetail() {
                                       <RatingCell
                                         label={`${cursus.naam} — ${r.naam}`}
                                         readonly={vergrendeld}
+                                        readonlyTitel="Vergrendeld — dit rapport is afgewerkt"
                                         value={item.kleur}
                                         geschiedenis={geschiedenis(sleutel)}
                                         onChange={(next) =>
@@ -1005,84 +995,7 @@ export function RapportDetail() {
 
               {/* Printweergave: enkel zichtbaar bij het afdrukken (zie @media print in index.css).
                   Statische, opgeruimde weergave — geen popovers/knoppen die toch niet printen. */}
-              <div className="rapport-print">
-                <h1>{gekozen.naam}</h1>
-                <p className="rapport-print-meta">{rapportMetaTekst}</p>
-                {gekozen.klassenraadCommentaar && (
-                  <div className="rapport-print-algemeen">
-                    <h2>Commentaar klassenraad</h2>
-                    <p>{gekozen.klassenraadCommentaar}</p>
-                  </div>
-                )}
-                <table className="rapport-print-tabel">
-                  <thead>
-                    <tr>
-                      <th>Cursus</th>
-                      <th>Rubric</th>
-                      <th>Kleur</th>
-                      <th>Betekenis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printRijen.length === 0 ? (
-                      <tr>
-                        <td colSpan={4}>Nog geen enkele rubric ingevuld voor dit rapport.</td>
-                      </tr>
-                    ) : (
-                      printRijen.map(({ cursus, r, item }) => (
-                        <tr key={r.id}>
-                          <td>{cursus.naam}</td>
-                          <td>{r.naam}</td>
-                          <td>
-                            <span className={`rating rating-${item.kleur ?? "empty"}`}>
-                              {item.kleur ? RATING_LABEL[item.kleur] : "—"}
-                            </span>
-                          </td>
-                          {/* De rubric-tekst bij de gekozen kleur — enkel de 4 kleuren hebben er
-                              een, een witte status (bv. vrijgesteld) niet. */}
-                          <td className="rapport-print-betekenis">
-                            {item.kleur && item.kleur in KLEUR_KEY
-                              ? r.criteria[KLEUR_KEY[item.kleur as keyof typeof KLEUR_KEY]] || "—"
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-                {/* Per cursus: de cursuskleur en -opmerking, enkel voor cursussen waar
-                    minstens één van beide ingevuld is. */}
-                {cursussen.some(
-                  (c) =>
-                    getRapportCursusKleur(gekozen, c.id).kleur ||
-                    getRapportCursusOpmerking(gekozen, c.id),
-                ) && (
-                  <div className="rapport-print-algemeen">
-                    <h2>Per cursus</h2>
-                    {cursussen.map((c) => {
-                      const kleur = getRapportCursusKleur(gekozen, c.id).kleur;
-                      const opmerking = getRapportCursusOpmerking(gekozen, c.id);
-                      if (!kleur && !opmerking) return null;
-                      return (
-                        <p key={c.id}>
-                          <strong>{c.naam}:</strong>{" "}
-                          {kleur && (
-                            <span className={`rating rating-${kleur}`}>{RATING_LABEL[kleur]}</span>
-                          )}
-                          {kleur && opmerking && " "}
-                          {opmerking}
-                        </p>
-                      );
-                    })}
-                  </div>
-                )}
-                {gekozen.algemeneOpmerking && (
-                  <div className="rapport-print-algemeen">
-                    <h2>Algemene opmerking</h2>
-                    <p>{gekozen.algemeneOpmerking}</p>
-                  </div>
-                )}
-              </div>
+              <RapportPrint student={student} rapport={gekozen} rubrieken={alleRubrieken} />
             </>
           ) : (
             <p className="lege-staat">

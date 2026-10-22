@@ -1727,6 +1727,26 @@ export function rondRapportAf(id: string) {
   });
 }
 
+/**
+ * Zet meerdere rapporten in één opslagbeurt op "afgewerkt" (bulkactie op `/rapport`, enkel voor
+ * de beheerder). Rapporten die al afgewerkt zijn blijven ongemoeid. Geeft het aantal terug.
+ */
+export function rondRapportenAfBulk(ids: string[]): number {
+  const nu = Date.now();
+  const wie = huidigeGebruiker();
+  const teDoen = new Set(ids.filter((id) => rapport(id)?.status === "concept"));
+  if (teDoen.size === 0) return 0;
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      teDoen.has(r.id)
+        ? { ...r, status: "afgewerkt", afgewerktOp: nu, afgewerktDoor: wie, gewijzigdOp: nu, gewijzigdDoor: wie }
+        : r,
+    ),
+  });
+  return teDoen.size;
+}
+
 /** Heropen een afgewerkt rapport (terug naar concept). De UI gate dit tot een beheerder. */
 export function heropenRapport(id: string) {
   const nu = Date.now();

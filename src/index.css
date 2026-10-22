@@ -658,6 +658,13 @@ th {
   flex-shrink: 0;
 }
 
+/* Afgewerkt rapport: de vergrendelde kleurcel staat hier los naast de rubricnaam (niet in een
+   tabelcel) — `width: 100%` zou dan de hele kop innemen en de naam wegduwen. */
+.rapport-rubriek-kop > .rating-cell-btn.is-readonly,
+.rapport-cursus-kop .rating-cell-btn.is-readonly {
+  width: auto;
+}
+
 .rubriek-legende {
   display: flex;
   flex-wrap: wrap;
@@ -3045,11 +3052,12 @@ th {
   filter: brightness(0.97);
 }
 
-/* Alleen-lezen cel (afgesloten schooljaar). */
+/* Alleen-lezen cel (afgesloten schooljaar, afgewerkt rapport). Gecentreerd zoals de knop. */
 .rating-cell-btn.is-readonly {
   display: inline-block;
   cursor: default;
   opacity: 0.75;
+  text-align: center;
 }
 
 .rating-cell-backdrop {
@@ -4083,6 +4091,29 @@ th {
   color: var(--text-muted);
 }
 
+/* Bulkacties per rapportmoment (printen / afwerken) op /rapport: knoppen onderaan uitgelijnd
+   met de rapportmomentkiezer, zelfde kaartstijl als de lijst eronder. */
+.rapport-bulk-acties {
+  align-items: flex-end;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rapport-bulk-acties select {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.rapport-bulk-acties .rapport-bulk-melding {
+  align-self: center;
+}
+
 /* Overlay: naam + LeerlingFilterBar (vestiging/graad/leerjaar/klasgroep/groep) samen — dezelfde
    invoerstijl als de rapportmoment-/cursuskiezer op de detailpagina. */
 .rapport-toolbar-kies input[type="text"] {
@@ -4451,33 +4482,187 @@ th {
   display: none;
 }
 
-.rapport-print h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
+/* Zelfde taal als de app (kaarten met afgeronde hoeken, lichte randen, groen accent, kleine
+   grijze labels in hoofdletters), maar op papier: randen een tikje donkerder dan `--border` en
+   enkel lichte vlakken, zodat het ook in zwart-wit en op een gewone printer leesbaar blijft. */
+.rapport-print {
+  --print-rand: #d1d5db;
+  font-size: 13px;
+  color: var(--text);
 }
 
-.rapport-print-meta {
-  margin: 0 0 18px;
-  color: #444;
+.rapport-print h2,
+.rapport-print h3,
+.rapport-print h4 {
+  margin: 0;
+}
+
+.rapport-print p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Kaarten (kop, klassenraad, cursuskop, leerlijn). */
+.rapport-print-kop,
+.rapport-print-kader,
+.rapport-print-cursus-kop {
+  border: 1px solid var(--print-rand);
+  border-radius: var(--radius);
+  background: var(--surface);
+  break-inside: avoid;
+}
+
+/* Labels boven een kaartinhoud — zelfde stijl als de tabelkoppen (`th`) van de app. */
+.rapport-print-kader h2,
+.rapport-print-kader h3,
+.rapport-print-cursus-eval small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rapport-print-kop {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  min-height: 120px;
+  border-top: 4px solid var(--accent);
+}
+
+.rapport-print-kop img {
+  width: 190px;
+  max-width: 100%;
+  justify-self: center;
+}
+
+.rapport-print-kop-info {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.rapport-print-kop-info > p:first-child {
+  color: var(--text-muted);
+}
+
+.rapport-print-kop-leerling {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 17px;
+}
+
+.rapport-print-kop-leerling span {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 13px;
+  font-weight: 700;
+}
+
+.rapport-print-kop-info > p:last-child {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rapport-print-kader {
+  margin-top: 16px;
+  padding: 12px 16px;
+}
+
+.rapport-print-kader h2 {
+  margin-bottom: 6px;
+}
+
+/* Ook leeg genoeg ruimte om op papier aan te vullen. */
+.rapport-print-klassenraad {
+  min-height: 150px;
+}
+
+.rapport-print-leeg {
+  margin-top: 18px !important;
+  color: var(--text-muted);
+}
+
+.rapport-print-cursus {
+  margin-top: 26px;
+}
+
+/* Cursuskop: naam + opmerking links, rechts een smal vak met de cursuskleur. Lichtgroen vlak
+   met accentstreep links — zo springt elke nieuwe cursus er op het blad meteen uit. */
+.rapport-print-cursus-kop {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  overflow: hidden;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  break-after: avoid;
+}
+
+.rapport-print-cursus-naam {
+  padding: 10px 14px;
+}
+
+.rapport-print-cursus-naam h2 {
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.rapport-print-cursus-naam p {
+  font-style: italic;
+  margin-top: 3px;
+}
+
+.rapport-print-cursus-eval {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-left: 1px solid var(--print-rand);
+  background: var(--surface);
+}
+
+.rapport-print-geen-kleur {
+  color: var(--text-muted);
 }
 
 .rapport-print-tabel {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 6px;
+}
+
+.rapport-print-tabel tr {
+  break-inside: avoid;
 }
 
 .rapport-print-tabel th,
 .rapport-print-tabel td {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--print-rand);
   vertical-align: top;
 }
 
-/* Cursus/rubric/kleur smal houden, de rubric-tekst bij de kleur krijgt de rest van de breedte. */
+.rapport-print-tabel tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rapport-print-tabel th {
+  font-size: 11px;
+}
+
+/* Cursus/kleur smal houden, de rubric-tekst bij de kleur krijgt de rest van de breedte. */
 .rapport-print-tabel th:nth-child(1),
-.rapport-print-tabel td:nth-child(1):not(:last-child),
+.rapport-print-tabel td:nth-child(1),
 .rapport-print-tabel th:nth-child(3),
 .rapport-print-tabel td:nth-child(3) {
   width: 1%;
@@ -4486,25 +4671,51 @@ th {
 
 .rapport-print-tabel th:nth-child(2),
 .rapport-print-tabel td:nth-child(2) {
-  width: 25%;
+  width: 30%;
+  font-weight: 600;
 }
 
 .rapport-print-tabel td.rapport-print-betekenis {
   white-space: pre-line;
 }
 
-.rapport-print-algemeen {
-  margin-top: 20px;
+.rapport-print-leerlijn {
+  margin-top: 6px;
+  background: #fafbfc;
 }
 
-.rapport-print-algemeen h2 {
-  font-size: 14px;
-  margin: 0 0 4px;
+.rapport-print-leerlijn h3 {
+  margin-bottom: 4px;
 }
 
-.rapport-print-algemeen p {
-  white-space: pre-wrap;
-  margin: 0;
+.rapport-print-leerlijn h4 {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.rapport-print-leerlijn h4:first-child {
+  margin-top: 0;
+}
+
+/* Bulkprinten: meerdere rapporten na elkaar, elk op een nieuwe pagina. */
+.rapport-print + .rapport-print {
+  break-before: page;
+}
+
+.rapport-print-handtekeningen {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 36px;
+  padding-top: 70px;
+  color: var(--text-muted);
+  font-size: 12px;
+  break-inside: avoid;
+}
+
+.rapport-print-handtekeningen div {
+  border-top: 1px solid var(--text);
+  padding-top: 6px;
 }
 
 @media print {
@@ -4519,6 +4730,14 @@ th {
     display: block;
   }
 
+  /* Wit blad: de grijze app-achtergrond hoort niet op papier (zeker niet met
+     `print-color-adjust: exact` hieronder, dat achtergronden mee laat afdrukken). */
+  body,
+  .layout,
+  .content {
+    background: #fff;
+  }
+
   .content,
   .content--breed {
     max-width: none;
@@ -4527,5 +4746,8 @@ th {
 
   .rapport-print {
     display: block;
+    /* Kleurchips (blauw/groen/geel/rood) ook afdrukken zonder "achtergrondafbeeldingen". */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

@@ -83,6 +83,11 @@ export function filterLeerlingen(
   });
 }
 
+/** Alfabetisch op achternaam, bij gelijke achternaam op voornaam (hoofdletters/accenten negeren). */
+export const opAchternaam = (a: Student, b: Student): number =>
+  a.lastName.localeCompare(b.lastName, "nl", { sensitivity: "base" }) ||
+  a.firstName.localeCompare(b.firstName, "nl", { sensitivity: "base" });
+
 /** Unieke, gesorteerde waarden voor een keuzelijst. */
 export const unieke = <T extends string | number>(waarden: T[]): T[] =>
   [...new Set(waarden)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));

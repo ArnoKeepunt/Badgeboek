@@ -21,6 +21,7 @@ export function RatingCell({
   onChange,
   label,
   readonly = false,
+  readonlyTitel = "Vergrendeld — dit schooljaar is afgesloten",
   geschiedenis,
 }: {
   value: Rating | null;
@@ -29,6 +30,8 @@ export function RatingCell({
   label: string;
   /** Alleen tonen, niet bewerkbaar (bv. bij een afgesloten schooljaar). */
   readonly?: boolean;
+  /** Tooltip bij een alleen-lezen cel (standaard: afgesloten schooljaar). */
+  readonlyTitel?: string;
   /** Volledige wijzigingsgeschiedenis (nieuwste eerst), uitklapbaar onderaan het keuzemenu. */
   geschiedenis?: GeschiedenisRegel[];
 }) {
@@ -52,7 +55,7 @@ export function RatingCell({
     return (
       <span
         className={`rating-cell-btn rating-${value ?? "empty"} is-readonly`}
-        title="Vergrendeld — dit schooljaar is afgesloten"
+        title={readonlyTitel}
         aria-label={`${label} — ${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL} (vergrendeld)`}
       >
         {value ? RATING_KORT[value] : "–"}
