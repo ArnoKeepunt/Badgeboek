@@ -316,6 +316,8 @@ export function RapportDetail() {
     : cursussen;
   const gekozen: Rapport | undefined = mijnRapporten.find((r) => r.id === gekozenId);
   const vergrendeld = gekozen?.status === "afgewerkt";
+  // Afwerken en heropenen zijn beheerder-only (afwerken ook in de Firestore-regels).
+  const magAfwerken = rol === "beheerder";
   const magHeropenen = rol === "beheerder";
   // Verwijderen is beheerder-only (ook in de Firestore-regels), zowel concept als afgewerkt.
   const magVerwijderen = rol === "beheerder";
@@ -603,17 +605,19 @@ export function RapportDetail() {
                   </div>
                   <div className="rapport-knopgroep">
                     {!vergrendeld ? (
-                      <button
-                        type="button"
-                        className="knop-secundair rapport-afwerk-knop"
-                        onClick={() => {
-                          if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
-                            rondRapportAf(gekozen.id);
-                          }
-                        }}
-                      >
-                        Rapport afwerken
-                      </button>
+                      magAfwerken && (
+                        <button
+                          type="button"
+                          className="knop-secundair rapport-afwerk-knop"
+                          onClick={() => {
+                            if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
+                              rondRapportAf(gekozen.id);
+                            }
+                          }}
+                        >
+                          Rapport afwerken
+                        </button>
+                      )
                     ) : magHeropenen ? (
                       <button
                         type="button"

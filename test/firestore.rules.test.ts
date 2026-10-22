@@ -369,6 +369,12 @@ describe("rapporten — handmatige rapporten per leerling", () => {
     await assertSucceeds(beheerder.doc("rapporten/rap-afgewerkt").update({ status: "concept" }));
   });
 
+  it("enkel de beheerder mag een rapport afwerken", async () => {
+    await assertFails(mentor.doc("rapporten/rap-concept").update({ status: "afgewerkt" }));
+    await assertFails(coordinator.doc("rapporten/rap-concept").update({ status: "afgewerkt" }));
+    await assertSucceeds(beheerder.doc("rapporten/rap-concept").update({ status: "afgewerkt" }));
+  });
+
   it("enkel de beheerder mag een rapport verwijderen, ook een concept", async () => {
     await assertFails(mentor.doc("rapporten/rap-concept").delete());
     await assertFails(coordinator.doc("rapporten/rap-concept").delete());
