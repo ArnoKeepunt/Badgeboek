@@ -94,3 +94,31 @@ export async function bewaarAlles(timeoutMs = 10_000): Promise<boolean> {
   clearTimeout(stop);
   return !bron.onbewaard();
 }
+
+/**
+ * Melding na het herstellen van een back-up uit een vorige sessie (zie
+ * `src/lib/data/onbewaardBackup.ts`). `overgeslagen` = documenten die iemand anders intussen
+ * aanpaste: die zijn bewust niet overschreven.
+ */
+export type HerstelMelding = { hersteld: number; overgeslagen: number } | null;
+
+let herstel: HerstelMelding = null;
+const herstelLuisteraars = new Set<() => void>();
+
+export function meldHerstel(nieuw: HerstelMelding): void {
+  herstel = nieuw;
+  herstelLuisteraars.forEach((fn) => fn());
+}
+
+export const leesHerstelMelding = (): HerstelMelding => herstel;
+
+export function useHerstelMelding(): HerstelMelding {
+  return useSyncExternalStore(
+    (cb) => {
+      herstelLuisteraars.add(cb);
+      return () => herstelLuisteraars.delete(cb);
+    },
+    leesHerstelMelding,
+    leesHerstelMelding,
+  );
+}

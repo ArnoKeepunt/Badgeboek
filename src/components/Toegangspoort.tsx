@@ -1,8 +1,8 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
-import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase } from "../lib/data";
+import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase, sessieBeginVan } from "../lib/data";
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
-import { leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
+import { MAX_SESSIE_MS, leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
 import { AutoAfmelden } from "./AutoAfmelden";
 import { LogoIcoon } from "./LogoIcoon";
 
@@ -16,10 +16,47 @@ export function Toegangspoort({ children }: { children: ReactNode }) {
   return <FirebasePoort>{children}</FirebasePoort>;
 }
 
+/**
+ * Is de sessie van deze gebruiker verlopen (langer dan `MAX_SESSIE_MS` sinds de laatste echte
+ * login)? `null` zolang dat nog niet gekend is. Een verlopen sessie wordt meteen afgemeld.
+ *
+ * Moet vóór de accountcontrole: bij een verlopen sessie weigert de database ook het eigen
+ * account, en dan zou de poort "Je hebt nog geen toegang" tonen in plaats van "sessie verlopen".
+ */
+function useSessieVerlopen(gebruiker: User | null): boolean | null {
+  const [gecontroleerd, setGecontroleerd] = useState<{ uid: string; verlopen: boolean } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!gebruiker) return;
+    let actief = true;
+    sessieBeginVan(gebruiker)
+      .then((begin) => Date.now() >= begin + MAX_SESSIE_MS)
+      .catch(() => false) // token onleesbaar: dan beslist de Firestore-regel
+      .then((verlopen) => {
+        if (!actief) return;
+        setGecontroleerd({ uid: gebruiker.uid, verlopen });
+        if (verlopen) {
+          zetAfmeldReden("sessie");
+          void meldAfVanFirebase();
+        }
+      });
+    return () => {
+      actief = false;
+    };
+  }, [gebruiker]);
+
+  if (!gebruiker) return false;
+  return gecontroleerd?.uid === gebruiker.uid ? gecontroleerd.verlopen : null;
+}
+
 function FirebasePoort({ children }: { children: ReactNode }) {
   const status = useAuthStatus();
+  const sessieVerlopen = useSessieVerlopen(status.gebruiker);
 
-  if (status.laden) {
+  // Een verlopen sessie wordt net afgemeld: niets tonen tot het inlogscherm verschijnt.
+  if (status.laden || sessieVerlopen !== false) {
     return (
       <PoortScherm>
         <p className="toegangspoort-tekst">Even geduld…</p>

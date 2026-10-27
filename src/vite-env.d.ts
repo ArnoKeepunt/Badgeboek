@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_DATABASE_ID?: string;
   readonly VITE_FIREBASE_STORAGE_BUCKET?: string;
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID?: string;
+  /** Versie-id van deze build (gezet door `vite.config.ts`, enkel bij `vite build`). */
+  readonly VITE_BADGEBOEK_VERSIE?: string;
 }
 
 interface ImportMeta {

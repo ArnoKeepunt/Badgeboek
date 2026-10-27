@@ -13,11 +13,13 @@ import { huidigBereik, opBereikWissel } from "./firebaseBereik";
 import {
   auth,
   db,
+  leesDoc,
   schrijfCurriculum as schrijfCurriculumDoc,
   schrijfOverlays as schrijfOverlaysDoc,
   schrijfDocMap,
 } from "./firebaseApp";
-import { duidOpslagFout, registreerOpslagBron, zetOpslagStatus } from "../opslagStatus";
+import { duidOpslagFout, meldHerstel, registreerOpslagBron, zetOpslagStatus } from "../opslagStatus";
+import { verwijderSleutel, wezen, wisBackup, zetBackup } from "./onbewaardBackup";
 import {
   type DocData,
   type DocMap,
@@ -190,6 +192,13 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   let pendingOverlay: DocMap | null = null;
   /** Overlays waarvan de schrijfactie nog loopt of mislukte — opnieuw te proberen. */
   let onbewaardeOverlays: Overlays | null = null;
+  /**
+   * Van wie de openstaande wijzigingen zijn. Meldt er intussen een ander account aan in dezelfde
+   * browser, dan mogen die nooit onder dat andere account vertrekken (de back-up blijft wel
+   * staan voor het oorspronkelijke account).
+   */
+  let pendingEmail: string | null = null;
+  let overlaysEmail: string | null = null;
   /** Lopende Firestore-commits. Offline blijft een commit hangen tot de verbinding terug is. */
   let bezig = 0;
 
@@ -214,6 +223,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       timer = null;
     }
     if (!auth.currentUser || !laatsteStore) return;
+    if (pendingEmail && auth.currentUser.email !== pendingEmail) {
+      pendingOverlay = null; // van een ander account — zie `pendingEmail`
+      return;
+    }
     // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar — anders
     // zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
     if (vorigeDocs && vorigeDocsSchooljaar !== actiefSchooljaar) return;
@@ -245,9 +258,16 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
       return;
     }
+    // Eerst een back-up in de browser: overleeft herladen, sluiten of een verlopen sessie.
+    const backupNr = zetBackup("docs", {
+      email: auth.currentUser.email ?? "",
+      schrijf: [...schrijf],
+      verwijder,
+    });
     bezig++;
     try {
       await schrijfDocMap(schrijf, verwijder);
+      wisBackup("docs", backupNr);
       vorigeDocs = volledigNu;
       // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
@@ -266,9 +286,12 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   const schrijfOverlaysNu = async (overlays: Overlays) => {
     if (!auth.currentUser) return;
     onbewaardeOverlays = overlays;
+    overlaysEmail = auth.currentUser.email;
+    const backupNr = zetBackup("overlays", { email: auth.currentUser.email ?? "", overlays });
     bezig++;
     try {
       await schrijfOverlaysDoc(overlays);
+      wisBackup("overlays", backupNr);
       if (onbewaardeOverlays === overlays) onbewaardeOverlays = null;
       zetOpslagStatus({ soort: "ok" });
     } catch (error) {
@@ -281,6 +304,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
 
   /** Alles wat nog openstaat meteen doorsturen (ook wat eerder mislukte). */
   const bewaarAlles = async () => {
+    if (onbewaardeOverlays && auth.currentUser?.email !== overlaysEmail) onbewaardeOverlays = null;
     await Promise.all([
       pendingOverlay || timer ? schrijfNu() : undefined,
       onbewaardeOverlays ? schrijfOverlaysNu(onbewaardeOverlays) : undefined,
@@ -293,8 +317,69 @@ export function firebasePersistentie(): BadgeboekPersistentie {
    * nog een commit loopt: offline houdt Firestore die zelf vast tot de verbinding terug is.
    */
   const probeerOpnieuw = () => {
-    if (bezig > 0 || !auth.currentUser || !onbewaard()) return;
-    void bewaarAlles();
+    if (!auth.currentUser) return;
+    if (bezig === 0 && onbewaard()) void bewaarAlles();
+    void herstelBackups();
+  };
+
+  let herstelBezig = false;
+  /** Pogingen per paginalading: een back-up die de regels blijvend weigeren, niet eindeloos. */
+  let herstelPogingen = 0;
+
+  /**
+   * Back-ups uit een vorige sessie van dit account alsnog versturen (na herladen, een crash of
+   * opnieuw aanmelden na een verlopen sessie). Een document dat iemand anders ná de mislukte
+   * schrijfactie nog aanpaste, wordt overgeslagen: diens werk gaat voor. Lukt het niet (geen
+   * verbinding, sessie nog niet geldig), dan blijft de back-up staan voor een volgende poging.
+   */
+  const herstelBackups = async () => {
+    const email = auth.currentUser?.email;
+    if (herstelBezig || !email || herstelPogingen >= 5) return;
+    const lijst = wezen(email);
+    if (lijst.length === 0) return;
+    herstelBezig = true;
+    herstelPogingen++;
+    let hersteld = 0;
+    let overgeslagen = 0;
+    try {
+      for (const { sleutel, soort, backup } of lijst) {
+        const serverStand = async (pad: string) => {
+          const d = await leesDoc(...pad.split("/"));
+          const gewijzigd = Date.parse(String(d?.updatedAt ?? ""));
+          return { bestaat: d !== null, laterGewijzigd: gewijzigd > backup.tijd };
+        };
+        if (soort === "overlays" && backup.overlays) {
+          if ((await serverStand("instellingen/overlays")).laterGewijzigd) overgeslagen++;
+          else {
+            await schrijfOverlaysDoc(backup.overlays);
+            hersteld++;
+          }
+        } else if (soort === "docs") {
+          const schrijf: DocMap = new Map();
+          const verwijder: string[] = [];
+          for (const [pad, data] of backup.schrijf ?? []) {
+            if ((await serverStand(pad)).laterGewijzigd) overgeslagen++;
+            else schrijf.set(pad, data);
+          }
+          for (const pad of backup.verwijder ?? []) {
+            const stand = await serverStand(pad);
+            if (!stand.bestaat) continue;
+            if (stand.laterGewijzigd) overgeslagen++;
+            else verwijder.push(pad);
+          }
+          if (schrijf.size > 0 || verwijder.length > 0) {
+            await schrijfDocMap(schrijf, verwijder);
+            hersteld += schrijf.size + verwijder.length;
+          }
+        }
+        verwijderSleutel(sleutel);
+      }
+    } catch (error) {
+      console.warn("Onbewaarde wijzigingen van eerder herstellen lukte (nog) niet:", error);
+    } finally {
+      herstelBezig = false;
+    }
+    if (hersteld > 0 || overgeslagen > 0) meldHerstel({ hersteld, overgeslagen });
   };
 
   registreerOpslagBron({ onbewaard, bewaarAlles });
@@ -336,6 +421,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
 
     bewaar(store: PersistedStore): void {
       laatsteStore = store;
+      pendingEmail = auth.currentUser?.email ?? null;
       bewaarCache(store);
       if (store.schooljaar !== actiefSchooljaar) {
         actiefSchooljaar = store.schooljaar;
@@ -564,8 +650,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       };
 
       const unsubAuth = auth.onAuthStateChanged((user) => {
-        if (user) startAlles();
-        else stopAlles();
+        if (user) {
+          startAlles();
+          void herstelBackups(); // bv. na opnieuw aanmelden na een verlopen sessie
+        } else stopAlles();
       });
       // Herabonneren zodra het vestiging-bereik bekend wordt of wijzigt (login, rolwissel).
       const unsubBereik = opBereikWissel(() => {

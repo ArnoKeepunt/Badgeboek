@@ -1704,6 +1704,26 @@ th {
   gap: 8px;
 }
 
+/* Enkel zichtbaar voor wie een oudere versie draait dan online staat. Niet-blokkerend. */
+.nieuwe-versie {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 90;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-size: 13px;
+  color: var(--text);
+}
+
 /* Rustiger variant: wel duidelijk een knop, maar zonder de volle accentkleur. */
 .knop-secundair {
   border: 1px solid var(--border);
@@ -1833,6 +1853,34 @@ th {
   font-size: 13px;
   background: #fef2f2;
   color: #991b1b;
+}
+
+/* Na het herstellen van onbewaarde wijzigingen uit een vorige sessie. */
+.opslag-herstelbalk {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  font-size: 13px;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.opslag-herstelbalk span {
+  flex: 1;
+}
+
+.opslag-herstelbalk-sluit {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 /* --- Personeelsaccounts (/gebruikers) ------------------------------------------ */
@@ -4753,6 +4801,7 @@ th {
   .sidebar,
   .topbar,
   .opslag-foutbalk,
+  .opslag-herstelbalk,
   .no-print {
     display: none !important;
   }

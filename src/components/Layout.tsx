@@ -5,7 +5,7 @@ import { meldAfMetBewaren } from "../lib/afmelden";
 import { PERSISTENTIE_MODUS } from "../lib/data";
 import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
 import { isMentorachtigeRol, PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
-import { useOpslagStatus } from "../lib/opslagStatus";
+import { meldHerstel, useHerstelMelding, useOpslagStatus } from "../lib/opslagStatus";
 import { useZichtbareLeerlingen } from "../lib/rechten";
 import { type Aangemeld, naamVan, useAangemeld, useBasisRol, useEffectieveRol } from "../lib/sessie";
 import { meldAf } from "../lib/store";
@@ -310,6 +310,7 @@ export function Layout() {
       pathname.startsWith("/rapport/"));
   const titel = paginaTitel(pathname, students);
   const opslag = useOpslagStatus();
+  const herstel = useHerstelMelding();
 
   const [ingeklapt, setIngeklapt] = useState(loadIngeklapt);
   useEffect(() => {
@@ -377,6 +378,25 @@ export function Layout() {
           {opslag.soort === "fout" && (
             <div className="opslag-foutbalk" role="alert">
               <strong>Niet bewaard.</strong> {opslag.melding}
+            </div>
+          )}
+          {herstel && (
+            <div className="opslag-herstelbalk" role="status">
+              <span>
+                {herstel.hersteld > 0 &&
+                  "Wijzigingen van eerder die nog niet bewaard waren, zijn alsnog bewaard. "}
+                {herstel.overgeslagen > 0 &&
+                  "Een deel van je eerdere invoer is niet hersteld, omdat iemand anders hetzelfde " +
+                    "intussen aanpaste. Kijk je laatste invoer even na."}
+              </span>
+              <button
+                type="button"
+                className="opslag-herstelbalk-sluit"
+                aria-label="Melding sluiten"
+                onClick={() => meldHerstel(null)}
+              >
+                ×
+              </button>
             </div>
           )}
           <Outlet />
