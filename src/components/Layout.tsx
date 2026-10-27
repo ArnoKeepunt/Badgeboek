@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useBeheerderWeergave, zetVereenvoudigdeWeergave } from "../lib/beheerderWeergave";
-import { PERSISTENTIE_MODUS, meldAfVanFirebase } from "../lib/data";
+import { meldAfMetBewaren } from "../lib/afmelden";
+import { PERSISTENTIE_MODUS } from "../lib/data";
 import { useDevToegang, useFirebaseGebruiker, useHuidigPersoneelslid } from "../lib/firebaseAuth";
 import { isMentorachtigeRol, PERSONEEL_ROL_LABEL } from "../lib/gebruikers";
 import { useOpslagStatus } from "../lib/opslagStatus";
@@ -260,7 +261,7 @@ function SidebarAccount({ aangemeld, ingeklapt }: { aangemeld: Aangemeld; ingekl
         <button
           type="button"
           className="sidebar-account-actie"
-          onClick={() => void meldAfVanFirebase()}
+          onClick={() => void meldAfMetBewaren()}
           title={ingeklapt ? "Afmelden" : undefined}
         >
           <span className="sidebar-account-actie-tekst">Afmelden</span>

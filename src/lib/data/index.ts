@@ -11,6 +11,8 @@ export {
   db,
   meldAanMetGoogle,
   meldAfVanFirebase,
+  bevestigAanmelding,
+  sessieBeginVan,
   abonneerAuth,
   abonneerGebruiker,
   abonneerGebruikers,

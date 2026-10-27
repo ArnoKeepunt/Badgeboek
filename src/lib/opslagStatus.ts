@@ -56,3 +56,41 @@ const lees = () => status;
 export function useOpslagStatus(): OpslagStatus {
   return useSyncExternalStore(abonneer, lees, lees);
 }
+
+/**
+ * Wat er nog niet in de database staat. De persistentielaag (firebase-modus) registreert zich
+ * hier; zo kunnen het afmelden en de auto-afmelding eerst alles proberen te bewaren, zonder dat
+ * de UI iets van Firestore hoeft te weten. Zonder geregistreerde bron (local-modus) is er nooit
+ * iets onbewaard.
+ */
+export interface OpslagBron {
+  /** Staat er een wijziging klaar, onderweg of mislukt die de server nog niet bevestigde? */
+  onbewaard(): boolean;
+  /** Stuur alles wat nog openstaat meteen door (ook mislukte schrijfacties opnieuw). */
+  bewaarAlles(): Promise<void>;
+}
+
+let bron: OpslagBron | null = null;
+
+export function registreerOpslagBron(nieuw: OpslagBron | null): void {
+  bron = nieuw;
+}
+
+export const heeftOnbewaardeWijzigingen = (): boolean => bron?.onbewaard() ?? false;
+
+/**
+ * Probeer alles te bewaren en wacht daar hooguit `timeoutMs` op. `true` = alles staat in de
+ * database (of er was niets), `false` = er blijft iets onbewaard (bv. geen verbinding).
+ */
+export async function bewaarAlles(timeoutMs = 10_000): Promise<boolean> {
+  if (!bron?.onbewaard()) return true;
+  let stop: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    bron.bewaarAlles().catch(() => undefined),
+    new Promise((klaar) => {
+      stop = setTimeout(klaar, timeoutMs);
+    }),
+  ]);
+  clearTimeout(stop);
+  return !bron.onbewaard();
+}

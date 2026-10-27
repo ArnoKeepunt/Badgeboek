@@ -43,14 +43,20 @@ function emulatorHost(): { host: string; port: number } {
   return { host, port: Number(port) };
 }
 
+const nuInSeconden = () => Math.floor(Date.now() / 1000);
+const UUR = 3600;
+
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: "demo-keerpunt",
     firestore: { rules: readFileSync("firestore.rules", "utf8"), ...emulatorHost() },
   });
 
+  // `auth_time` = nu: anders zet de testomgeving 0 (1970) en is elke sessie al verlopen.
   const ctx = (uid: string, email: string, verified = true): Firestore =>
-    testEnv.authenticatedContext(uid, { email, email_verified: verified }).firestore();
+    testEnv
+      .authenticatedContext(uid, { email, email_verified: verified, auth_time: nuInSeconden() })
+      .firestore();
 
   beheerder = ctx("beheerder", "beheerder@keerpuntscholen.be");
   coordinator = ctx("coord", "coord@keerpuntscholen.be");
@@ -477,5 +483,44 @@ describe("legacy-documenten en de catch-all", () => {
     await assertFails(beheerder.doc("willekeurig/doc").get());
     await assertFails(beheerder.doc("willekeurig/doc").set({ x: 1 }));
     await assertFails(bootstrap.doc("willekeurig/doc").set({ x: 1 }));
+  });
+});
+
+// --- Maximale sessieduur (sessieGeldig) ----------------------------------------------
+describe("maximale sessieduur: 12 uur na de laatste echte login", () => {
+  /** Een context waarvan de laatste echte Google-login `urenGeleden` uur terug ligt. */
+  const aangemeldGeleden = (uid: string, email: string, urenGeleden: number): Firestore =>
+    testEnv
+      .authenticatedContext(uid, {
+        email,
+        email_verified: true,
+        auth_time: nuInSeconden() - urenGeleden * UUR,
+      })
+      .firestore();
+
+  it("binnen de 12 uur: gewoon toegang", async () => {
+    const db = aangemeldGeleden("mentor", "mentor@keerpuntscholen.be", 11);
+    await assertSucceeds(db.doc("leerlingen/ll-gent").get());
+    await assertSucceeds(db.doc("gebruikers/mentor@keerpuntscholen.be").get());
+  });
+
+  it("na 12 uur: niets meer lezen of schrijven, ook het eigen account niet", async () => {
+    const db = aangemeldGeleden("mentor", "mentor@keerpuntscholen.be", 13);
+    await assertFails(db.doc("leerlingen/ll-gent").get());
+    await assertFails(db.doc(`evaluaties/${JAAR}/leerlingen/ll-gent`).get());
+    await assertFails(
+      db.doc(`evaluaties/${JAAR}/leerlingen/ll-gent`).set(
+        { kleuren: { b1: "groen" }, notities: {}, gewist: [], auditLog: {}, vestiging: "Gent" },
+        { merge: true },
+      ),
+    );
+    await assertFails(db.doc("gebruikers/mentor@keerpuntscholen.be").get());
+  });
+
+  it("geldt ook voor de beheerder en het noodluik (bootstrap-admin)", async () => {
+    await assertFails(
+      aangemeldGeleden("beheerder", "beheerder@keerpuntscholen.be", 13).collection("gebruikers").get(),
+    );
+    await assertFails(aangemeldGeleden("bootstrap", BOOTSTRAP, 13).doc("leerlingen/ll-gent").get());
   });
 });

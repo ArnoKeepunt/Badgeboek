@@ -17,7 +17,7 @@ import {
   schrijfOverlays as schrijfOverlaysDoc,
   schrijfDocMap,
 } from "./firebaseApp";
-import { duidOpslagFout, zetOpslagStatus } from "../opslagStatus";
+import { duidOpslagFout, registreerOpslagBron, zetOpslagStatus } from "../opslagStatus";
 import {
   type DocData,
   type DocMap,
@@ -188,6 +188,16 @@ export function firebasePersistentie(): BadgeboekPersistentie {
    * de schrijfactie zelf denken dat er niets te doen is en zichzelf overslaan.
    */
   let pendingOverlay: DocMap | null = null;
+  /** Overlays waarvan de schrijfactie nog loopt of mislukte — opnieuw te proberen. */
+  let onbewaardeOverlays: Overlays | null = null;
+  /** Lopende Firestore-commits. Offline blijft een commit hangen tot de verbinding terug is. */
+  let bezig = 0;
+
+  /**
+   * Staat er iets dat de server nog niet bevestigde? `pendingOverlay` blijft staan tot een
+   * schrijfactie slaagt, dus dekt ook mislukte en (offline) hangende schrijfacties.
+   */
+  const onbewaard = () => timer !== null || pendingOverlay !== null || onbewaardeOverlays !== null;
 
   /** Enkel de door `bewaar()` beheerde paden voor het huidige schooljaar (zie `magBewarenSchrijven`). */
   const beheerd = (m: DocMap): DocMap =>
@@ -235,6 +245,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
       return;
     }
+    bezig++;
     try {
       await schrijfDocMap(schrijf, verwijder);
       vorigeDocs = volledigNu;
@@ -243,12 +254,50 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       zetOpslagStatus({ soort: "ok" });
     } catch (error) {
       // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont de
-      // fout; de wijziging blijft lokaal staan (en overlayed, zie hierboven) en `bewaar`
-      // probeert het bij de volgende wijziging opnieuw.
+      // fout; de wijziging blijft lokaal staan (en overlayed, zie hierboven) en `probeerOpnieuw`
+      // stuurt ze opnieuw, ook als er geen volgende wijziging komt.
       console.error("Firestore batch-schrijffout:", error);
       zetOpslagStatus(duidOpslagFout(error));
+    } finally {
+      bezig--;
     }
   };
+
+  const schrijfOverlaysNu = async (overlays: Overlays) => {
+    if (!auth.currentUser) return;
+    onbewaardeOverlays = overlays;
+    bezig++;
+    try {
+      await schrijfOverlaysDoc(overlays);
+      if (onbewaardeOverlays === overlays) onbewaardeOverlays = null;
+      zetOpslagStatus({ soort: "ok" });
+    } catch (error) {
+      console.error("Firestore overlays-schrijffout:", error);
+      zetOpslagStatus(duidOpslagFout(error));
+    } finally {
+      bezig--;
+    }
+  };
+
+  /** Alles wat nog openstaat meteen doorsturen (ook wat eerder mislukte). */
+  const bewaarAlles = async () => {
+    await Promise.all([
+      pendingOverlay || timer ? schrijfNu() : undefined,
+      onbewaardeOverlays ? schrijfOverlaysNu(onbewaardeOverlays) : undefined,
+    ]);
+  };
+
+  /**
+   * Een mislukte schrijfactie opnieuw proberen. Vroeger gebeurde dat pas bij de volgende
+   * wijziging — wie daarna niets meer aanpaste en het tabblad sloot, verloor ze. Niet zolang er
+   * nog een commit loopt: offline houdt Firestore die zelf vast tot de verbinding terug is.
+   */
+  const probeerOpnieuw = () => {
+    if (bezig > 0 || !auth.currentUser || !onbewaard()) return;
+    void bewaarAlles();
+  };
+
+  registreerOpslagBron({ onbewaard, bewaarAlles });
 
   // Best-effort: sluit je het tabblad of schakel je weg terwijl er nog een schrijfactie in de
   // wachtrij staat (de 600ms-debounce), stuur 'm dan meteen — anders haalt de timer het niet
@@ -256,6 +305,17 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden" && timer) void schrijfNu();
+      if (document.visibilityState === "visible") probeerOpnieuw(); // bv. na slaapstand
+    });
+    window.addEventListener("online", probeerOpnieuw);
+    window.setInterval(probeerOpnieuw, 30_000);
+    // Sluiten of herladen met onbewaard werk: de browser vraagt om bevestiging. (De tekst kiest
+    // de browser zelf; een eigen melding tonen mag niet meer.)
+    window.addEventListener("beforeunload", (e) => {
+      if (!onbewaard()) return;
+      void bewaarAlles();
+      e.preventDefault();
+      e.returnValue = "";
     });
   }
 
@@ -270,15 +330,8 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       return schrijfCurriculumDoc(data);
     },
 
-    async schrijfOverlays(overlays: Overlays): Promise<void> {
-      if (!auth.currentUser) return;
-      try {
-        await schrijfOverlaysDoc(overlays);
-        zetOpslagStatus({ soort: "ok" });
-      } catch (error) {
-        console.error("Firestore overlays-schrijffout:", error);
-        zetOpslagStatus(duidOpslagFout(error));
-      }
+    schrijfOverlays(overlays: Overlays): Promise<void> {
+      return schrijfOverlaysNu(overlays);
     },
 
     bewaar(store: PersistedStore): void {

@@ -8,8 +8,18 @@ service cloud.firestore {
     }
 
     // --- Helpers ------------------------------------------------------------------
+    // Maximale sessieduur: 12 uur na de laatste échte Google-login (`auth_time`, in seconden)
+    // weigert de database alles, ook als de app zelf niet afmeldt (oude versie, omzeilde timer,
+    // nooit gesloten tabblad). Een stil vernieuwd token verandert `auth_time` niet; enkel opnieuw
+    // aanmelden of bevestigen doet dat. Spiegelt `MAX_SESSIE_MS` in `src/lib/inactiviteit.ts`.
+    function sessieGeldig() {
+      return request.time
+        < timestamp.value(request.auth.token.auth_time * 1000) + duration.value(12, 'h');
+    }
+    // Elke andere controle (isVerified, heeftAccount, isBeheerder…) steunt hierop, dus de
+    // sessieduur geldt overal.
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && sessieGeldig();
     }
     function isVerified() {
       return isSignedIn() && request.auth.token.email_verified == true;

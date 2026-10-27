@@ -4,6 +4,7 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithPopup,
+  reauthenticateWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -114,6 +115,23 @@ export async function meldAanMetGoogle(): Promise<User | null> {
     console.error("Fout bij aanmelden met Google:", err);
     throw err;
   }
+}
+
+/**
+ * Bevestig de login opnieuw via de Google-pop-up, zonder af te melden (de app en onbewaard werk
+ * blijven staan). Dat zet een nieuwe `auth_time`, waarmee de maximale sessieduur in de
+ * Firestore-regels opnieuw begint. Het token wordt meteen vernieuwd, zodat de regels het zien.
+ */
+export async function bevestigAanmelding(): Promise<void> {
+  if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
+  await reauthenticateWithPopup(auth.currentUser, googleProvider);
+  await auth.currentUser.getIdToken(true);
+}
+
+/** Wanneer (ms) de gebruiker zich laatst écht aanmeldde — de `auth_time` die de regels zien. */
+export async function sessieBeginVan(gebruiker: User): Promise<number> {
+  const token = await gebruiker.getIdTokenResult();
+  return Date.parse(token.authTime);
 }
 
 /** Meld af van Firebase */

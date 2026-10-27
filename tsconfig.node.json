@@ -20,6 +20,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["vite.config.ts", "vitest.config.ts", "test"],
-  // Component-tests (.tsx) importeren app-code en horen bij tsconfig.app.json.
-  "exclude": ["test/**/*.tsx"]
+  // Tests met browser-API's (jsdom) importeren app-code en horen bij tsconfig.app.json.
+  "exclude": ["test/dom"]
 }

@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase } from "../lib/data";
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
-import { isAfgemeldWegensInactiviteit, zetAfgemeldWegensInactiviteit } from "../lib/inactiviteit";
+import { leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
 import { AutoAfmelden } from "./AutoAfmelden";
 import { LogoIcoon } from "./LogoIcoon";
 
@@ -77,12 +77,12 @@ function GoogleIcoon() {
 function Inloggen() {
   const [laden, setLaden] = useState(false);
   const [fout, setFout] = useState("");
-  const [wasInactief] = useState(isAfgemeldWegensInactiviteit);
+  const [afmeldReden] = useState(leesAfmeldReden);
 
   const aanmelden = async () => {
     setLaden(true);
     setFout("");
-    zetAfgemeldWegensInactiviteit(false);
+    zetAfmeldReden(null);
     try {
       await meldAanMetGoogle();
     } catch (err) {
@@ -99,9 +99,11 @@ function Inloggen() {
 
   return (
     <PoortScherm>
-      {wasInactief && (
+      {afmeldReden && (
         <p className="toegangspoort-melding">
-          Je werd automatisch afgemeld omdat je een tijdje niet actief was.
+          {afmeldReden === "sessie"
+            ? "Je sessie is verlopen. Meld je opnieuw aan om verder te werken."
+            : "Je werd automatisch afgemeld omdat je een tijdje niet actief was."}
         </p>
       )}
       <p className="toegangspoort-tekst">
