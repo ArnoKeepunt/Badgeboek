@@ -2,6 +2,8 @@ import { type ReactNode, useState } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase } from "../lib/data";
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
+import { isAfgemeldWegensInactiviteit, zetAfgemeldWegensInactiviteit } from "../lib/inactiviteit";
+import { AutoAfmelden } from "./AutoAfmelden";
 import { LogoIcoon } from "./LogoIcoon";
 
 /**
@@ -29,7 +31,12 @@ function FirebasePoort({ children }: { children: ReactNode }) {
     return <GeenToegang gebruiker={status.gebruiker} reden="domein" />;
   }
   if (!heeftToegang(status)) return <GeenToegang gebruiker={status.gebruiker} reden="account" />;
-  return <>{children}</>;
+  return (
+    <>
+      <AutoAfmelden gebruiker={status.gebruiker} />
+      {children}
+    </>
+  );
 }
 
 function PoortScherm({ children }: { children: ReactNode }) {
@@ -70,10 +77,12 @@ function GoogleIcoon() {
 function Inloggen() {
   const [laden, setLaden] = useState(false);
   const [fout, setFout] = useState("");
+  const [wasInactief] = useState(isAfgemeldWegensInactiviteit);
 
   const aanmelden = async () => {
     setLaden(true);
     setFout("");
+    zetAfgemeldWegensInactiviteit(false);
     try {
       await meldAanMetGoogle();
     } catch (err) {
@@ -90,6 +99,11 @@ function Inloggen() {
 
   return (
     <PoortScherm>
+      {wasInactief && (
+        <p className="toegangspoort-melding">
+          Je werd automatisch afgemeld omdat je een tijdje niet actief was.
+        </p>
+      )}
       <p className="toegangspoort-tekst">
         Meld je aan met je Keerpunt-account (<code>@keerpuntscholen.be</code>) om verder te gaan.
       </p>

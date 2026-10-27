@@ -1673,6 +1673,37 @@ th {
   gap: 8px;
 }
 
+/* Waarom je terug op het inlogscherm staat (automatisch afgemeld na inactiviteit). */
+.toegangspoort-melding {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* "Ben je er nog?"-melding vóór de automatische afmelding. */
+.auto-afmelden-titel {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.auto-afmelden-tekst {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.auto-afmelden-knoppen {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Rustiger variant: wel duidelijk een knop, maar zonder de volle accentkleur. */
 .knop-secundair {
   border: 1px solid var(--border);

@@ -4,9 +4,11 @@ import { defineConfig } from "vitest/config";
 // de emulator. Start via `npm run test:rules` — dat wikkelt `firebase emulators:exec` errond zodat
 // de emulator automatisch op- en afgaat. `npm test` verwacht een al draaiende emulator.
 export default defineConfig({
+  // Zelfde JSX-omzetting als de app (via @vitejs/plugin-react): geen `import React` nodig.
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.{ts,tsx}"],
     // De regels-tests delen één emulator; serieel draaien voorkomt dat parallelle bestanden
     // elkaars `clearFirestore()` in de wielen rijden.
     fileParallelism: false,
