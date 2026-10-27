@@ -51,6 +51,7 @@ const abonneer = (cb: () => void) => {
   return () => luisteraars.delete(cb);
 };
 const lees = () => status;
+export const leesOpslagStatus = lees;
 
 /** Hook: de huidige opslagstatus (voor de foutbalk in `Layout`). */
 export function useOpslagStatus(): OpslagStatus {

@@ -30,7 +30,12 @@ vi.mock("../../src/lib/data/firestoreLayout", async (origineel) => ({
 
 import { firebasePersistentie } from "../../src/lib/data/firebasePersistentie";
 import type { BadgeboekPersistentie, Overlays, PersistedStore } from "../../src/lib/data/persistentie";
-import { bewaarAlles, heeftOnbewaardeWijzigingen } from "../../src/lib/opslagStatus";
+import {
+  bewaarAlles,
+  heeftOnbewaardeWijzigingen,
+  leesOpslagStatus,
+  zetOpslagStatus,
+} from "../../src/lib/opslagStatus";
 import { HUIDIG_SCHOOLJAAR } from "../../src/lib/schooljaar";
 
 let opslag: BadgeboekPersistentie;
@@ -56,6 +61,7 @@ beforeEach(() => {
   fb.schrijfOverlays.mockReset().mockResolvedValue(undefined);
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   vi.spyOn(console, "error").mockImplementation(() => undefined);
+  zetOpslagStatus({ soort: "ok" });
   opslag = firebasePersistentie();
 });
 
@@ -147,5 +153,49 @@ describe("opslag: niets stil verliezen", () => {
     await wacht(30_000);
     expect(fb.schrijfOverlays).toHaveBeenCalledTimes(2);
     expect(heeftOnbewaardeWijzigingen()).toBe(false);
+  });
+});
+
+describe("melding als de database niet bevestigt", () => {
+  /** Een schrijfactie die blijft hangen (offline) tot de test ze laat slagen. */
+  const hangend = () => {
+    let klaar!: () => void;
+    fb.schrijfDocMap.mockImplementationOnce(() => new Promise<void>((r) => (klaar = r)));
+    return () => klaar();
+  };
+
+  it("een weigering toont meteen de foutbalk", async () => {
+    fb.schrijfDocMap.mockImplementationOnce(() => Promise.reject(new Error("permission-denied")));
+    opslag.bewaar(store("Anna"));
+    await wacht(600);
+    expect(leesOpslagStatus()).toMatchObject({ soort: "fout", reden: "rechten" });
+  });
+
+  it("een schrijfactie die blijft hangen, toont na 10 seconden toch een melding", async () => {
+    const verbindingTerug = hangend();
+    opslag.bewaar(store("Anna"));
+    await wacht(600 + 9_000);
+    expect(leesOpslagStatus().soort).toBe("ok"); // even trager is nog geen probleem
+
+    await wacht(1_000);
+    expect(leesOpslagStatus()).toMatchObject({ soort: "fout", reden: "verbinding" });
+
+    verbindingTerug();
+    await wacht(0);
+    expect(leesOpslagStatus().soort).toBe("ok");
+    expect(heeftOnbewaardeWijzigingen()).toBe(false);
+  });
+
+  it("een snelle schrijfactie laat geen melding achter", async () => {
+    opslag.bewaar(store("Anna"));
+    await wacht(600 + 60_000);
+    expect(leesOpslagStatus().soort).toBe("ok");
+  });
+
+  it("ook hangende overlays (doelen/rubrieken) geven een melding", async () => {
+    fb.schrijfOverlays.mockImplementationOnce(() => new Promise(() => undefined));
+    void opslag.schrijfOverlays!({ doelWijzigingen: {} } as unknown as Overlays);
+    await wacht(10_000);
+    expect(leesOpslagStatus()).toMatchObject({ soort: "fout", reden: "verbinding" });
   });
 });

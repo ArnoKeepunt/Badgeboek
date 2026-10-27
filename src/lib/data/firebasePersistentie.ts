@@ -72,6 +72,33 @@ const magBewarenSchrijven = (pad: string, actiefSchooljaar: string): boolean => 
     : BEHEERD.test(pad);
 };
 
+/**
+ * Na hoeveel tijd een schrijfactie zonder bevestiging van de server als "niet bewaard" geldt.
+ * Offline geeft Firestore geen fout: de schrijfactie wacht gewoon tot de verbinding terug is.
+ * Zonder deze grens zou de foutbalk dan nooit verschijnen.
+ */
+export const BEVESTIGING_TIMEOUT_MS = 10_000;
+
+/** Wacht op een schrijfactie; blijft de bevestiging uit, dan toont de foutbalk dat al. */
+async function metWaakhond<T>(schrijfactie: Promise<T>): Promise<T> {
+  const waakhond = setTimeout(
+    () =>
+      zetOpslagStatus({
+        soort: "fout",
+        reden: "verbinding",
+        melding:
+          "De database heeft je laatste wijziging nog niet bevestigd (geen verbinding?). " +
+          "Ze wordt verstuurd zodra de verbinding terug is — sluit het Badgeboek nog niet.",
+      }),
+    BEVESTIGING_TIMEOUT_MS,
+  );
+  try {
+    return await schrijfactie;
+  } finally {
+    clearTimeout(waakhond);
+  }
+}
+
 /** Collecties die enkel de beheerder mag schrijven, maar die wel in `bewaar()` meerijden. */
 const BEHEERDER_ONLY = /^(vestigingen|rubrieken)\//;
 
@@ -266,7 +293,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     });
     bezig++;
     try {
-      await schrijfDocMap(schrijf, verwijder);
+      await metWaakhond(schrijfDocMap(schrijf, verwijder));
       wisBackup("docs", backupNr);
       vorigeDocs = volledigNu;
       // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
@@ -290,7 +317,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     const backupNr = zetBackup("overlays", { email: auth.currentUser.email ?? "", overlays });
     bezig++;
     try {
-      await schrijfOverlaysDoc(overlays);
+      await metWaakhond(schrijfOverlaysDoc(overlays));
       wisBackup("overlays", backupNr);
       if (onbewaardeOverlays === overlays) onbewaardeOverlays = null;
       zetOpslagStatus({ soort: "ok" });
