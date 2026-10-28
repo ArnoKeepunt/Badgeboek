@@ -3,6 +3,7 @@ import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase, sessieBeginVan } from "../lib/data";
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
 import { MAX_SESSIE_MS, leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
+import { useGesynct } from "../lib/opslagStatus";
 import { AutoAfmelden } from "./AutoAfmelden";
 import { LogoIcoon } from "./LogoIcoon";
 
@@ -54,6 +55,7 @@ function useSessieVerlopen(gebruiker: User | null): boolean | null {
 function FirebasePoort({ children }: { children: ReactNode }) {
   const status = useAuthStatus();
   const sessieVerlopen = useSessieVerlopen(status.gebruiker);
+  const gesynct = useGesynct();
 
   // Een verlopen sessie wordt net afgemeld: niets tonen tot het inlogscherm verschijnt.
   if (status.laden || sessieVerlopen !== false) {
@@ -71,8 +73,42 @@ function FirebasePoort({ children }: { children: ReactNode }) {
   return (
     <>
       <AutoAfmelden gebruiker={status.gebruiker} />
-      {children}
+      {gesynct ? children : <GegevensLaden />}
     </>
+  );
+}
+
+/** Na zoveel tijd zonder eerste snapshot zeggen we dat er iets mis lijkt. */
+const LADEN_TRAAG_MS = 15_000;
+
+/**
+ * Tot de eerste volledige snapshot binnen is, blijft de app dicht: de lokale cache kan dagen
+ * oud zijn, en wie daarop bewerkt, overschrijft bij het bewaren het werk van collega's.
+ */
+function GegevensLaden() {
+  const [traag, setTraag] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setTraag(true), LADEN_TRAAG_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <PoortScherm>
+      <p className="toegangspoort-tekst">Gegevens laden…</p>
+      {traag && (
+        <>
+          <p className="toegangspoort-fout">
+            Het laden duurt ongewoon lang. Controleer je verbinding en probeer opnieuw.
+          </p>
+          <button
+            type="button"
+            className="knop-primair toegangspoort-knop"
+            onClick={() => window.location.reload()}
+          >
+            Opnieuw laden
+          </button>
+        </>
+      )}
+    </PoortScherm>
   );
 }
 

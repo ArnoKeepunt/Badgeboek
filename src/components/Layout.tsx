@@ -386,8 +386,9 @@ export function Layout() {
                 {herstel.hersteld > 0 &&
                   "Wijzigingen van eerder die nog niet bewaard waren, zijn alsnog bewaard. "}
                 {herstel.overgeslagen > 0 &&
-                  "Een deel van je eerdere invoer is niet hersteld, omdat iemand anders hetzelfde " +
-                    "intussen aanpaste. Kijk je laatste invoer even na."}
+                  "Een deel van je eerdere invoer is niet hersteld, omdat het intussen ook elders " +
+                    "gewijzigd werd of van een oudere versie van het Badgeboek komt. Kijk je " +
+                    "laatste invoer even na."}
               </span>
               <button
                 type="button"

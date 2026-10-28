@@ -9,10 +9,31 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const fb = vi.hoisted(() => ({
-  auth: { currentUser: { email: "mentor@keerpuntscholen.be", uid: "u1" } as object | null },
-  schrijfDocMap: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  schrijfOverlays: vi.fn<(...args: unknown[]) => Promise<void>>(),
+const fb = vi.hoisted(() => {
+  const auth = {
+    currentUser: { email: "mentor@keerpuntscholen.be", uid: "u1" } as object | null,
+    onAuthStateChanged: (cb: (u: object | null) => void) => {
+      cb(auth.currentUser);
+      return () => undefined;
+    },
+  };
+  return {
+    auth,
+    schrijfDocMap: vi.fn<(...args: unknown[]) => Promise<void>>(),
+    schrijfOverlays: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  };
+});
+
+// Firestore-luisteraars: elke collectie levert meteen een (lege) eerste snapshot.
+vi.mock("firebase/firestore", () => ({
+  collection: () => ({}),
+  collectionGroup: () => ({}),
+  query: (ref: object) => ref,
+  where: () => null,
+  onSnapshot: (_ref: object, volgende: (snap: { forEach: () => void }) => void) => {
+    volgende({ forEach: () => undefined });
+    return () => undefined;
+  },
 }));
 
 vi.mock("../../src/lib/data/firebaseApp", () => ({
@@ -28,17 +49,20 @@ vi.mock("../../src/lib/data/firestoreLayout", async (origineel) => ({
   storeNaarDocs: (store: { docs: Record<string, object> }) => new Map(Object.entries(store.docs)),
 }));
 
+import { zetFirebaseBereik } from "../../src/lib/data/firebaseBereik";
 import { firebasePersistentie } from "../../src/lib/data/firebasePersistentie";
 import type { BadgeboekPersistentie, Overlays, PersistedStore } from "../../src/lib/data/persistentie";
 import {
   bewaarAlles,
   heeftOnbewaardeWijzigingen,
+  leesGesynct,
   leesOpslagStatus,
   zetOpslagStatus,
 } from "../../src/lib/opslagStatus";
 import { HUIDIG_SCHOOLJAAR } from "../../src/lib/schooljaar";
 
 let opslag: BadgeboekPersistentie;
+let stopAbonnement: () => void;
 
 /** Een store met één gewijzigde leerling (genoeg om een schrijfactie uit te lokken). */
 const store = (naam: string) =>
@@ -54,7 +78,7 @@ const sluitTabblad = () => {
   return e.defaultPrevented; // true = de browser vraagt "Pagina verlaten?"
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers();
   fb.auth.currentUser = { email: "mentor@keerpuntscholen.be", uid: "u1" };
   fb.schrijfDocMap.mockReset().mockResolvedValue(undefined);
@@ -62,7 +86,11 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   zetOpslagStatus({ soort: "ok" });
+  zetFirebaseBereik({ alles: true, vestigingen: [], beheerder: false });
   opslag = firebasePersistentie();
+  // Zoals in de app: eerst de eerste snapshot, pas dan wijzigingen.
+  stopAbonnement = opslag.abonneer!(() => undefined);
+  await wacht(60);
 });
 
 afterEach(async () => {
@@ -70,6 +98,7 @@ afterEach(async () => {
   fb.schrijfDocMap.mockResolvedValue(undefined);
   fb.schrijfOverlays.mockResolvedValue(undefined);
   await bewaarAlles();
+  stopAbonnement();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -197,5 +226,48 @@ describe("melding als de database niet bevestigt", () => {
     void opslag.schrijfOverlays!({ doelWijzigingen: {} } as unknown as Overlays);
     await wacht(10_000);
     expect(leesOpslagStatus()).toMatchObject({ soort: "fout", reden: "verbinding" });
+  });
+});
+
+describe("nooit schrijven op de lokale cache", () => {
+  it("een wijziging van vóór de eerste snapshot vertrekt nooit, ook niet erna", async () => {
+    const vers = firebasePersistentie(); // nog niet geabonneerd: enkel de cache is bekend
+    vers.bewaar(store("Uit een oude cache"));
+    await wacht(600);
+    expect(fb.schrijfDocMap).not.toHaveBeenCalled();
+
+    const stop = vers.abonneer!(() => undefined);
+    await wacht(60 + 30_000);
+    expect(fb.schrijfDocMap).not.toHaveBeenCalled();
+    expect(leesGesynct()).toBe(true);
+    stop();
+  });
+});
+
+describe("de foutbalk verdwijnt zodra alles bewaard is", () => {
+  it("ook als de herpoging niets meer te doen heeft", async () => {
+    fb.schrijfDocMap.mockImplementationOnce(() => Promise.reject(new Error("permission-denied")));
+    opslag.bewaar(store("Anna"));
+    await wacht(600);
+    expect(leesOpslagStatus().soort).toBe("fout");
+
+    // De wijziging wordt teruggedraaid: er valt niets meer te schrijven.
+    opslag.bewaar({ schooljaar: HUIDIG_SCHOOLJAAR, docs: {} } as unknown as PersistedStore);
+    await wacht(600);
+    expect(heeftOnbewaardeWijzigingen()).toBe(false);
+    expect(leesOpslagStatus().soort).toBe("ok");
+  });
+
+  it("niet zolang er nog iets anders openstaat", async () => {
+    fb.schrijfOverlays.mockImplementationOnce(geenVerbinding);
+    await opslag.schrijfOverlays!({} as Overlays);
+    expect(leesOpslagStatus().soort).toBe("fout");
+
+    opslag.bewaar(store("Anna")); // lukt wel, maar de overlays staan er nog niet
+    await wacht(600);
+    expect(leesOpslagStatus().soort).toBe("fout");
+
+    await wacht(30_000); // de herpoging van de overlays lukt
+    expect(leesOpslagStatus().soort).toBe("ok");
   });
 });

@@ -509,7 +509,7 @@ function stabielJson(x: unknown): string {
   return JSON.stringify(x) ?? "null";
 }
 
-const zelfde = (a: unknown, b: unknown) => stabielJson(a) === stabielJson(b);
+export const zelfde = (a: unknown, b: unknown) => stabielJson(a) === stabielJson(b);
 
 /** De documenten die veranderd/nieuw zijn, en de paden die verdwenen. */
 export function diffDocs(oud: DocMap, nieuw: DocMap): { schrijf: DocMap; verwijder: string[] } {

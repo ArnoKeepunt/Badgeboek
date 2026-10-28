@@ -18,7 +18,14 @@ import {
   schrijfOverlays as schrijfOverlaysDoc,
   schrijfDocMap,
 } from "./firebaseApp";
-import { duidOpslagFout, meldHerstel, registreerOpslagBron, zetOpslagStatus } from "../opslagStatus";
+import {
+  type OpslagStatus,
+  duidOpslagFout,
+  meldHerstel,
+  registreerOpslagBron,
+  zetGesynct,
+  zetOpslagStatus,
+} from "../opslagStatus";
 import { verwijderSleutel, wezen, wisBackup, zetBackup } from "./onbewaardBackup";
 import {
   type DocData,
@@ -27,6 +34,7 @@ import {
   docsNaarStore,
   normaliseerRapportDoc,
   storeNaarDocs,
+  zelfde,
 } from "./firestoreLayout";
 import type { CurriculumRuw } from "../curriculum";
 import type { BadgeboekPersistentie, Overlays, PersistedStore, RauweStore } from "./persistentie";
@@ -228,12 +236,23 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   let overlaysEmail: string | null = null;
   /** Lopende Firestore-commits. Offline blijft een commit hangen tot de verbinding terug is. */
   let bezig = 0;
+  /** Een back-up uit een vorige sessie die (nog) niet hersteld raakte — houdt de foutbalk open. */
+  let herstelFout: OpslagStatus | null = null;
 
   /**
    * Staat er iets dat de server nog niet bevestigde? `pendingOverlay` blijft staan tot een
    * schrijfactie slaagt, dus dekt ook mislukte en (offline) hangende schrijfacties.
    */
   const onbewaard = () => timer !== null || pendingOverlay !== null || onbewaardeOverlays !== null;
+
+  /**
+   * De foutbalk enkel sluiten als er echt niets meer openstaat. Eén geslaagde schrijfactie
+   * betekent niet dat alles bewaard is (bv. de overlays of een back-up van eerder kunnen nog
+   * falen), en omgekeerd moet de balk ook verdwijnen als een herpoging niets meer te doen heeft.
+   */
+  const meldOkAlsAllesBewaard = () => {
+    if (!onbewaard() && !herstelFout) zetOpslagStatus({ soort: "ok" });
+  };
 
   /** Enkel de door `bewaar()` beheerde paden voor het huidige schooljaar (zie `magBewarenSchrijven`). */
   const beheerd = (m: DocMap): DocMap =>
@@ -254,9 +273,14 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       pendingOverlay = null; // van een ander account — zie `pendingEmail`
       return;
     }
+    // Nooit schrijven zonder serverstand: dan valt er niets te diffen en zou de hele (mogelijk
+    // dagen oude) lokale cache vertrekken — over het werk van collega's heen, en met bv. een
+    // afgewerkt rapport erin dat de regels een mentor weigeren (→ de hele batch geweigerd). De
+    // toegangspoort houdt de app daarom dicht tot de eerste snapshot binnen is (`zetGesynct`).
+    if (!vorigeDocs) return;
     // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar — anders
     // zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
-    if (vorigeDocs && vorigeDocsSchooljaar !== actiefSchooljaar) return;
+    if (vorigeDocsSchooljaar !== actiefSchooljaar) return;
     // Vastleggen welke overlay dit specifiek is: als er ondertussen een NIEUWERE `bewaar()`-
     // aanroep gebeurde (die `pendingOverlay` alweer verving), mag succes hier die nieuwere
     // overlay niet opheffen — die heeft zijn eigen (nog lopende) schrijfactie nodig.
@@ -267,10 +291,8 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     // vorige schooljaar of `instellingen/overlays` (aparte schrijfweg) als "verdwenen" en
     // wist/overschrijft het.
     const nu = beheerd(volledigNu);
-    const vorigeBeheerd = vorigeDocs ? beheerd(vorigeDocs) : null;
-    let { schrijf, verwijder } = vorigeBeheerd
-      ? diffDocs(vorigeBeheerd, nu)
-      : { schrijf: nu, verwijder: [] };
+    const vorigeBeheerd = beheerd(vorigeDocs);
+    let { schrijf, verwijder } = diffDocs(vorigeBeheerd, nu);
     if (!huidigBereik().beheerder) {
       const gefilterd = zonderVerbodenVoorNietBeheerder(schrijf, verwijder, vorigeBeheerd);
       ({ schrijf, verwijder } = gefilterd);
@@ -283,13 +305,19 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     }
     if (schrijf.size === 0 && verwijder.length === 0) {
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
+      meldOkAlsAllesBewaard(); // bv. een herpoging na een fout die intussen niets meer te doen heeft
       return;
     }
-    // Eerst een back-up in de browser: overleeft herladen, sluiten of een verlopen sessie.
+    // Eerst een back-up in de browser: overleeft herladen, sluiten of een verlopen sessie. Met de
+    // serverstand van vóór deze schrijfactie (`voor`): enkel waar die nog klopt, mag het herstel
+    // later schrijven.
+    const voor: Record<string, DocData | null> = {};
+    for (const pad of [...schrijf.keys(), ...verwijder]) voor[pad] = vorigeBeheerd.get(pad) ?? null;
     const backupNr = zetBackup("docs", {
       email: auth.currentUser.email ?? "",
       schrijf: [...schrijf],
       verwijder,
+      voor,
     });
     bezig++;
     try {
@@ -298,7 +326,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       vorigeDocs = volledigNu;
       // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
       if (pendingOverlay === dezeOverlay) pendingOverlay = null;
-      zetOpslagStatus({ soort: "ok" });
+      meldOkAlsAllesBewaard();
     } catch (error) {
       // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont de
       // fout; de wijziging blijft lokaal staan (en overlayed, zie hierboven) en `probeerOpnieuw`
@@ -320,7 +348,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       await metWaakhond(schrijfOverlaysDoc(overlays));
       wisBackup("overlays", backupNr);
       if (onbewaardeOverlays === overlays) onbewaardeOverlays = null;
-      zetOpslagStatus({ soort: "ok" });
+      meldOkAlsAllesBewaard();
     } catch (error) {
       console.error("Firestore overlays-schrijffout:", error);
       zetOpslagStatus(duidOpslagFout(error));
@@ -355,44 +383,68 @@ export function firebasePersistentie(): BadgeboekPersistentie {
 
   /**
    * Back-ups uit een vorige sessie van dit account alsnog versturen (na herladen, een crash of
-   * opnieuw aanmelden na een verlopen sessie). Een document dat iemand anders ná de mislukte
-   * schrijfactie nog aanpaste, wordt overgeslagen: diens werk gaat voor. Lukt het niet (geen
-   * verbinding, sessie nog niet geldig), dan blijft de back-up staan voor een volgende poging.
+   * opnieuw aanmelden na een verlopen sessie). Enkel documenten die op de server nog exact zo
+   * staan als vlak vóór de mislukte schrijfactie (`voor`) worden geschreven: wat iemand anders
+   * intussen aanpaste — ook vóór de mislukte poging, als dit tabblad dat nog niet gezien had —
+   * gaat voor. Back-ups zonder `voor` (van een oudere versie, mogelijk de hele cache) worden niet
+   * meer verstuurd. Lukt het niet (geen verbinding, sessie nog niet geldig), dan blijft de
+   * back-up staan voor een volgende poging en toont de foutbalk dat.
    */
   const herstelBackups = async () => {
     const email = auth.currentUser?.email;
     if (herstelBezig || !email || herstelPogingen >= 5) return;
     const lijst = wezen(email);
-    if (lijst.length === 0) return;
+    if (lijst.length === 0) {
+      if (herstelFout) {
+        herstelFout = null;
+        meldOkAlsAllesBewaard();
+      }
+      return;
+    }
     herstelBezig = true;
     herstelPogingen++;
     let hersteld = 0;
     let overgeslagen = 0;
+    /** De huidige serverstand van één document, in dezelfde vorm als de snapshots (zonder meta). */
+    const huidig = async (pad: string): Promise<DocData | null> => {
+      const d = await leesDoc(...pad.split("/"));
+      if (!d) return null;
+      const data = zonderMeta(d);
+      return pad.startsWith("rapporten/") ? normaliseerRapportDoc(data) : data;
+    };
     try {
       for (const { sleutel, soort, backup } of lijst) {
-        const serverStand = async (pad: string) => {
-          const d = await leesDoc(...pad.split("/"));
-          const gewijzigd = Date.parse(String(d?.updatedAt ?? ""));
-          return { bestaat: d !== null, laterGewijzigd: gewijzigd > backup.tijd };
-        };
         if (soort === "overlays" && backup.overlays) {
-          if ((await serverStand("instellingen/overlays")).laterGewijzigd) overgeslagen++;
+          const d = await leesDoc("instellingen", "overlays");
+          if (Date.parse(String(d?.updatedAt ?? "")) > backup.tijd) overgeslagen++;
           else {
             await schrijfOverlaysDoc(backup.overlays);
             hersteld++;
           }
-        } else if (soort === "docs") {
-          const schrijf: DocMap = new Map();
-          const verwijder: string[] = [];
+        } else if (soort === "docs" && !backup.voor) {
+          overgeslagen += (backup.schrijf?.length ?? 0) + (backup.verwijder?.length ?? 0);
+        } else if (soort === "docs" && backup.voor) {
+          const server: DocMap = new Map();
+          let schrijf: DocMap = new Map();
+          let verwijder: string[] = [];
           for (const [pad, data] of backup.schrijf ?? []) {
-            if ((await serverStand(pad)).laterGewijzigd) overgeslagen++;
-            else schrijf.set(pad, data);
+            const nu = await huidig(pad);
+            if (nu) server.set(pad, nu);
+            if (zelfde(nu, data)) continue; // staat er al
+            if (zelfde(nu, backup.voor[pad] ?? null)) schrijf.set(pad, data);
+            else overgeslagen++;
           }
           for (const pad of backup.verwijder ?? []) {
-            const stand = await serverStand(pad);
-            if (!stand.bestaat) continue;
-            if (stand.laterGewijzigd) overgeslagen++;
-            else verwijder.push(pad);
+            const nu = await huidig(pad);
+            if (!nu) continue; // al weg
+            server.set(pad, nu);
+            if (zelfde(nu, backup.voor[pad] ?? null)) verwijder.push(pad);
+            else overgeslagen++;
+          }
+          if (!huidigBereik().beheerder) {
+            const gefilterd = zonderVerbodenVoorNietBeheerder(schrijf, verwijder, server);
+            ({ schrijf, verwijder } = gefilterd);
+            overgeslagen += gefilterd.overgeslagen.length;
           }
           if (schrijf.size > 0 || verwijder.length > 0) {
             await schrijfDocMap(schrijf, verwijder);
@@ -401,8 +453,12 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         }
         verwijderSleutel(sleutel);
       }
+      herstelFout = null;
+      meldOkAlsAllesBewaard();
     } catch (error) {
       console.warn("Onbewaarde wijzigingen van eerder herstellen lukte (nog) niet:", error);
+      herstelFout = duidOpslagFout(error);
+      zetOpslagStatus(herstelFout);
     } finally {
       herstelBezig = false;
     }
@@ -498,6 +554,16 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         for (const frag of Object.values(bron)) {
           if (frag) for (const [pad, data] of frag) docs.set(pad, data);
         }
+        if (vorigeDocs === null && (timer || pendingOverlay)) {
+          // Een schrijfactie van vóór de eerste snapshot steunt op de lokale cache, niet op de
+          // database — die mag nooit vertrekken (zie `schrijfNu`). De app toont vanaf nu de
+          // serverstand; de UI liet intussen geen bewerkingen toe (toegangspoort).
+          console.warn("Firestore: wijziging van vóór de eerste snapshot niet verstuurd.");
+          if (timer) clearTimeout(timer);
+          timer = null;
+          pendingOverlay = null;
+        }
+        zetGesynct(true);
         if (!vestigingGebackfild && huidigBereik().alles && auth.currentUser) {
           vestigingGebackfild = true;
           void backfillEvalVestiging(docs);
@@ -680,7 +746,14 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         if (user) {
           startAlles();
           void herstelBackups(); // bv. na opnieuw aanmelden na een verlopen sessie
-        } else stopAlles();
+        } else {
+          stopAlles();
+          // Na het afmelden: de volgende login wacht opnieuw op de eerste snapshot, en een balk
+          // van het vorige account blijft niet hangen.
+          zetGesynct(false);
+          herstelFout = null;
+          zetOpslagStatus({ soort: "ok" });
+        }
       });
       // Herabonneren zodra het vestiging-bereik bekend wordt of wijzigt (login, rolwissel).
       const unsubBereik = opBereikWissel(() => {

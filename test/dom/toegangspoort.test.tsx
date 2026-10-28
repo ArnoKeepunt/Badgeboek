@@ -31,6 +31,7 @@ vi.mock("../../src/lib/firebaseAuth", () => ({
 
 import { Toegangspoort } from "../../src/components/Toegangspoort";
 import { MAX_SESSIE_MS, leesAfmeldReden, zetAfmeldReden } from "../../src/lib/inactiviteit";
+import { zetGesynct } from "../../src/lib/opslagStatus";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -59,6 +60,7 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
   m.meldAf.mockReset();
   zetAfmeldReden(null);
+  zetGesynct(false);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -91,11 +93,16 @@ describe("toegangspoort en sessieduur", () => {
     expect(container.textContent).toContain("nog geen toegang");
   });
 
-  it("geldige sessie met account: de app verschijnt", async () => {
+  it("geldige sessie met account: de app verschijnt zodra de gegevens binnen zijn", async () => {
     m.sessieBegin.mockResolvedValue(NU - 60_000);
     m.status = { gebruiker, persoon: { actief: true }, laden: false };
 
+    // Eerst enkel de (mogelijk oude) lokale cache: nog niets tonen om op te bewerken.
     await toon();
+    expect(container.textContent).toContain("Gegevens laden");
+    expect(container.textContent).not.toContain("de app");
+
+    await act(async () => zetGesynct(true));
     expect(container.textContent).toContain("de app");
   });
 

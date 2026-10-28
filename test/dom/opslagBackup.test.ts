@@ -9,12 +9,43 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const fb = vi.hoisted(() => ({
-  auth: { currentUser: null as { email: string; uid: string } | null },
-  schrijfDocMap: vi.fn<(schrijf: Map<string, object>, verwijder?: string[]) => Promise<void>>(),
-  schrijfOverlays: vi.fn<(o: object) => Promise<void>>(),
-  /** De serverstand per pad, zoals `leesDoc` die teruggeeft. */
-  server: new Map<string, Record<string, unknown>>(),
+const fb = vi.hoisted(() => {
+  const auth = {
+    currentUser: null as { email: string; uid: string } | null,
+    onAuthStateChanged: (cb: (u: object | null) => void) => {
+      cb(auth.currentUser);
+      return () => undefined;
+    },
+  };
+  return {
+    auth,
+    schrijfDocMap: vi.fn<(schrijf: Map<string, object>, verwijder?: string[]) => Promise<void>>(),
+    schrijfOverlays: vi.fn<(o: object) => Promise<void>>(),
+    /** De serverstand per pad, zoals `leesDoc` en de eerste snapshot die teruggeven. */
+    server: new Map<string, Record<string, unknown>>(),
+  };
+});
+
+// Firestore-luisteraars: elke collectie levert meteen een eerste snapshot uit `fb.server`.
+vi.mock("firebase/firestore", () => ({
+  collection: (_db: object, ...pad: string[]) => ({ pad: pad.join("/") }),
+  collectionGroup: () => ({ pad: null }),
+  query: (ref: object) => ref,
+  where: () => null,
+  onSnapshot: (
+    ref: { pad: string | null },
+    volgende: (snap: { forEach: (fn: (d: object) => void) => void }) => void,
+  ) => {
+    volgende({
+      forEach: (fn) => {
+        for (const [pad, data] of fb.server) {
+          const i = pad.lastIndexOf("/");
+          if (pad.slice(0, i) === ref.pad) fn({ id: pad.slice(i + 1), data: () => data });
+        }
+      },
+    });
+    return () => undefined;
+  },
 }));
 
 vi.mock("../../src/lib/data/firebaseApp", () => ({
@@ -55,14 +86,20 @@ const backups = () => [...opslagData.keys()].filter((k) => k.includes(":onbewaar
 
 /**
  * Een nieuwe paginalading: verse modules (nieuwe tabblad-id, leeg geheugen). De timers van de
- * vorige pagina stoppen, zoals bij echt herladen — localStorage blijft.
+ * vorige pagina stoppen, zoals bij echt herladen — localStorage blijft. Zoals in de app komt
+ * eerst de eerste snapshot binnen (en start het herstel), pas dan kan er iets gewijzigd worden.
  */
-async function laadPagina() {
+async function laadPagina({ beheerder = false } = {}) {
   vi.clearAllTimers();
   vi.resetModules();
   const { firebasePersistentie } = await import("../../src/lib/data/firebasePersistentie");
+  const { zetFirebaseBereik } = await import("../../src/lib/data/firebaseBereik");
   const status = await import("../../src/lib/opslagStatus");
-  return { opslag: firebasePersistentie(), status };
+  zetFirebaseBereik({ alles: true, vestigingen: [], beheerder });
+  const opslag = firebasePersistentie();
+  opslag.abonneer!(() => undefined);
+  await wacht(60);
+  return { opslag, status };
 }
 
 const store = (naam: string) =>
@@ -136,7 +173,6 @@ describe("back-up van onbewaarde wijzigingen", () => {
 
     fb.schrijfDocMap.mockReset().mockResolvedValue(undefined);
     const { status } = await laadPagina();
-    expect(status.leesHerstelMelding()).toBeNull();
     await wacht(30_000);
     expect(status.leesHerstelMelding()).toEqual({ hersteld: 1, overgeslagen: 0 });
   });
@@ -176,7 +212,7 @@ describe("back-up van onbewaarde wijzigingen", () => {
     expect(status.leesHerstelMelding()).toEqual({ hersteld: 0, overgeslagen: 1 });
   });
 
-  it("schrijft wel als de server ouder is dan de mislukte poging", async () => {
+  it("schrijft wel als de server nog staat zoals vóór de mislukte poging", async () => {
     fb.server.set(PAD, { naam: "Oud", updatedAt: new Date(Date.now() - 60_000).toISOString() });
     fb.schrijfDocMap.mockImplementation(geenVerbinding);
     (await laadPagina()).opslag.bewaar(store("Anna"));
@@ -245,5 +281,83 @@ describe("back-up van onbewaarde wijzigingen", () => {
     await wacht(30_000);
     expect(fb.schrijfOverlays).toHaveBeenCalledWith({ doelWijzigingen: { d1: {} } });
     expect(backups()).toHaveLength(0);
+  });
+
+  it("overschrijft ook geen werk van vóór de mislukte poging dat dit tabblad nog niet zag", async () => {
+    fb.server.set(PAD, { naam: "Oud" });
+    fb.schrijfDocMap.mockImplementation(geenVerbinding);
+    (await laadPagina()).opslag.bewaar(store("Anna"));
+    await wacht(600);
+
+    // Een collega bewaarde net vóór onze poging; die snapshot was hier nog niet binnen.
+    fb.server.set(PAD, {
+      naam: "Collega",
+      updatedAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    fb.schrijfDocMap.mockReset().mockResolvedValue(undefined);
+    const { status } = await laadPagina();
+    await wacht(30_000);
+
+    expect(fb.schrijfDocMap).not.toHaveBeenCalled();
+    expect(status.leesHerstelMelding()).toEqual({ hersteld: 0, overgeslagen: 1 });
+  });
+
+  it("back-ups van een oudere versie (zonder serverstand) worden niet meer verstuurd", async () => {
+    // Zo zag een back-up eruit vóór 28/10 — mogelijk de volledige, oude cache.
+    opslagData.set(
+      "keerpunt-badgeboek:onbewaard:docs:oud-tabblad",
+      JSON.stringify({
+        email: MENTOR.email,
+        tijd: Date.now() - 60_000,
+        nr: 1,
+        schrijf: [[PAD, { naam: "Uit de cache" }], ["groepen/g1", { naam: "Oud" }]],
+        verwijder: [],
+      }),
+    );
+    const { status } = await laadPagina();
+    await wacht(30_000);
+
+    expect(fb.schrijfDocMap).not.toHaveBeenCalled();
+    expect(backups()).toHaveLength(0);
+    expect(status.leesHerstelMelding()).toEqual({ hersteld: 0, overgeslagen: 2 });
+  });
+
+  it("een mentor herstelt geen afgewerkt rapport, maar de rest wel", async () => {
+    fb.server.set("rapporten/r1", { status: "afgewerkt", leerlingId: "l1" });
+    fb.schrijfDocMap.mockImplementation(geenVerbinding);
+    const eerste = await laadPagina();
+    eerste.opslag.bewaar(store("Anna"));
+    await wacht(600);
+
+    // De back-up bevat (door een vroegere fout) ook het afgewerkte rapport, ongewijzigd t.o.v.
+    // de server: zonder filter zou de hele batch geweigerd worden.
+    const k = backups()[0];
+    const b = JSON.parse(opslagData.get(k)!);
+    const rapport = { status: "afgewerkt", leerlingId: "l1", opmerking: "x" };
+    b.schrijf.push(["rapporten/r1", rapport]);
+    b.voor["rapporten/r1"] = (await import("../../src/lib/data/firestoreLayout")).normaliseerRapportDoc(
+      { status: "afgewerkt", leerlingId: "l1" },
+    );
+    opslagData.set(k, JSON.stringify(b));
+
+    fb.schrijfDocMap.mockReset().mockResolvedValue(undefined);
+    await laadPagina();
+    await wacht(30_000);
+    expect(geschreven(0)).toEqual({ [PAD]: { naam: "Anna" } });
+  });
+
+  it("lukt het herstel niet, dan toont de foutbalk dat", async () => {
+    fb.schrijfDocMap.mockImplementation(geenVerbinding);
+    (await laadPagina()).opslag.bewaar(store("Anna"));
+    await wacht(600);
+
+    fb.schrijfDocMap.mockReset().mockRejectedValue(new Error("permission-denied"));
+    const { status } = await laadPagina();
+    await wacht(0);
+    expect(status.leesOpslagStatus()).toMatchObject({ soort: "fout", reden: "rechten" });
+
+    fb.schrijfDocMap.mockReset().mockResolvedValue(undefined);
+    await wacht(30_000);
+    expect(status.leesOpslagStatus().soort).toBe("ok");
   });
 });

@@ -97,6 +97,33 @@ export async function bewaarAlles(timeoutMs = 10_000): Promise<boolean> {
 }
 
 /**
+ * Is de eerste volledige snapshot van de database binnen (firebase-modus)? Tot dan toont de app
+ * enkel de lokale cache, en die kan dagen oud zijn: bewerken op die stand zou bij het bewaren
+ * het werk van collega's overschrijven. De toegangspoort houdt de app dicht tot dit `true` is.
+ */
+let gesynct = false;
+const gesynctLuisteraars = new Set<() => void>();
+
+export function zetGesynct(nieuw: boolean): void {
+  if (gesynct === nieuw) return;
+  gesynct = nieuw;
+  gesynctLuisteraars.forEach((fn) => fn());
+}
+
+export const leesGesynct = (): boolean => gesynct;
+
+export function useGesynct(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      gesynctLuisteraars.add(cb);
+      return () => gesynctLuisteraars.delete(cb);
+    },
+    leesGesynct,
+    leesGesynct,
+  );
+}
+
+/**
  * Melding na het herstellen van een back-up uit een vorige sessie (zie
  * `src/lib/data/onbewaardBackup.ts`). `overgeslagen` = documenten die iemand anders intussen
  * aanpaste: die zijn bewust niet overschreven.

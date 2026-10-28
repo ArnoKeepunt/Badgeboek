@@ -28,6 +28,11 @@ export interface Backup {
   nr: number;
   schrijf?: Array<[string, DocData]>;
   verwijder?: string[];
+  /**
+   * De serverstand per pad vlak vóór de schrijfactie (`null` = bestond niet). Het herstel
+   * schrijft enkel waar de server nog zo staat. Ontbreekt bij back-ups van vóór 28/10/2026.
+   */
+  voor?: Record<string, DocData | null>;
   overlays?: Overlays;
 }
 
