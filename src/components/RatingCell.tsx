@@ -38,9 +38,12 @@ export function RatingCell({
   const [open, setOpen] = useState(false);
   const [toonGeschiedenis, setToonGeschiedenis] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const paneel = useRef<HTMLDivElement>(null);
   const regels = geschiedenis ?? [];
   const heeftGeschiedenis = regels.length > 0;
+  // `paneel`: op een laag scherm scrollt het menu intern — dat mag het niet sluiten.
   const pos = usePopover(open, trigger, () => setOpen(false), {
+    paneel,
     breedte: heeftGeschiedenis ? 264 : 188,
     hoogte: toonGeschiedenis ? 680 : heeftGeschiedenis ? 540 : 490,
     uitlijn: "midden",
@@ -88,9 +91,10 @@ export function RatingCell({
               onClick={() => setOpen(false)}
             />
             <div
+              ref={paneel}
               className="rating-cell-menu zwevend-menu"
               role="menu"
-              style={{ top: pos.top, left: pos.left }}
+              style={pos}
             >
               {RATINGS.map((r) => (
                 <button

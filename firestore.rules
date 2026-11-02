@@ -219,6 +219,26 @@ service cloud.firestore {
       allow delete: if isBeheerder();
     }
 
+    // Bewerksloten: "wie typt nu in dit vrije tekstveld" (bv. commentaar klassenraad), zodat
+    // twee mentoren niet tegelijk hetzelfde veld overschrijven. Bevat enkel e-mail + naam van
+    // het personeelslid en een vervaltijd (`tot`, epoch-ms, max. 5 min vooruit). Een slot van
+    // iemand anders overnemen of wissen mag pas als het verlopen is (gecrasht tabblad).
+    match /bewerkSloten/{id} {
+      function slotVrij() {
+        return resource == null
+          || resource.data.email == request.auth.token.email
+          || resource.data.tot < request.time.toMillis();
+      }
+      allow read: if isPersoneel();
+      allow create, update: if isPersoneel() && slotVrij()
+        && request.resource.data.keys().hasOnly(['email', 'naam', 'tot'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.naam is string
+        && request.resource.data.tot is int
+        && request.resource.data.tot <= request.time.toMillis() + 5 * 60 * 1000;
+      allow delete: if isPersoneel() && slotVrij();
+    }
+
     // --- Evaluaties: /evaluaties/{schooljaar}/leerlingen/{leerlingId} ---------
     // `vestiging` staat gedenormaliseerd op het doc (afgeleid van de leerling). Afgesloten
     // schooljaar → enkel lezen; mentor → enkel de eigen vestiging(en). Uitzondering: op een

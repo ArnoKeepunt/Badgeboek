@@ -49,6 +49,7 @@ export function DeelevaluatieEditor({
   );
   const [datum, setDatum] = useState(bestaand?.datum ?? "");
   const [toelichting, setToelichting] = useState(bestaand?.toelichting ?? "");
+  const [verborgen, setVerborgen] = useState(bestaand?.verborgenVoorLeerlingen ?? false);
   // Vestiging: alleen-lezen voor een mentor (die zit op zijn eigen vestiging). Een coördinator/
   // beheerder kiest — ook bij het bewerken kan die de vestiging aanpassen of op "Alle
   // vestigingen" zetten.
@@ -91,6 +92,7 @@ export function DeelevaluatieEditor({
       datum,
       leerdoelIds: [...leerdoelIds],
       toelichting: toelichting.trim(),
+      verborgenVoorLeerlingen: verborgen,
       mentorId: bestaand?.mentorId ?? mentorId,
     };
     if (bestaand) wijzigDeelevaluatie(bestaand.id, data);
@@ -246,6 +248,20 @@ export function DeelevaluatieEditor({
           value={toelichting}
           onChange={(e) => setToelichting(e.target.value)}
         />
+      </label>
+
+      <label className="de-zichtbaarheid">
+        <input
+          type="checkbox"
+          checked={verborgen}
+          onChange={(e) => setVerborgen(e.target.checked)}
+        />
+        <span>
+          Verbergen voor leerlingen
+          <small>
+            Leerlingen en ouders zien deze deelbadge (en de kleur) dan niet in hun badgeboek.
+          </small>
+        </span>
       </label>
 
       <div className="de-editor-acties">

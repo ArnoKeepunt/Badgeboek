@@ -148,9 +148,15 @@ export function DeelPaneel({
                     <div className="grid-doel-rij">
                       <span className="grid-deel-tekst">
                         <span className="grid-deel-titel">{d.titel}</span>
-                        {(d.datum || d.cursus) && (
+                        {(d.datum || d.cursus || d.verborgenVoorLeerlingen) && (
                           <span className="grid-deel-meta">
-                            {[d.datum, d.cursus].filter(Boolean).join(" · ")}
+                            {[
+                              d.datum,
+                              d.cursus,
+                              d.verborgenVoorLeerlingen && "verborgen voor leerlingen",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         )}
                       </span>

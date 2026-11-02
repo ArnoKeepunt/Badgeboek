@@ -3,6 +3,12 @@ import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
 export interface PopoverPos {
   top: number;
   left: number;
+  /**
+   * Zo hoog mag het paneel maximaal zijn om binnen het scherm te blijven. Op een laag scherm
+   * (laptop, ingezoomd) kleiner dan het menu zelf → het paneel scrollt dan intern
+   * (`.zwevend-menu` heeft `overflow-y: auto`).
+   */
+  maxHeight: number;
 }
 
 /**
@@ -43,10 +49,21 @@ export function usePopover(
           ? r.left + r.width / 2 - breedte / 2
           : r.left;
     left = Math.min(Math.max(marge, left), window.innerWidth - breedte - marge);
+    // Onder het anker als het daar past, anders erboven. Past het nergens volledig (een rij
+    // halverwege het scherm, met een hoog menu zoals het kleurenmenu), dan niet half buiten
+    // beeld laten hangen — dan was "te laat ingediend" onderaan onbereikbaar, want scrollen sluit
+    // het menu — maar binnen het scherm schuiven, desnoods over het anker heen.
+    const vh = window.innerHeight;
+    const maxHeight = vh - 2 * marge;
     const onder = r.bottom + 4;
+    const boven = r.top - 4 - hoogte;
     const top =
-      onder + hoogte > window.innerHeight && r.top > hoogte ? r.top - 4 - hoogte : onder;
-    setPos({ top, left });
+      onder + hoogte <= vh - marge
+        ? onder
+        : boven >= marge
+          ? boven
+          : Math.max(marge, vh - marge - Math.min(hoogte, maxHeight));
+    setPos({ top, left, maxHeight });
     // Alleen herberekenen wanneer het menu opengaat.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);

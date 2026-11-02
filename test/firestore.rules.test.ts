@@ -389,6 +389,37 @@ describe("rapporten — handmatige rapporten per leerling", () => {
   });
 });
 
+// --- Bewerksloten (één persoon tegelijk in "Commentaar klassenraad") --------
+describe("bewerkSloten — één persoon tegelijk in een vrij tekstveld", () => {
+  const SLOT = "bewerkSloten/rapport-rap-concept-klassenraad";
+  const slot = (email: string, tot = Date.now() + 2 * 60_000) => ({ email, naam: "Iemand", tot });
+
+  it("personeel neemt een vrij slot op eigen naam, niet op naam van een ander", async () => {
+    await assertFails(anoniem.doc(SLOT).set(slot("mentor@keerpuntscholen.be")));
+    await assertFails(geenAccount.doc(SLOT).set(slot("nieuw@keerpuntscholen.be")));
+    await assertFails(mentor.doc(SLOT).set(slot("mentor2@keerpuntscholen.be")));
+    await assertSucceeds(mentor.doc(SLOT).set(slot("mentor@keerpuntscholen.be")));
+    await assertSucceeds(mentor2.doc(SLOT).get());
+  });
+
+  it("een geldig slot van een ander is niet over te nemen of te wissen, een verlopen wel", async () => {
+    await assertSucceeds(mentor.doc(SLOT).set(slot("mentor@keerpuntscholen.be")));
+    await assertFails(mentor2.doc(SLOT).set(slot("mentor2@keerpuntscholen.be")));
+    await assertFails(mentor2.doc(SLOT).delete());
+    await assertSucceeds(mentor.doc(SLOT).update({ tot: Date.now() + 60_000 }));
+    await assertSucceeds(mentor.doc(SLOT).set(slot("mentor@keerpuntscholen.be", Date.now() - 1000)));
+    await assertSucceeds(mentor2.doc(SLOT).set(slot("mentor2@keerpuntscholen.be")));
+    await assertSucceeds(mentor2.doc(SLOT).delete());
+  });
+
+  it("weigert een slot dat te ver vooruit loopt of extra velden heeft", async () => {
+    await assertFails(
+      mentor.doc(SLOT).set(slot("mentor@keerpuntscholen.be", Date.now() + 60 * 60_000)),
+    );
+    await assertFails(mentor.doc(SLOT).set({ ...slot("mentor@keerpuntscholen.be"), extra: 1 }));
+  });
+});
+
 // --- Vestigingen / rubrieken = beheerder-write ------------------------------
 describe("vestigingen en rubrieken — beheerder-write", () => {
   it("mentor mag niet schrijven, beheerder wel", async () => {

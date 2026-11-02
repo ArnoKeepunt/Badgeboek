@@ -2257,6 +2257,111 @@ th {
   font-weight: 600;
 }
 
+/* Tabs in de leerlingbalk: "Mijn badges" · "Mijn rapporten". */
+.ll-tabs {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.ll-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.ll-tab:hover {
+  color: var(--text);
+}
+
+.ll-tab.is-actief {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .ll-topbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 16px;
+  }
+
+  .ll-tabs {
+    order: 3;
+    width: 100%;
+  }
+}
+
+/* --- Mijn rapporten (leerling) --- */
+.ll-rapporten-leeg {
+  color: var(--text-muted);
+}
+
+.ll-rapporten-lijst {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ll-rapport-kaart {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ll-rapport-kaart:hover {
+  border-color: var(--accent);
+}
+
+.ll-rapport-naam {
+  font-weight: 700;
+}
+
+.ll-rapport-jaar {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ll-rapport-acties {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ll-rapport-acties .ll-terug {
+  margin-bottom: 0;
+}
+
+.ll-rapport-knoppen {
+  display: flex;
+  gap: 8px;
+}
+
+.ll-rapport-knoppen a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Het afgewerkte rapport op het scherm: dezelfde `.rapport-print`-opmaak als op papier. */
+.ll-rapport-blad .rapport-print {
+  display: block;
+}
+
 /* --- Meldingencentrum (leerling) --- */
 .ll-klok {
   position: relative;
@@ -3178,6 +3283,10 @@ th {
   position: fixed;
   transform: none;
   z-index: 1000;
+  /* `max-height` komt van `usePopover`: past het menu niet op het scherm, dan scrollt het
+     intern — zonder de pagina eronder mee te laten scrollen (dat zou het menu sluiten). */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .rating-cell-option {
@@ -3493,6 +3602,27 @@ th {
   margin: 0;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+/* "Verbergen voor leerlingen": vinkje + uitleg eronder. */
+.de-zichtbaarheid {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.de-zichtbaarheid input {
+  margin: 2px 0 0;
+}
+
+.de-zichtbaarheid small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .de-editor-acties {
@@ -4226,13 +4356,45 @@ th {
   border-top: 1px solid var(--border);
 }
 
-/* Groepje van bij-elkaar-horende acties (bv. printen + pdf, of afwerken + heropenen) — een
-   dun lijntje tussen groepen onderling houdt losse knoppen leesbaar geclusterd. */
-.rapport-pdf-tip {
-  margin-left: auto;
-  font-size: 12px;
+/* Bewaarde pdf('s) van een afgewerkt rapport, onder de statusbalk. */
+.rapport-pdf-archief {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 10px;
+  font-size: 13px;
   color: var(--text-muted);
 }
+
+.rapport-pdf-archief a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rapport-pdf-ouder {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.rapport-pdf-ouder summary {
+  cursor: pointer;
+}
+
+.rapport-pdf-ouder ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.rapport-pdf-fout {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+/* Groepje van bij-elkaar-horende acties (bv. printen + pdf, of afwerken + heropenen) — een
+   dun lijntje tussen groepen onderling houdt losse knoppen leesbaar geclusterd. */
 
 .rapport-knopgroep {
   display: flex;
@@ -4546,6 +4708,20 @@ th {
   margin-bottom: 16px;
 }
 
+/* "X is dit veld aan het bewerken" — boven een vak dat iemand anders nu vasthoudt. */
+.rapport-slot-melding {
+  padding: 8px 12px;
+  border: 1px solid #f3d27a;
+  border-radius: 10px;
+  background: #fdf6e3;
+  color: #7a5a00;
+  font-weight: 400;
+}
+
+.rapport-algemeen textarea[readonly] {
+  background: var(--bg);
+}
+
 .rapport-algemeen textarea {
   font: inherit;
   font-weight: 400;
@@ -4568,8 +4744,16 @@ th {
 /* Zelfde taal als de app (kaarten met afgeronde hoeken, lichte randen, groen accent, kleine
    grijze labels in hoofdletters), maar op papier: randen een tikje donkerder dan `--border` en
    enkel lichte vlakken, zodat het ook in zwart-wit en op een gewone printer leesbaar blijft. */
+/* Vast blad (A4 + marges) en een ingebed lettertype: de pdf van de server (Chrome, zie
+   `functions/index.js`) gebruikt exact deze printweergave, dus moet ze overal gelijk renderen. */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 .rapport-print {
   --print-rand: #d1d5db;
+  font-family: "Inter", var(--sans);
   font-size: 13px;
   color: var(--text);
 }
@@ -4666,6 +4850,9 @@ th {
 /* Ook leeg genoeg ruimte om op papier aan te vullen. */
 .rapport-print-klassenraad {
   min-height: 150px;
+  /* Een lang commentaar loopt gewoon door op het volgende blad, i.p.v. als geheel naar blad 2
+     te springen (de andere kaders houden `break-inside: avoid`). */
+  break-inside: auto;
 }
 
 .rapport-print-leeg {
@@ -4717,48 +4904,38 @@ th {
   color: var(--text-muted);
 }
 
-.rapport-print-tabel {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 6px;
+/* Rubrics onder de cursuskop: per rubric de naam links en de kleur uiterst rechts, met de
+   betekenis eronder. Geen tabel — enkel een lijntje tussen de rubrics. */
+.rapport-print-rubrieken {
+  margin: 6px 0 0;
+  padding: 0 4px;
+  list-style: none;
 }
 
-.rapport-print-tabel tr {
+.rapport-print-rubrieken li {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--print-rand);
   break-inside: avoid;
 }
 
-.rapport-print-tabel th,
-.rapport-print-tabel td {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--print-rand);
-  vertical-align: top;
-}
-
-.rapport-print-tabel tbody tr:last-child td {
+.rapport-print-rubrieken li:last-child {
   border-bottom: 0;
 }
 
-.rapport-print-tabel th {
-  font-size: 11px;
+.rapport-print-rubriek-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
 
-/* Cursus/kleur smal houden, de rubric-tekst bij de kleur krijgt de rest van de breedte. */
-.rapport-print-tabel th:nth-child(1),
-.rapport-print-tabel td:nth-child(1),
-.rapport-print-tabel th:nth-child(3),
-.rapport-print-tabel td:nth-child(3) {
-  width: 1%;
-  white-space: nowrap;
+.rapport-print-rubriek-kop .rating {
+  flex: none;
 }
 
-.rapport-print-tabel th:nth-child(2),
-.rapport-print-tabel td:nth-child(2) {
-  width: 30%;
-  font-weight: 600;
-}
-
-.rapport-print-tabel td.rapport-print-betekenis {
+.rapport-print p.rapport-print-betekenis {
+  margin-top: 3px;
+  color: var(--text-muted);
   white-space: pre-line;
 }
 
@@ -4804,6 +4981,7 @@ th {
 @media print {
   .sidebar,
   .topbar,
+  .ll-topbar,
   .opslag-foutbalk,
   .opslag-herstelbalk,
   .no-print {
@@ -4818,12 +4996,14 @@ th {
      `print-color-adjust: exact` hieronder, dat achtergronden mee laat afdrukken). */
   body,
   .layout,
-  .content {
+  .content,
+  .ll-shell {
     background: #fff;
   }
 
   .content,
-  .content--breed {
+  .content--breed,
+  .ll-content {
     max-width: none;
     padding: 0;
   }

@@ -51,6 +51,7 @@ import type {
   Notities,
   Rapport,
   RapportItem,
+  RapportPdfVersie,
   Rating,
   Rubriek,
   Sessie,
@@ -1384,10 +1385,10 @@ const deelevaluatieVergrendeld = (id: string): boolean => {
   return de ? isAfgesloten(de.schooljaar) : false;
 };
 
-/** Melding-info (cursus) voor een deelevaluatie. `null` = niet loggen. */
+/** Melding-info (cursus) voor een deelevaluatie. `null` = niet loggen (ook: verborgen voor leerlingen). */
 const deelMeldingInfo = (id: string) => {
   const de = deelevaluatie(id);
-  if (!de || de.schooljaar !== HUIDIG_SCHOOLJAAR) return null;
+  if (!de || de.schooljaar !== HUIDIG_SCHOOLJAAR || de.verborgenVoorLeerlingen) return null;
   return {
     soort: "deelevaluatie" as const,
     cursusId: cursusVanLeerdoel(de.leerdoelIds[0] ?? "")?.id ?? "",
@@ -1745,6 +1746,21 @@ export function rondRapportenAfBulk(ids: string[]): number {
     ),
   });
   return teDoen.size;
+}
+
+/**
+ * Koppel een bewaarde pdf (Firebase Storage) aan een afgewerkt rapport: een nieuwe versie achteraan,
+ * de vorige blijven staan. Bewust ook op een vergrendeld rapport — het bewaren gebeurt net ná het
+ * afwerken. Enkel de beheerder werkt af (UI + Firestore-regels voor een afgewerkt rapport).
+ */
+export function voegRapportPdfToe(id: string, versie: Omit<RapportPdfVersie, "door">) {
+  const wie = huidigeGebruiker();
+  commit({
+    ...state,
+    rapporten: state.rapporten.map((r) =>
+      r.id === id ? { ...r, pdfVersies: [...(r.pdfVersies ?? []), { ...versie, door: wie }] } : r,
+    ),
+  });
 }
 
 /** Heropen een afgewerkt rapport (terug naar concept). De UI gate dit tot een beheerder. */

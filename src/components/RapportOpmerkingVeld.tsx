@@ -97,7 +97,7 @@ export function RapportOpmerkingVeld({
             <div
               ref={paneel}
               className="notitie-panel zwevend-menu"
-              style={{ top: pos.top, left: pos.left }}
+              style={pos}
             >
               <label className="notitie-veld">
                 <span>{label}</span>

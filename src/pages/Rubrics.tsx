@@ -453,7 +453,7 @@ function SoortDropdown({
             <div
               className="zwevend-menu rubriek-soort-menu"
               role="listbox"
-              style={{ top: pos.top, left: pos.left }}
+              style={pos}
             >
               <button
                 type="button"

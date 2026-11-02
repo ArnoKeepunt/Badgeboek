@@ -16,7 +16,10 @@ export function BulkKnop({
 }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const paneel = useRef<HTMLDivElement>(null);
+  // `paneel`: op een laag scherm scrollt het menu intern — dat mag het niet sluiten.
   const pos = usePopover(open, trigger, () => setOpen(false), {
+    paneel,
     breedte: 214,
     hoogte: 400,
     uitlijn: "rechts",
@@ -53,9 +56,10 @@ export function BulkKnop({
               onClick={() => setOpen(false)}
             />
             <div
+              ref={paneel}
               className="rating-cell-menu zwevend-menu bulk-menu"
               role="menu"
-              style={{ top: pos.top, left: pos.left }}
+              style={pos}
             >
               <div className="bulk-menu-kop">Alle {aantal} zichtbare leerlingen</div>
               {RATINGS.map((r) => (

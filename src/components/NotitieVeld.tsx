@@ -98,7 +98,7 @@ export function NotitieVeld({
             <div
               ref={paneel}
               className="notitie-panel zwevend-menu"
-              style={{ top: pos.top, left: pos.left }}
+              style={pos}
             >
               <label className="notitie-veld">
                 <span>Zichtbaar voor de leerling</span>

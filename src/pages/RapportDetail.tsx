@@ -2,6 +2,11 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ColorBar } from "../components/ColorBar";
+import { useBewerkSlot } from "../lib/bewerkSlot";
+import { downloadBlob } from "../lib/download";
+import { PDF_ARCHIEF_ACTIEF, archiveerRapportPdf } from "../lib/rapportArchief";
+import { rapportBestandsnaam } from "../lib/rapportInhoud";
+import { PDF_SERVER_ACTIEF, maakRapportPdf } from "../lib/rapportPdf";
 import { usePopover } from "../lib/popover";
 import { NotitieVeld } from "../components/NotitieVeld";
 import { RapportOpmerkingVeld } from "../components/RapportOpmerkingVeld";
@@ -44,7 +49,7 @@ import {
   zetRapportKlassenraadCommentaar,
   zetRapportRubriekKleur,
 } from "../lib/store";
-import type { Rapport } from "../lib/types";
+import type { Rapport, RapportPdfVersie } from "../lib/types";
 import { rapportItemSleutel } from "../lib/types";
 import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
 
@@ -118,54 +123,144 @@ function kiesNaKlik(kies: () => void) {
  * opmerking die een andere mentor intussen bewaarde ook hier (zolang je zelf niet aan het typen
  * bent), en overschrijf je die niet met een verouderde tekst. Bewaart bij blur én bij het
  * verlaten van de pagina/rapport — een klik op een link geeft in Safari geen blur-event.
+ *
+ * Met `slotId` kan maar één persoon tegelijk in het vak typen (`useBewerkSlot`): wie erin klikt,
+ * neemt het slot; anderen zien het vak dan alleen-lezen, met de naam van wie bezig is.
  */
 function AlgemeneOpmerkingVeld({
   opmerking,
   onSave,
   readonly,
   title,
+  slotId,
 }: {
   opmerking: string;
   onSave: (tekst: string) => void;
   readonly: boolean;
   title?: string;
+  slotId?: string;
 }) {
   const [tekst, setTekst] = useState(opmerking);
   const [bezig, setBezig] = useState(false);
   const [gezien, setGezien] = useState(opmerking);
+  const slot = useBewerkSlot(slotId ?? null);
+  const doorAnder = slot.doorAnder;
   // Een wijziging van elders overnemen, maar niet terwijl de gebruiker zelf typt.
   if (opmerking !== gezien && !bezig) {
     setGezien(opmerking);
     setTekst(opmerking);
   }
 
-  const laatste = useRef({ tekst, opmerking, readonly, onSave });
+  const laatste = useRef({ tekst, opmerking, readonly, onSave, slot });
   useEffect(() => {
-    laatste.current = { tekst, opmerking, readonly, onSave };
+    laatste.current = { tekst, opmerking, readonly, onSave, slot };
   });
 
   // Bij het weggaan (andere pagina of ander rapport) nog niet bewaarde tekst wegschrijven.
   useEffect(
     () => () => {
       const l = laatste.current;
-      if (!l.readonly && l.tekst !== l.opmerking) l.onSave(l.tekst);
+      if (!l.readonly && l.slot.isVanMij() && l.tekst !== l.opmerking) l.onSave(l.tekst);
     },
     [],
   );
 
   return (
-    <textarea
-      rows={4}
-      readOnly={readonly}
-      value={tekst}
-      title={title}
-      onFocus={() => setBezig(true)}
-      onChange={(e) => setTekst(e.target.value)}
-      onBlur={() => {
-        setBezig(false);
-        if (!readonly && tekst !== opmerking) onSave(tekst);
-      }}
-    />
+    <>
+      {doorAnder && !readonly && (
+        <span className="rapport-slot-melding" role="status">
+          <strong>{doorAnder.naam || doorAnder.email}</strong> is dit veld aan het bewerken. Je
+          kunt het aanpassen zodra die klaar is.
+        </span>
+      )}
+      <textarea
+        rows={4}
+        readOnly={readonly || Boolean(doorAnder)}
+        value={tekst}
+        title={title}
+        onFocus={async (e) => {
+          if (readonly || doorAnder) return;
+          const vak = e.currentTarget;
+          setBezig(true);
+          if (!(await slot.neem())) {
+            // Iemand anders was net sneller: niets van hier bewaren.
+            setBezig(false);
+            setTekst(opmerking);
+            vak.blur();
+          }
+        }}
+        onChange={(e) => setTekst(e.target.value)}
+        onBlur={() => {
+          setBezig(false);
+          if (!readonly && slot.isVanMij() && tekst !== opmerking) onSave(tekst);
+          slot.laatLos();
+        }}
+      />
+    </>
+  );
+}
+
+const datumTijd = (ms: number) =>
+  new Date(ms).toLocaleString("nl-BE", { dateStyle: "medium", timeStyle: "short" });
+
+/**
+ * De bewaarde pdf's van een afgewerkt rapport (Firebase Storage), nieuwste eerst — zichtbaar voor
+ * elk personeelslid dat het rapport mag zien. Heropenen + opnieuw afwerken geeft een nieuwe versie;
+ * de vorige blijven staan. Ontbreekt de pdf (bv. het bewaren mislukte), dan kan de beheerder ze
+ * hier opnieuw laten bewaren.
+ */
+function RapportPdfArchief({
+  rapport,
+  bezig,
+  fout,
+  magBewaren,
+  onBewaar,
+}: {
+  rapport: Rapport;
+  bezig: boolean;
+  fout: string | null;
+  magBewaren: boolean;
+  onBewaar: () => void;
+}) {
+  const versies: RapportPdfVersie[] = [...(rapport.pdfVersies ?? [])].reverse();
+  const [nieuwste, ...ouder] = versies;
+  return (
+    <div className="rapport-pdf-archief no-print">
+      {bezig ? (
+        <span>Pdf wordt bewaard…</span>
+      ) : nieuwste ? (
+        <span>
+          Bewaarde pdf:{" "}
+          <a href={nieuwste.url} target="_blank" rel="noreferrer">
+            {datumTijd(nieuwste.op)}
+          </a>
+          {ouder.length > 0 && (
+            <details className="rapport-pdf-ouder">
+              <summary>
+                {ouder.length} oudere versie{ouder.length === 1 ? "" : "s"}
+              </summary>
+              <ul>
+                {ouder.map((v) => (
+                  <li key={v.pad}>
+                    <a href={v.url} target="_blank" rel="noreferrer">
+                      {datumTijd(v.op)}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </span>
+      ) : (
+        <span>Er is nog geen pdf van dit rapport bewaard.</span>
+      )}
+      {!bezig && magBewaren && (!nieuwste || fout) && (
+        <button type="button" className="linkknop" onClick={onBewaar}>
+          Pdf bewaren
+        </button>
+      )}
+      {fout && <p className="rapport-pdf-fout">{fout}</p>}
+    </div>
   );
 }
 
@@ -235,6 +330,10 @@ export function RapportDetail() {
   // Rubrics.tsx), telkens dicht bij het openen van de pagina.
   const [deelOpen, setDeelOpen] = useState<Set<string>>(new Set());
   const [gekozenId, setGekozenId] = useState<string | null>(null);
+  // Een pdf maken duurt even (bibliotheek laden + opbouwen): knoppen intussen uit.
+  const [pdfBezig, setPdfBezig] = useState<"download" | "bewaren" | null>(null);
+  // Per rapport: een fout bij het ene rapport hoort niet bij het volgende dat je opent.
+  const [pdfFoutVan, setPdfFoutVan] = useState<{ rapportId: string; tekst: string } | null>(null);
   // Cursusfilter — zelfde idee als op Badges/Deelevaluaties, maar hier lokaal (niet de gedeelde
   // `matrixCursus`): dit is een enkele-leerling-pagina, geen matrix over meerdere leerlingen.
   // Blijft wel gewoon staan bij "vorige"/"volgende" (React Router hermonteert de pagina niet bij
@@ -359,31 +458,58 @@ export function RapportDetail() {
       return next;
     });
 
-  // Bestandsnaam voor "Opslaan als pdf": "naamRapport-vestiging-schooljaar-voornaamNaam" (zonder
-  // ".pdf" — de browser voegt die zelf toe aan `document.title` bij "Opslaan als pdf"; zet je die
-  // erbij, dan krijg je "….pdf.pdf"). Filenaam-onveilige tekens (bv. "/" in een vrij getypte
-  // rapportnaam) eruit gefilterd.
-  const veiligVoorBestandsnaam = (s: string) => s.replace(/[\\/:*?"<>|]/g, "").trim();
-  const downloadBestandsnaam = (rapport: Rapport): string => {
-    const naamRapport = veiligVoorBestandsnaam(rapport.naam) || "Rapport";
-    const vestiging = veiligVoorBestandsnaam(student.vestiging) || "onbekend";
-    const voornaamNaam =
-      veiligVoorBestandsnaam(`${student.firstName}${student.lastName}`) || "leerling";
-    return `${naamRapport}-${vestiging}-${rapport.schooljaar}-${voornaamNaam}`;
-  };
-  // Het printvenster gebruikt `document.title` als voorgestelde bestandsnaam (bv. kiest de
-  // mentor daar zelf "Opslaan als pdf" als bestemming) — tijdelijk wisselen, en terugzetten
-  // zodra het venster weer sluit (`afterprint`, vuurt zowel bij printen als annuleren).
+  // Het printvenster gebruikt `document.title` als voorgestelde bestandsnaam (kiest de mentor
+  // daar toch "Opslaan als pdf") — tijdelijk wisselen, en terugzetten zodra het venster weer
+  // sluit (`afterprint`, vuurt zowel bij printen als annuleren). Zonder ".pdf": die voegt de
+  // browser zelf toe.
   const printen = () => {
     if (!gekozen) return;
     const vorigeTitel = document.title;
-    document.title = downloadBestandsnaam(gekozen);
+    document.title = rapportBestandsnaam(gekozen, student);
     const herstelTitel = () => {
       document.title = vorigeTitel;
       window.removeEventListener("afterprint", herstelTitel);
     };
     window.addEventListener("afterprint", herstelTitel);
     window.print();
+  };
+
+  const pdfFout = pdfFoutVan && pdfFoutVan.rapportId === gekozen?.id ? pdfFoutVan.tekst : null;
+  const zetPdfFout = (rapportId: string, tekst: string | null) =>
+    setPdfFoutVan(tekst === null ? null : { rapportId, tekst });
+
+  const opslaanAlsPdf = async () => {
+    if (!gekozen) return;
+    setPdfBezig("download");
+    zetPdfFout(gekozen.id, null);
+    try {
+      const pdf = await maakRapportPdf(student, gekozen, alleRubrieken);
+      downloadBlob(`${rapportBestandsnaam(gekozen, student)}.pdf`, pdf);
+    } catch (err) {
+      console.error("Pdf maken mislukt:", err);
+      zetPdfFout(gekozen.id, "De pdf kon niet gemaakt worden. Probeer opnieuw of gebruik Printen.");
+    } finally {
+      setPdfBezig(null);
+    }
+  };
+
+  // Na het afwerken (of opnieuw, via "Pdf bewaren"): de pdf als nieuwe versie in de database.
+  const bewaarPdf = async (rapport: Rapport) => {
+    if (!PDF_ARCHIEF_ACTIEF) return;
+    setPdfBezig("bewaren");
+    zetPdfFout(rapport.id, null);
+    try {
+      await archiveerRapportPdf(student, rapport, alleRubrieken);
+    } catch (err) {
+      console.error("Pdf bewaren mislukt:", err);
+      zetPdfFout(
+        rapport.id,
+        "Het rapport is afgewerkt, maar de pdf kon niet in de database bewaard worden. " +
+          "Probeer opnieuw met \"Pdf bewaren\".",
+      );
+    } finally {
+      setPdfBezig(null);
+    }
   };
 
   return (
@@ -452,7 +578,7 @@ export function RapportDetail() {
                 ref={kiesPaneel}
                 className="rapport-leerling-picker zwevend-menu"
                 role="listbox"
-                style={{ top: kiesPos.top, left: kiesPos.left }}
+                style={kiesPos}
               >
                 <input
                   type="text"
@@ -584,11 +710,13 @@ export function RapportDetail() {
                     <button
                       type="button"
                       className="knop-secundair rapport-icoonknop"
-                      title='Opent het printvenster — kies daar "Opslaan als pdf" als bestemming.'
-                      onClick={printen}
+                      title="Downloadt het rapport van deze leerling als pdf-bestand."
+                      disabled={pdfBezig !== null}
+                      // Zonder server (local-modus): het printvenster, daar "Opslaan als pdf".
+                      onClick={() => (PDF_SERVER_ACTIEF ? void opslaanAlsPdf() : printen())}
                     >
                       <PdfIcoon />
-                      Opslaan als pdf
+                      {pdfBezig === "download" ? "Pdf maken…" : "Opslaan als pdf"}
                     </button>
                   </div>
                   <div className="rapport-knopgroep">
@@ -600,6 +728,7 @@ export function RapportDetail() {
                           onClick={() => {
                             if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
                               rondRapportAf(gekozen.id);
+                              void bewaarPdf(gekozen);
                             }
                           }}
                         >
@@ -640,14 +769,19 @@ export function RapportDetail() {
                     {magHeropenen && " Enkel een beheerder kan het heropenen."}
                   </span>
                 )}
-                {/* De bestemming in het printvenster kan een website niet zelf kiezen — Chrome/
-                    Edge onthouden wel de laatste keuze, dus meestal is dit eenmalig per toestel. */}
-                <span className="rapport-pdf-tip">
-                  Pdf nodig? Kies in het printvenster bij <strong>Bestemming</strong> de optie{" "}
-                  <strong>Opslaan als PDF</strong>.
-                </span>
               </div>
             )}
+
+            {gekozen && vergrendeld && PDF_ARCHIEF_ACTIEF && (
+              <RapportPdfArchief
+                rapport={gekozen}
+                bezig={pdfBezig === "bewaren"}
+                fout={pdfFout}
+                magBewaren={magAfwerken}
+                onBewaar={() => void bewaarPdf(gekozen)}
+              />
+            )}
+            {pdfFout && !vergrendeld && <p className="rapport-pdf-fout no-print">{pdfFout}</p>}
           </div>
 
           {gekozen ? (
@@ -662,6 +796,7 @@ export function RapportDetail() {
                   readonly={vergrendeld}
                   title={wijzigingLabel(rapportItemSleutel(gekozen.id, "klassenraad")) ?? undefined}
                   onSave={(tekst) => zetRapportKlassenraadCommentaar(gekozen.id, tekst)}
+                  slotId={`rapport-${gekozen.id}-klassenraad`}
                 />
               </label>
 

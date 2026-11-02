@@ -9,9 +9,11 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-keerpunt \"vitest run\""
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-keerpunt \"vitest run\""
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "fflate": "^0.8.3",
     "firebase": "^12.18.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

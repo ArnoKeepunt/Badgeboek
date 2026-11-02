@@ -4,7 +4,11 @@ export function downloadTekst(
   inhoud: string,
   mime = "text/csv;charset=utf-8",
 ) {
-  const blob = new Blob(["﻿", inhoud], { type: mime });
+  downloadBlob(bestandsnaam, new Blob(["﻿", inhoud], { type: mime }));
+}
+
+/** Bied een bestand (pdf, zip, …) aan om te downloaden. */
+export function downloadBlob(bestandsnaam: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

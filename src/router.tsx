@@ -2,6 +2,7 @@ import { type ReactNode, lazy, Suspense } from "react";
 import { createHashRouter } from "react-router-dom";
 import { AlleenBeheerder } from "./components/AlleenBeheerder";
 import { AlleenDev } from "./components/AlleenDev";
+import { AlleenPersoneel } from "./components/AlleenPersoneel";
 import { Shell } from "./components/Shell";
 import { Aanmelden } from "./pages/Aanmelden";
 import { Foutpagina } from "./pages/Foutpagina";
@@ -20,6 +21,10 @@ const Rapport = lazy(() => import("./pages/Rapport").then((m) => ({ default: m.R
 // oxlint-disable-next-line react/only-export-components
 const RapportDetail = lazy(() =>
   import("./pages/RapportDetail").then((m) => ({ default: m.RapportDetail })),
+);
+// oxlint-disable-next-line react/only-export-components
+const LeerlingRapporten = lazy(() =>
+  import("./pages/LeerlingRapporten").then((m) => ({ default: m.LeerlingRapporten })),
 );
 // oxlint-disable-next-line react/only-export-components
 const Deelevaluaties = lazy(() =>
@@ -48,6 +53,9 @@ const traag = (node: ReactNode) => (
   </Suspense>
 );
 
+// Personeelspagina's: een leerling (of ouder) komt er ook via een rechtstreekse URL niet in.
+const personeel = (node: ReactNode) => <AlleenPersoneel>{node}</AlleenPersoneel>;
+
 // Hash-routing (URLs met `/#/...`): de dist-map werkt zo op elk (sub)pad zonder serverconfig
 // voor SPA-fallback. Wil je nette URLs? Zet dit terug naar `createBrowserRouter` + regel een
 // rewrite (alle paden → index.html) op de host.
@@ -60,13 +68,18 @@ export const router = createHashRouter([
       { index: true, element: <Home /> },
       { path: "aanmelden", element: <AlleenBeheerder>{<Aanmelden />}</AlleenBeheerder> },
       { path: "vak/:cursusId", element: <LeerlingCursus /> },
-      { path: "badges", element: traag(<Badges />) },
-      { path: "rapport", element: traag(<Rapport />) },
-      { path: "rapport/:studentId", element: traag(<RapportDetail />) },
-      { path: "deelevaluaties", element: <AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev> },
-      { path: "rubrics", element: traag(<Rubrics />) },
-      { path: "doelen", element: traag(<Doelen />) },
-      { path: "groepen", element: <Groepen /> },
+      { path: "mijn-rapporten", element: traag(<LeerlingRapporten />) },
+      { path: "mijn-rapporten/:rapportId", element: traag(<LeerlingRapporten />) },
+      { path: "badges", element: personeel(traag(<Badges />)) },
+      { path: "rapport", element: personeel(traag(<Rapport />)) },
+      { path: "rapport/:studentId", element: personeel(traag(<RapportDetail />)) },
+      {
+        path: "deelevaluaties",
+        element: personeel(<AlleenDev>{traag(<Deelevaluaties />)}</AlleenDev>),
+      },
+      { path: "rubrics", element: personeel(traag(<Rubrics />)) },
+      { path: "doelen", element: personeel(traag(<Doelen />)) },
+      { path: "groepen", element: personeel(<Groepen />) },
       { path: "badges-beheer", element: <AlleenBeheerder>{traag(<BadgesBeheer />)}</AlleenBeheerder> },
       {
         path: "gegevens",
@@ -86,8 +99,8 @@ export const router = createHashRouter([
           <AlleenBeheerder>{traag(<Vestigingen />)}</AlleenBeheerder>
         ),
       },
-      { path: "students", element: <Students /> },
-      { path: "students/:studentId", element: <StudentDetail /> },
+      { path: "students", element: personeel(<Students />) },
+      { path: "students/:studentId", element: personeel(<StudentDetail />) },
       { path: "*", element: <NotFound /> },
     ],
   },

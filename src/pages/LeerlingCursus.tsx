@@ -93,14 +93,22 @@ export function LeerlingCursus() {
   const badgeTekst = new Map(leerdoelenVoorStroom(stroom).map((d) => [d.id, d.omschrijving]));
 
   // De deelevaluaties die aan een badge van deze cursus hangen (elk één keer, alleen-lezen).
-  // Nieuwste bovenaan; deelevaluaties zonder datum onderaan.
+  // Nieuwste bovenaan; deelevaluaties zonder datum onderaan. Enkel de **eigen** deelbadges: van
+  // de eigen vestiging (of overkoepelend) én met een kleur of zichtbare opmerking voor deze
+  // leerling. Een deelbadge hangt niet aan een klas/groep, enkel aan stroom + vestiging — zonder
+  // die laatste voorwaarde zag elke leerling van de stroom de toetsen van andere groepen als
+  // "Nog niet beoordeeld". Door de mentor verborgen deelbadges blijven sowieso weg.
   const cursusDoelIds = new Set(doelen.map((d) => d.id));
   const deelVanCursus = deelevaluaties
     .filter(
       (d) =>
+        !d.verborgenVoorLeerlingen &&
         d.schooljaar === HUIDIG_SCHOOLJAAR &&
         d.stroom === stroom &&
-        d.leerdoelIds.some((id) => cursusDoelIds.has(id)),
+        (d.vestiging === "" || d.vestiging === leerling.vestiging) &&
+        d.leerdoelIds.some((id) => cursusDoelIds.has(id)) &&
+        (getDeelKleur(deelKleuren, d.id, leerling.id) !== null ||
+          getDeelNotitie(deelNotities, d.id, leerling.id).zichtbaar !== ""),
     )
     .sort((a, b) => {
       if (a.datum && b.datum && a.datum !== b.datum) return a.datum < b.datum ? 1 : -1;

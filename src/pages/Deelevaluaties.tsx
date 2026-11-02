@@ -486,9 +486,15 @@ function DeelCursusSectie({
                           <div className="de-rij-kop">
                             <div className="de-rij-titel">
                               <strong>{d.titel}</strong>
-                              {(d.datum || type) && (
+                              {(d.datum || type || d.verborgenVoorLeerlingen) && (
                                 <span className="de-rij-meta">
-                                  {[d.datum, type?.naam].filter(Boolean).join(" · ")}
+                                  {[
+                                    d.datum,
+                                    type?.naam,
+                                    d.verborgenVoorLeerlingen && "verborgen voor leerlingen",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
                                 </span>
                               )}
                               {d.leerdoelIds.length > 0 && (

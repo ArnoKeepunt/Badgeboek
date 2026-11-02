@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { naamVan, useAangemeld } from "../lib/sessie";
 import { meldAf } from "../lib/store";
 import { MeldingenKlok } from "./MeldingenKlok";
@@ -9,6 +9,9 @@ import { MeldingenKlok } from "./MeldingenKlok";
  */
 export function LeerlingShell() {
   const aangemeld = useAangemeld();
+  const { pathname } = useLocation();
+  // "Mijn badges" = de startpagina én de cursuspagina's (`/vak/...`).
+  const rapportenActief = pathname.startsWith("/mijn-rapporten");
 
   return (
     <div className="ll-shell">
@@ -40,6 +43,19 @@ export function LeerlingShell() {
             Mijn badgeboek<span className="ll-brand-sub"> — dagelijks werk</span>
           </span>
         </Link>
+        {aangemeld?.rol === "leerling" && (
+          <nav className="ll-tabs" aria-label="Hoofdmenu">
+            <NavLink to="/" className={`ll-tab${rapportenActief ? "" : " is-actief"}`}>
+              Mijn badges
+            </NavLink>
+            <NavLink
+              to="/mijn-rapporten"
+              className={`ll-tab${rapportenActief ? " is-actief" : ""}`}
+            >
+              Mijn rapporten
+            </NavLink>
+          </nav>
+        )}
         {aangemeld && (
           <div className="ll-account">
             {aangemeld.rol === "leerling" && (

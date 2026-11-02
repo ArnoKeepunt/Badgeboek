@@ -1,9 +1,6 @@
 import keerpuntLogo from "../assets/keerpunt-logo.png";
-import { cursussenVoorStroom } from "../lib/curriculum";
-import { stroomVan } from "../lib/leerlingen";
+import { rapportCursussen, rapportKlas } from "../lib/rapportInhoud";
 import { RATING_LABEL } from "../lib/ratings";
-import { KLEUR_KEY, rubriekenVoorCursus } from "../lib/rubrieken";
-import { getRapportCursusKleur, getRapportCursusOpmerking, getRapportItem } from "../lib/store";
 import type { Rapport, Rubriek, Student } from "../lib/types";
 
 /**
@@ -16,41 +13,29 @@ export function RapportPrint({
   student,
   rapport,
   rubrieken,
+  logo = keerpuntLogo,
 }: {
   student: Student;
   rapport: Rapport;
+  /** Het logo; de pdf-server geeft hier een `data:`-URI mee (die laadt niets van buiten). */
+  logo?: string;
   /** `rubriekenLijst()` — bundel + overrides, dezelfde bron als de Rubrics-pagina. */
   rubrieken: Rubriek[];
 }) {
-  const stroom = stroomVan(student, rapport.schooljaar);
-  const cursussen = cursussenVoorStroom(stroom);
-  // Per cursus: enkel de rubrics die effectief een kleur hebben — een leeg/
-  // niet-gekozen rubric staat er standaard niet bij (dat is ballast op een rapport dat de deur uit
-  // gaat; het volledige overzicht incl. lege rubrics blijft gewoon op het scherm staan). Een cursus
-  // komt op het blad zodra er iets ingevuld is: een rubric-kleur, de cursuskleur of -opmerking.
-  const printCursussen = cursussen
-    .map((cursus) => ({
-      cursus,
-      kleur: getRapportCursusKleur(rapport, cursus.id).kleur,
-      opmerking: getRapportCursusOpmerking(rapport, cursus.id),
-      rijen: rubriekenVoorCursus(rubrieken, stroom, cursus.naam, cursus.id)
-        .map((r) => ({ r, item: getRapportItem(rapport, r.id) }))
-        .filter(({ item }) => item.kleur !== null),
-    }))
-    .filter(({ kleur, opmerking, rijen }) => kleur || opmerking || rijen.length > 0);
+  const printCursussen = rapportCursussen(student, rapport, rubrieken);
 
   return (
     <div className="rapport-print">
       {/* Kop: logo links, schooljaar / leerling + klas / rapportmoment rechts. */}
       <header className="rapport-print-kop">
-        <img src={keerpuntLogo} alt="Keerpunt freinetscholen" />
+        <img src={logo} alt="Keerpunt freinetscholen" />
         <div className="rapport-print-kop-info">
           <p>Schooljaar {rapport.schooljaar.replace("-", " – ")}</p>
           <p className="rapport-print-kop-leerling">
             <strong>
               {student.firstName} {student.lastName}
             </strong>
-            <span>{student.klasgroep}</span>
+            <span>{rapportKlas(student, rapport)}</span>
           </p>
           <p>{rapport.naam}</p>
         </div>
@@ -68,7 +53,7 @@ export function RapportPrint({
         </p>
       ) : (
         printCursussen.map(({ cursus, kleur, opmerking, rijen }) => {
-          const leerlijnen = rijen.filter(({ r }) => r.leerlijn.trim());
+          const leerlijnen = rijen.filter(({ rubriek }) => rubriek.leerlijn.trim());
           return (
             <section key={cursus.id} className="rapport-print-cursus">
               {/* Cursuskop: naam + opmerking links, de cursuskleur (eval. cursus) rechts. */}
@@ -90,45 +75,28 @@ export function RapportPrint({
               </div>
 
               {rijen.length > 0 && (
-                <table className="rapport-print-tabel">
-                  <thead>
-                    <tr>
-                      <th>Cursus</th>
-                      <th>Rubric</th>
-                      <th>Kleur</th>
-                      <th>Betekenis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rijen.map(({ r, item }) => (
-                      <tr key={r.id}>
-                        <td>{cursus.naam}</td>
-                        <td>{r.naam}</td>
-                        <td>
-                          <span className={`rating rating-${item.kleur ?? "empty"}`}>
-                            {item.kleur ? RATING_LABEL[item.kleur] : "—"}
-                          </span>
-                        </td>
-                        {/* De rubric-tekst bij de rapport kleur — enkel de 4 kleuren
-                            hebben er een, een witte status (bv. vrijgesteld) niet. */}
-                        <td className="rapport-print-betekenis">
-                          {item.kleur && item.kleur in KLEUR_KEY
-                            ? r.criteria[
-                                KLEUR_KEY[item.kleur as keyof typeof KLEUR_KEY]
-                              ] || "—"
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ul className="rapport-print-rubrieken">
+                  {rijen.map(({ rubriek: r, kleur: rijKleur, betekenis }) => (
+                    <li key={r.id}>
+                      <div className="rapport-print-rubriek-kop">
+                        <strong>{r.naam}</strong>
+                        <span className={`rating rating-${rijKleur}`}>
+                          {RATING_LABEL[rijKleur]}
+                        </span>
+                      </div>
+                      {/* De rubric-tekst bij de gekozen kleur — enkel de 4 kleuren hebben er
+                          een, een witte status (bv. vrijgesteld) niet. */}
+                      {betekenis && <p className="rapport-print-betekenis">{betekenis}</p>}
+                    </li>
+                  ))}
+                </ul>
               )}
 
               {/* Leerlijn onder elke rubric (cluster) van deze cursus. */}
               {leerlijnen.length > 0 && (
                 <div className="rapport-print-kader rapport-print-leerlijn">
                   <h3>Leerlijn</h3>
-                  {leerlijnen.map(({ r }) => (
+                  {leerlijnen.map(({ rubriek: r }) => (
                     <div key={r.id}>
                       {leerlijnen.length > 1 && <h4>{r.naam}</h4>}
                       <p>{r.leerlijn}</p>
