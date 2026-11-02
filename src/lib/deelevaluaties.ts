@@ -4,7 +4,7 @@ import {
   cursussenVoorStroom,
   leerdoelenVoorCursus,
 } from "./curriculum";
-import type { Deelevaluatie, Leerdoel, Stroom } from "./types";
+import type { Deelevaluatie, Leerdoel, Stroom, Student } from "./types";
 
 export type { DeelevaluatieType } from "./curriculum";
 
@@ -82,6 +82,20 @@ const opDatumDanTitel = (a: Deelevaluatie, b: Deelevaluatie): number => {
   if (Boolean(a.datum) !== Boolean(b.datum)) return a.datum ? -1 : 1;
   return a.titel.localeCompare(b.titel, "nl");
 };
+
+/**
+ * Waarom een deelbadgecel niet aanklikbaar is: de deelbadge hoort bij een andere vestiging dan
+ * de leerling (een toets op de ene vestiging hoort niet bij een andere). Met de vestiging van de
+ * leerling erbij — staat die er net anders of leeg, dan zie je meteen dat dáár het probleem zit.
+ */
+export const andereVestigingUitleg = (
+  d: Pick<Deelevaluatie, "vestiging">,
+  leerling: Pick<Student, "vestiging">,
+): string =>
+  `Niet in te vullen: deze deelbadge hoort bij vestiging ${d.vestiging}, ` +
+  (leerling.vestiging
+    ? `deze leerling zit in ${leerling.vestiging}.`
+    : "deze leerling heeft geen vestiging.");
 
 /**
  * Hoort een deelbadge bij deze vestiging? `d.vestiging === ""` = overkoepelend (alle

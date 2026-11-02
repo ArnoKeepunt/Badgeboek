@@ -10,6 +10,7 @@ import { RatingCell } from "../components/RatingCell";
 import { StroomBalk } from "../components/StroomBalk";
 import { leerdoelenVoorStroom } from "../lib/curriculum";
 import {
+  andereVestigingUitleg,
   cursusNamenVoorStroom,
   deelevaluatiesVoor,
   typeById,
@@ -551,17 +552,16 @@ function DeelCursusSectie({
                           return (
                             <td
                               key={s.id}
-                              className="grid-cel"
-                              title={
-                                anderVestiging
-                                  ? `Deelbadge van vestiging ${d.vestiging}`
-                                  : wLabel
-                              }
+                              className={`grid-cel${anderVestiging ? " is-andere-vestiging" : ""}`}
+                              title={anderVestiging ? andereVestigingUitleg(d, s) : wLabel}
                             >
                               <div className={`grid-cel-inhoud rating-${kleur ?? "empty"}`}>
                                 <RatingCell
                                   label={`${s.firstName} — ${d.titel}`}
                                   readonly={vergrendeld || anderVestiging}
+                                  readonlyTitel={
+                                    anderVestiging ? andereVestigingUitleg(d, s) : undefined
+                                  }
                                   value={kleur}
                                   geschiedenis={geschiedenis(sleutel)}
                                   onChange={(next) => setDeelKleur(d.id, s.id, next)}

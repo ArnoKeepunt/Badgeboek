@@ -3241,6 +3241,20 @@ th {
 }
 
 /* Alleen-lezen cel (afgesloten schooljaar, afgewerkt rapport). Gecentreerd zoals de knop. */
+/* Deelbadge van een andere vestiging dan de leerling: niet in te vullen — gearceerd, zodat het
+   niet lijkt op een gewone lege cel die je nog moet aanklikken. */
+.grid-cel.is-andere-vestiging .grid-cel-inhoud {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    var(--border) 5px 6px
+  );
+}
+
+.grid-cel.is-andere-vestiging .rating-cell-btn {
+  cursor: not-allowed;
+}
+
 .rating-cell-btn.is-readonly {
   display: inline-block;
   cursor: default;
