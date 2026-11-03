@@ -12,6 +12,11 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_DATABASE_ID?: string;
   readonly VITE_FIREBASE_STORAGE_BUCKET?: string;
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID?: string;
+  /** Leerling-login via Smartschool (OAuth). Zonder client id verschijnt de knop niet.
+   *  Geen geheimen: het client secret staat enkel in de Cloud Function. */
+  readonly VITE_SMARTSCHOOL_CLIENT_ID?: string;
+  readonly VITE_SMARTSCHOOL_PLATFORM?: string;
+  readonly VITE_SMARTSCHOOL_REDIRECT_URI?: string;
   /** Versie-id van deze build (gezet door `vite.config.ts`, enkel bij `vite build`). */
   readonly VITE_BADGEBOEK_VERSIE?: string;
 }

@@ -4,7 +4,7 @@ import { PERSISTENTIE_MODUS, abonneerAuth, abonneerGebruiker } from "./data";
 import { zetFirebaseBereik } from "./data/firebaseBereik";
 import type { Personeelslid } from "./gebruikers";
 import { heeftDevToegang, isBootstrapAdmin } from "./gebruikers";
-import { zetFirebaseActor } from "./store";
+import { wisLeerlingweergave, zetFirebaseActor } from "./store";
 
 /**
  * Eén module-brede bron voor "wie is er aangemeld bij Firebase" + "welk personeelsaccount
@@ -16,6 +16,12 @@ export interface AuthStatus {
   gebruiker: User | null;
   /** Het personeelsaccount van die gebruiker, of `null` (geen account / local-modus). */
   persoon: Personeelslid | null;
+  /**
+   * Aangemeld als leerling (via Smartschool): de leerling-id uit het custom token. Zo'n account
+   * heeft geen e-mailadres en geen personeelsaccount; Firestore zelf blijft dicht, de gegevens
+   * komen uit de functie `mijnBadgeboek` (zie `data/smartschool.ts`).
+   */
+  leerlingId: string | null;
   /** `true` zolang de auth-status of het account nog opgehaald wordt. */
   laden: boolean;
 }
@@ -23,6 +29,7 @@ export interface AuthStatus {
 let status: AuthStatus = {
   gebruiker: null,
   persoon: null,
+  leerlingId: null,
   laden: PERSISTENTIE_MODUS === "firebase",
 };
 
@@ -37,9 +44,24 @@ if (PERSISTENTIE_MODUS === "firebase") {
     stopPersoon = null;
     zetFirebaseActor(null);
     zetFirebaseBereik(null);
+    // Een leerling meldde af (of de sessie verliep): zijn gegevens en "leerling-sessie" mogen
+    // niet blijven hangen voor wie zich daarna in dit tabblad aanmeldt.
+    if (status.leerlingId) wisLeerlingweergave();
 
-    if (u?.email) {
-      status = { gebruiker: u, persoon: null, laden: true };
+    if (u && !u.email) {
+      status = { gebruiker: u, persoon: null, leerlingId: null, laden: true };
+      meld();
+      void u
+        .getIdTokenResult()
+        .then((t) => (t.claims.rol === "leerling" ? String(t.claims.leerlingId ?? "") : ""))
+        .catch(() => "")
+        .then((leerlingId) => {
+          if (status.gebruiker !== u) return; // ondertussen afgemeld/gewisseld
+          status = { gebruiker: u, persoon: null, leerlingId: leerlingId || null, laden: false };
+          meld();
+        });
+    } else if (u?.email) {
+      status = { gebruiker: u, persoon: null, leerlingId: null, laden: true };
       meld();
       stopPersoon = abonneerGebruiker(u.email, (p) => {
         status = { ...status, persoon: p, laden: false };
@@ -63,7 +85,7 @@ if (PERSISTENTIE_MODUS === "firebase") {
         meld();
       });
     } else {
-      status = { gebruiker: u, persoon: null, laden: false };
+      status = { gebruiker: u, persoon: null, leerlingId: null, laden: false };
       meld();
     }
   });

@@ -851,6 +851,35 @@ export function meldAf() {
   commit({ ...state, sessie: null });
 }
 
+/**
+ * Een echte leerling-login (Smartschool): de afgeschermde leerlingweergave (enkel zijn eigen
+ * gegevens, uit `mijnBadgeboek`) wordt de volledige stand, met de leerling als sessie. Bewust
+ * geen `commit`: er valt niets terug te schrijven (Firestore is dicht voor leerlingen).
+ */
+export function zetLeerlingweergave(rauw: RauweStore, leerlingId: string) {
+  state = {
+    ...verwerkRauw(rauw),
+    sessie: { rol: "leerling", id: leerlingId },
+    matrixStromen: state.matrixStromen,
+    matrixCursus: state.matrixCursus,
+    schooljaar: state.schooljaar,
+  };
+  zetCurriculum(state.curriculumOverride);
+  zetVestigingen(state.vestigingen);
+  zetAfgeslotenSchooljaren(state.afgeslotenSchooljaren);
+  listeners.forEach((notify) => notify());
+}
+
+/** Na het afmelden van een leerling: zijn gegevens en leerling-sessie wissen. */
+export function wisLeerlingweergave() {
+  state = { ...seed(), sessie: null, matrixStromen: state.matrixStromen, matrixCursus: state.matrixCursus };
+  sessieOpslag.bewaar(null);
+  zetCurriculum(null);
+  zetVestigingen(null);
+  zetAfgeslotenSchooljaren(null);
+  listeners.forEach((notify) => notify());
+}
+
 // --- Gebruikers (CSV-import) --------------------------------------------
 
 /**

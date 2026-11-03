@@ -1,4 +1,6 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { meldAfVanFirebase } from "../lib/data";
+import { useAuthStatus } from "../lib/firebaseAuth";
 import { naamVan, useAangemeld } from "../lib/sessie";
 import { meldAf } from "../lib/store";
 import { MeldingenKlok } from "./MeldingenKlok";
@@ -9,6 +11,9 @@ import { MeldingenKlok } from "./MeldingenKlok";
  */
 export function LeerlingShell() {
   const aangemeld = useAangemeld();
+  // Echt aangemeld als leerling (Smartschool) → afmelden = uit de app. Anders is dit het
+  // "bekijk als" van een beheerder → terug naar de beheerder.
+  const { leerlingId } = useAuthStatus();
   const { pathname } = useLocation();
   // "Mijn badges" = de startpagina én de cursuspagina's (`/vak/...`).
   const rapportenActief = pathname.startsWith("/mijn-rapporten");
@@ -62,7 +67,11 @@ export function LeerlingShell() {
               <MeldingenKlok studentId={aangemeld.leerling.id} />
             )}
             <span>{naamVan(aangemeld)}</span>
-            <button type="button" className="ll-afmelden" onClick={() => meldAf()}>
+            <button
+              type="button"
+              className="ll-afmelden"
+              onClick={() => (leerlingId ? void meldAfVanFirebase() : meldAf())}
+            >
               Afmelden
             </button>
           </div>

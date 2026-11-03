@@ -503,6 +503,9 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     },
 
     bewaar(store: PersistedStore): void {
+      // Leerling-login (custom token, geen e-mail): niets te bewaren — Firestore is dicht voor
+      // leerlingen, en hun gefilterde gegevens horen niet in de lokale cache.
+      if (auth.currentUser && !auth.currentUser.email) return;
       laatsteStore = store;
       pendingEmail = auth.currentUser?.email ?? null;
       bewaarCache(store);
@@ -743,6 +746,13 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       };
 
       const unsubAuth = auth.onAuthStateChanged((user) => {
+        // Een leerling (Smartschool, geen e-mail) leest niets rechtstreeks uit Firestore: de
+        // regels weigeren het toch. Zijn gegevens komen uit `mijnBadgeboek` (`smartschool.ts`).
+        if (user && !user.email) {
+          stopAlles();
+          zetGesynct(false);
+          return;
+        }
         if (user) {
           startAlles();
           void herstelBackups(); // bv. na opnieuw aanmelden na een verlopen sessie
@@ -757,7 +767,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       });
       // Herabonneren zodra het vestiging-bereik bekend wordt of wijzigt (login, rolwissel).
       const unsubBereik = opBereikWissel(() => {
-        if (auth.currentUser) startAlles();
+        if (auth.currentUser?.email) startAlles();
       });
 
       return () => {

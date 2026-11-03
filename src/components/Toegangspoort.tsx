@@ -4,13 +4,21 @@ import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase, sessieBeginVan
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
 import { MAX_SESSIE_MS, leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
 import { useGesynct } from "../lib/opslagStatus";
+import {
+  SMARTSCHOOL_ACTIEF,
+  haalLeerlingweergave,
+  isSmartschoolTerugkeer,
+  startSmartschoolAanmelding,
+  verwerkSmartschoolTerugkeer,
+} from "../lib/data/smartschool";
+import { zetLeerlingweergave } from "../lib/store";
 import { AutoAfmelden } from "./AutoAfmelden";
 import { LogoIcoon } from "./LogoIcoon";
 
 /**
- * Toegangspoort: in firebase-modus moet je je eerst aanmelden met een geverifieerd
- * `@keerpuntscholen.be` Google-account. Pas dan verschijnt de app. In local-modus (geen
- * Firebase Auth) is er geen poort.
+ * Toegangspoort: in firebase-modus moet je je eerst aanmelden — personeel met een geverifieerd
+ * `@keerpuntscholen.be` Google-account, leerlingen met Smartschool. Pas dan verschijnt de app.
+ * In local-modus (geen Firebase Auth) is er geen poort.
  */
 export function Toegangspoort({ children }: { children: ReactNode }) {
   if (PERSISTENTIE_MODUS !== "firebase") return <>{children}</>;
@@ -66,6 +74,14 @@ function FirebasePoort({ children }: { children: ReactNode }) {
     );
   }
   if (!status.gebruiker) return <Inloggen />;
+  if (status.leerlingId) {
+    return (
+      <>
+        <AutoAfmelden gebruiker={status.gebruiker} leerling />
+        <LeerlingGegevens leerlingId={status.leerlingId}>{children}</LeerlingGegevens>
+      </>
+    );
+  }
   if (!isKeerpuntAccount(status.gebruiker)) {
     return <GeenToegang gebruiker={status.gebruiker} reden="domein" />;
   }
@@ -77,6 +93,84 @@ function FirebasePoort({ children }: { children: ReactNode }) {
     </>
   );
 }
+
+/** Bij terugkeren naar het tabblad hooguit zo vaak opnieuw ophalen. */
+const LEERLING_VERVERS_MS = 60_000;
+
+/**
+ * Een leerling leest Firestore niet zelf: de functie `mijnBadgeboek` geeft enkel zijn eigen
+ * gegevens. Opgehaald bij het openen en opnieuw wanneer het tabblad weer zichtbaar wordt.
+ */
+function LeerlingGegevens({ leerlingId, children }: { leerlingId: string; children: ReactNode }) {
+  const [klaar, setKlaar] = useState(false);
+  const [fout, setFout] = useState(false);
+  const [poging, setPoging] = useState(0);
+
+  useEffect(() => {
+    let actief = true;
+    let laatste = 0;
+    const haal = () => {
+      laatste = Date.now();
+      haalLeerlingweergave()
+        .then((rauw) => {
+          if (!actief) return;
+          zetLeerlingweergave(rauw, leerlingId);
+          setKlaar(true);
+          setFout(false);
+        })
+        .catch((err) => {
+          console.warn("Leerlinggegevens ophalen mislukt:", err);
+          if (actief) setFout(true);
+        });
+    };
+    const opZichtbaar = () => {
+      if (document.visibilityState === "visible" && Date.now() - laatste > LEERLING_VERVERS_MS) {
+        haal();
+      }
+    };
+    haal();
+    document.addEventListener("visibilitychange", opZichtbaar);
+    return () => {
+      actief = false;
+      document.removeEventListener("visibilitychange", opZichtbaar);
+    };
+  }, [leerlingId, poging]);
+
+  if (klaar) return <>{children}</>;
+  return (
+    <PoortScherm>
+      {fout ? (
+        <>
+          <p className="toegangspoort-fout">
+            Je gegevens konden niet geladen worden. Controleer je verbinding en probeer opnieuw.
+          </p>
+          <button
+            type="button"
+            className="knop-primair toegangspoort-knop"
+            onClick={() => setPoging((p) => p + 1)}
+          >
+            Opnieuw proberen
+          </button>
+          <button
+            type="button"
+            className="knop-secundair toegangspoort-knop"
+            onClick={() => void meldAfVanFirebase()}
+          >
+            Afmelden
+          </button>
+        </>
+      ) : (
+        <p className="toegangspoort-tekst">Gegevens laden…</p>
+      )}
+    </PoortScherm>
+  );
+}
+
+/**
+ * De terugkeer van Smartschool (`?code=…`) één keer verwerken, ook als het inlogscherm twee keer
+ * mount (StrictMode): de code is eenmalig bruikbaar.
+ */
+let smartschoolTerugkeer: Promise<string | null> | null = null;
 
 /** Na zoveel tijd zonder eerste snapshot zeggen we dat er iets mis lijkt. */
 const LADEN_TRAAG_MS = 15_000;
@@ -147,10 +241,40 @@ function GoogleIcoon() {
   );
 }
 
+function SmartschoolIcoon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M3 9.5 12 5l9 4.5-9 4.5-9-4.5zM7 11.5V16c0 1.4 2.2 3 5 3s5-1.6 5-3v-4.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function Inloggen() {
   const [laden, setLaden] = useState(false);
+  const [smartschoolBezig, setSmartschoolBezig] = useState(isSmartschoolTerugkeer);
   const [fout, setFout] = useState("");
   const [afmeldReden] = useState(leesAfmeldReden);
+
+  useEffect(() => {
+    if (!smartschoolTerugkeer && !isSmartschoolTerugkeer()) return;
+    smartschoolTerugkeer ??= verwerkSmartschoolTerugkeer();
+    let actief = true;
+    void smartschoolTerugkeer.then((melding) => {
+      smartschoolTerugkeer = null;
+      if (!actief) return;
+      // Gelukt: de auth-luisteraar neemt over (deze component verdwijnt).
+      if (melding) setFout(melding);
+      setSmartschoolBezig(false);
+    });
+    return () => {
+      actief = false;
+    };
+  }, []);
 
   const aanmelden = async () => {
     setLaden(true);
@@ -170,6 +294,14 @@ function Inloggen() {
     }
   };
 
+  if (smartschoolBezig) {
+    return (
+      <PoortScherm>
+        <p className="toegangspoort-tekst">Aanmelden met Smartschool…</p>
+      </PoortScherm>
+    );
+  }
+
   return (
     <PoortScherm>
       {afmeldReden && (
@@ -180,7 +312,8 @@ function Inloggen() {
         </p>
       )}
       <p className="toegangspoort-tekst">
-        Meld je aan met je Keerpunt-account (<code>@keerpuntscholen.be</code>) om verder te gaan.
+        {SMARTSCHOOL_ACTIEF ? "Personeel: meld" : "Meld"} je aan met je Keerpunt-account
+        (<code>@keerpuntscholen.be</code>) om verder te gaan.
       </p>
       {fout && <p className="toegangspoort-fout">{fout}</p>}
       <button
@@ -192,6 +325,24 @@ function Inloggen() {
         <GoogleIcoon />
         {laden ? "Aanmelden…" : "Aanmelden met Google"}
       </button>
+      {SMARTSCHOOL_ACTIEF && (
+        <>
+          <p className="toegangspoort-tekst toegangspoort-of">
+            Leerling? Meld je aan met je Smartschool-gebruikersnaam en -wachtwoord.
+          </p>
+          <button
+            type="button"
+            className="knop-secundair toegangspoort-knop"
+            onClick={() => {
+              zetAfmeldReden(null);
+              startSmartschoolAanmelding();
+            }}
+          >
+            <SmartschoolIcoon />
+            Aanmelden met Smartschool
+          </button>
+        </>
+      )}
     </PoortScherm>
   );
 }

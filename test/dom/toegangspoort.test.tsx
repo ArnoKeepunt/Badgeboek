@@ -14,7 +14,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   meldAf: vi.fn(),
   sessieBegin: vi.fn<() => Promise<number>>(),
-  status: { gebruiker: null as unknown, persoon: null as unknown, laden: false },
+  status: {
+    gebruiker: null as unknown,
+    persoon: null as unknown,
+    leerlingId: null as string | null,
+    laden: false,
+  },
+  haalLeerlingweergave: vi.fn<() => Promise<object>>(),
+  zetLeerlingweergave: vi.fn(),
 }));
 vi.mock("../../src/lib/data", () => ({
   PERSISTENTIE_MODUS: "firebase",
@@ -23,6 +30,14 @@ vi.mock("../../src/lib/data", () => ({
   sessieBeginVan: m.sessieBegin,
   bevestigAanmelding: vi.fn(),
 }));
+vi.mock("../../src/lib/data/smartschool", () => ({
+  SMARTSCHOOL_ACTIEF: true,
+  haalLeerlingweergave: m.haalLeerlingweergave,
+  isSmartschoolTerugkeer: () => false,
+  startSmartschoolAanmelding: vi.fn(),
+  verwerkSmartschoolTerugkeer: vi.fn(),
+}));
+vi.mock("../../src/lib/store", () => ({ zetLeerlingweergave: m.zetLeerlingweergave }));
 vi.mock("../../src/lib/firebaseAuth", () => ({
   useAuthStatus: () => m.status,
   isKeerpuntAccount: () => true,
@@ -76,7 +91,7 @@ afterEach(() => {
 describe("toegangspoort en sessieduur", () => {
   it("verlopen sessie + geweigerd account: afmelden met 'sessie verlopen', niet 'geen toegang'", async () => {
     m.sessieBegin.mockResolvedValue(NU - MAX_SESSIE_MS - 60_000);
-    m.status = { gebruiker, persoon: null, laden: false }; // de regels weigerden het account
+    m.status = { gebruiker, persoon: null, leerlingId: null, laden: false }; // de regels weigerden het account
 
     await toon();
     expect(m.meldAf).toHaveBeenCalledTimes(1);
@@ -86,7 +101,7 @@ describe("toegangspoort en sessieduur", () => {
 
   it("geldige sessie zonder account: wel 'geen toegang'", async () => {
     m.sessieBegin.mockResolvedValue(NU - 60_000);
-    m.status = { gebruiker, persoon: null, laden: false };
+    m.status = { gebruiker, persoon: null, leerlingId: null, laden: false };
 
     await toon();
     expect(m.meldAf).not.toHaveBeenCalled();
@@ -95,7 +110,7 @@ describe("toegangspoort en sessieduur", () => {
 
   it("geldige sessie met account: de app verschijnt zodra de gegevens binnen zijn", async () => {
     m.sessieBegin.mockResolvedValue(NU - 60_000);
-    m.status = { gebruiker, persoon: { actief: true }, laden: false };
+    m.status = { gebruiker, persoon: { actief: true }, leerlingId: null, laden: false };
 
     // Eerst enkel de (mogelijk oude) lokale cache: nog niets tonen om op te bewerken.
     await toon();
@@ -106,9 +121,32 @@ describe("toegangspoort en sessieduur", () => {
     expect(container.textContent).toContain("de app");
   });
 
+  it("leerling (Smartschool): eigen gegevens via de functie, niet via de Firestore-snapshot", async () => {
+    m.sessieBegin.mockResolvedValue(NU - 60_000);
+    m.haalLeerlingweergave.mockResolvedValue({ students: [] });
+    m.status = {
+      gebruiker: { ...gebruiker, email: null },
+      persoon: null,
+      leerlingId: "emma.janssens",
+      laden: false,
+    };
+
+    await toon();
+    expect(m.zetLeerlingweergave).toHaveBeenCalledWith({ students: [] }, "emma.janssens");
+    expect(container.textContent).toContain("de app");
+    expect(container.textContent).not.toContain("geen toegang");
+  });
+
+  it("inlogscherm toont ook de Smartschool-knop voor leerlingen", async () => {
+    m.status = { gebruiker: null, persoon: null, leerlingId: null, laden: false };
+
+    await toon();
+    expect(container.textContent).toContain("Aanmelden met Smartschool");
+  });
+
   it("na het afmelden toont het inlogscherm waarom", async () => {
     zetAfmeldReden("sessie");
-    m.status = { gebruiker: null, persoon: null, laden: false };
+    m.status = { gebruiker: null, persoon: null, leerlingId: null, laden: false };
 
     await toon();
     expect(container.textContent).toContain("Je sessie is verlopen");

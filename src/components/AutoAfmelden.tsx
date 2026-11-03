@@ -42,7 +42,7 @@ type Melding =
  * zichtbaar wordt. Vóór het afmelden wordt alles bewaard; lukt dat niet (bv. geen verbinding),
  * dan meldt dit niet af maar toont het een melding en probeert het opnieuw tot alles bewaard is.
  */
-export function AutoAfmelden({ gebruiker }: { gebruiker: User }) {
+export function AutoAfmelden({ gebruiker, leerling = false }: { gebruiker: User; leerling?: boolean }) {
   const laatsteRef = useRef(0); // gezet bij het openen, zie hieronder
   const geschrevenRef = useRef(0);
   /** Einde van de sessie (ms), zodra het token gelezen is. */
@@ -221,19 +221,29 @@ export function AutoAfmelden({ gebruiker }: { gebruiker: User }) {
     return (
       <Modal onClose={controleer} label="Bevestig je login">
         <h2 className="auto-afmelden-titel">Bevestig je login</h2>
-        <p className="auto-afmelden-tekst">
-          Je bent al een hele tijd aangemeld. Om de gegevens van leerlingen te beschermen moet je
-          je login om de {MAX_SESSIE_MS / 3_600_000} uur bevestigen. Zonder bevestiging word je
-          over <strong>{tekst}</strong> afgemeld. Je werk blijft gewoon staan.
-        </p>
+        {leerling ? (
+          <p className="auto-afmelden-tekst">
+            Je bent al een hele tijd aangemeld. Over <strong>{tekst}</strong> word je automatisch
+            afgemeld. Meld je daarna gewoon opnieuw aan met Smartschool.
+          </p>
+        ) : (
+          <p className="auto-afmelden-tekst">
+            Je bent al een hele tijd aangemeld. Om de gegevens van leerlingen te beschermen moet je
+            je login om de {MAX_SESSIE_MS / 3_600_000} uur bevestigen. Zonder bevestiging word je
+            over <strong>{tekst}</strong> afgemeld. Je werk blijft gewoon staan.
+          </p>
+        )}
         {bevestigFout && <p className="toegangspoort-fout">{bevestigFout}</p>}
         <div className="auto-afmelden-knoppen">
           <button type="button" className="knop-secundair" onClick={() => void meldAfMetBewaren()}>
             Nu afmelden
           </button>
-          <button type="button" className="knop-primair" onClick={() => void bevestig()}>
-            Login bevestigen
-          </button>
+          {/* Een leerling bevestigt niet via Google: na de sessieduur gewoon opnieuw aanmelden. */}
+          {!leerling && (
+            <button type="button" className="knop-primair" onClick={() => void bevestig()}>
+              Login bevestigen
+            </button>
+          )}
         </div>
       </Modal>
     );

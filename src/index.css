@@ -1673,6 +1673,17 @@ th {
   gap: 8px;
 }
 
+.toegangspoort-knop + .toegangspoort-knop {
+  margin-left: 8px;
+}
+
+/* Scheiding tussen de personeels- (Google) en de leerlinglogin (Smartschool). */
+.toegangspoort-of {
+  margin: 20px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 /* Waarom je terug op het inlogscherm staat (automatisch afgemeld na inactiviteit). */
 .toegangspoort-melding {
   margin: 0 0 12px;

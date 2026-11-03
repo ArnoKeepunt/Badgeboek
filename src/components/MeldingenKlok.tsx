@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { bewaarMeldingenGezien } from "../lib/data/smartschool";
+import { useAuthStatus } from "../lib/firebaseAuth";
 import { aantalOngelezen, markMeldingenGezien, meldingenVoor, useStore } from "../lib/store";
 import type { Melding } from "../lib/types";
 
@@ -20,6 +22,7 @@ function geleden(ts: number): string {
  */
 export function MeldingenKlok({ studentId }: { studentId: string }) {
   const { meldingen, meldingGezien } = useStore();
+  const { leerlingId } = useAuthStatus();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [gezienBijOpen, setGezienBijOpen] = useState(0);
@@ -43,7 +46,13 @@ export function MeldingenKlok({ studentId }: { studentId: string }) {
     }
     setGezienBijOpen(meldingGezien[studentId] ?? 0);
     setOpen(true);
-    if (ongelezen > 0) markMeldingenGezien(studentId);
+    if (ongelezen > 0) {
+      markMeldingenGezien(studentId);
+      // Een echte leerling schrijft niet zelf naar de database: via de functie.
+      if (leerlingId === studentId) {
+        bewaarMeldingenGezien().catch((err) => console.warn("Meldingen als gelezen markeren:", err));
+      }
+    }
   };
 
   const ga = (m: Melding) => {

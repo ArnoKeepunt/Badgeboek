@@ -118,3 +118,6 @@ export const rapportPdf = onCall(
     return { pdf: Buffer.from(pdf).toString("base64") };
   },
 );
+
+// Leerling-login via Smartschool + de afgeschermde leerlingweergave.
+export { mijnBadgeboek, mijnMeldingenGezien, smartschoolAanmelden } from "./smartschool.js";
