@@ -1623,47 +1623,77 @@ th {
 }
 
 /* --- Toegangspoort (verplichte Google-login vóór de app) --------------------- */
+/* --- Toegangspoort: aanmeldscherm voor personeel -------------------------------------------
+   In de stijl van de personeelsapp zelf: lichtgrijze achtergrond, witte kaart met dunne rand,
+   het Keerpunt-woordlogo zoals in de zijbalk, groen als accent. Verticaal, ook op de computer.
+   Bewust anders dan het groene leerlingenscherm (`.ll-login` in Leerling.css). */
+
 .toegangspoort {
   min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 16px;
   background: var(--bg);
 }
 
 .toegangspoort-kaart {
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
+  padding: 30px 28px 24px;
+  border-radius: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 32px 28px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
   text-align: center;
 }
 
-.toegangspoort-logo {
+/* Woordlogo + "Badgeboek · personeel", gescheiden van de inhoud door een lijn. */
+.tp-kop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tp-woordlogo {
   display: block;
-  width: 52px;
-  height: 52px;
-  margin: 0 auto;
+  width: 170px;
+  height: auto;
+}
+
+.tp-rol {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .toegangspoort-titel {
-  margin: 10px 0 14px;
-  font-size: 20px;
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 700;
 }
 
 .toegangspoort-tekst {
-  margin: 0 0 16px;
-  font-size: 13px;
+  margin: 0 0 18px;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--text-muted);
 }
 
 .toegangspoort-fout {
-  margin: 0 0 12px;
-  font-size: 12px;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fef2f2;
+  font-size: 12.5px;
   line-height: 1.5;
   color: #b91c1c;
 }
@@ -1678,16 +1708,42 @@ th {
   margin-left: 8px;
 }
 
-/* Voor wie dit inlogscherm is ("Leerlingen en ouders" / "Personeel"). */
-.toegangspoort-voor {
-  display: inline-block;
-  margin: -6px 0 14px;
-  padding: 3px 10px;
+/* "Aanmelden met Google": de groene hoofdknop van de app, over de volle breedte, met het
+   Google-logo op een wit rondje. */
+.tp-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tp-google svg {
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  padding: 4px;
   border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
+  background: #fff;
+}
+
+.tp-google:hover {
+  background: #335a43;
+}
+
+.tp-google:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* Discreet linkje onderaan naar het andere inlogscherm. */
@@ -1696,6 +1752,7 @@ th {
   padding-top: 14px;
   border-top: 1px solid var(--border);
   font-size: 12px;
+  text-align: center;
   color: var(--text-muted);
 }
 
@@ -1706,6 +1763,45 @@ th {
 
 .toegangspoort-wissel a:hover {
   color: var(--accent);
+}
+
+/* Allereerste laadscherm (nog onbekend wie het is): neutraal, zonder kader. */
+.poort-laden {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #f6f7f5;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.poort-laden img {
+  width: 44px;
+  height: 44px;
+  animation: poort-puls 1.4s ease-in-out infinite;
+}
+
+.poort-laden p {
+  margin: 0;
+}
+
+@keyframes poort-puls {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poort-laden img {
+    animation: none;
+  }
 }
 
 /* Waarom je terug op het inlogscherm staat (automatisch afgemeld na inactiviteit). */

@@ -13,6 +13,8 @@ import {
 } from "../lib/data/smartschool";
 import { zetLeerlingweergave } from "../lib/store";
 import { AutoAfmelden } from "./AutoAfmelden";
+import keerpuntLogo from "../assets/keerpunt-logo.png";
+import "./Leerling.css";
 
 /**
  * Toegangspoort: in firebase-modus moet je je eerst aanmelden — personeel met een geverifieerd
@@ -65,11 +67,13 @@ function FirebasePoort({ children }: { children: ReactNode }) {
   const gesynct = useGesynct();
 
   // Een verlopen sessie wordt net afgemeld: niets tonen tot het inlogscherm verschijnt.
+  // Neutraal (geen personeels- of leerlingkader): op dit moment weten we nog niet wie het is.
   if (status.laden || sessieVerlopen !== false) {
     return (
-      <PoortScherm>
-        <p className="toegangspoort-tekst">Even geduld…</p>
-      </PoortScherm>
+      <div className="poort-laden">
+        <img src="/keerpunt-favicon.png" alt="" />
+        <p>Even geduld…</p>
+      </div>
     );
   }
   if (!status.gebruiker) return <Inloggen />;
@@ -141,31 +145,31 @@ function LeerlingGegevens({ leerlingId, children }: { leerlingId: string; childr
 
   if (klaar) return <>{children}</>;
   return (
-    <PoortScherm>
+    <LeerlingPoortScherm>
       {fout ? (
         <>
-          <p className="toegangspoort-fout">
+          <p className="ll-login-fout">
             Je gegevens konden niet geladen worden. Controleer je verbinding en probeer opnieuw.
           </p>
           <button
             type="button"
-            className="knop-primair toegangspoort-knop"
+            className="ll-login-knop"
             onClick={() => setPoging((p) => p + 1)}
           >
             Opnieuw proberen
           </button>
           <button
             type="button"
-            className="knop-secundair toegangspoort-knop"
+            className="ll-login-knop is-secundair"
             onClick={() => void meldAfVanFirebase()}
           >
             Afmelden
           </button>
         </>
       ) : (
-        <p className="toegangspoort-tekst">Gegevens laden…</p>
+        <p className="ll-login-laden">Je badges worden geladen…</p>
       )}
-    </PoortScherm>
+    </LeerlingPoortScherm>
   );
 }
 
@@ -209,14 +213,44 @@ function GegevensLaden() {
   );
 }
 
-function PoortScherm({ children }: { children: ReactNode }) {
+/**
+ * Het kader voor alles wat **personeel** vóór de app ziet, in de stijl van de personeelsapp zelf
+ * (`Layout`): witte kaart met dunne rand op de lichtgrijze achtergrond, bovenaan hetzelfde
+ * Keerpunt-woordlogo als in de zijbalk. Bewust anders dan het groene leerlingenscherm
+ * (`LeerlingPoortScherm`).
+ */
+function PoortScherm({ titel, children }: { titel?: string; children: ReactNode }) {
   return (
     <div className="toegangspoort">
       <div className="toegangspoort-kaart">
-        {/* Het Keerpunt-logo = hetzelfde beeld als het favicon (public/). */}
-        <img className="toegangspoort-logo" src="/keerpunt-favicon.png" alt="Keerpunt" />
-        <h1 className="toegangspoort-titel">Badgeboek</h1>
+        <div className="tp-kop">
+          <img className="tp-woordlogo" src={keerpuntLogo} alt="Keerpunt freinetscholen" />
+          <span className="tp-rol">Badgeboek · personeel</span>
+        </div>
+        {titel && <h1 className="toegangspoort-titel">{titel}</h1>}
         {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Zelfde kader, maar in de stijl van het leerlingplatform (`Leerling.css`): groene kop zoals de
+ * welkomstbanner, zachtgroene achtergrond. Voor alles wat een leerling/ouder vóór de app ziet —
+ * zo is het verschil met het (sobere) personeelsscherm meteen duidelijk.
+ */
+function LeerlingPoortScherm({ ondertitel, children }: { ondertitel?: string; children: ReactNode }) {
+  return (
+    <div className="ll-login">
+      <div className="ll-login-kaart">
+        <div className="ll-login-kop">
+          <span className="ll-login-logo">
+            <img src="/keerpunt-favicon.png" alt="Keerpunt" />
+          </span>
+          <h1>Mijn badgeboek</h1>
+          {ondertitel && <p>{ondertitel}</p>}
+        </div>
+        <div className="ll-login-inhoud">{children}</div>
       </div>
     </div>
   );
@@ -313,9 +347,9 @@ function Inloggen() {
 
   if (smartschoolBezig) {
     return (
-      <PoortScherm>
-        <p className="toegangspoort-tekst">Aanmelden met Smartschool…</p>
-      </PoortScherm>
+      <LeerlingPoortScherm>
+        <p className="ll-login-laden">Even geduld, we melden je aan…</p>
+      </LeerlingPoortScherm>
     );
   }
 
@@ -329,8 +363,7 @@ function Inloggen() {
 
   if (personeel) {
     return (
-      <PoortScherm>
-        <p className="toegangspoort-voor">Personeel</p>
+      <PoortScherm titel="Aanmelden">
         {melding}
         <p className="toegangspoort-tekst">
           Meld je aan met je Keerpunt-account (<code>@keerpuntscholen.be</code>).
@@ -338,7 +371,7 @@ function Inloggen() {
         {fout && <p className="toegangspoort-fout">{fout}</p>}
         <button
           type="button"
-          className="knop-primair toegangspoort-knop"
+          className="tp-google"
           onClick={aanmelden}
           disabled={laden}
         >
@@ -355,17 +388,12 @@ function Inloggen() {
   }
 
   return (
-    <PoortScherm>
-      <p className="toegangspoort-voor">Leerlingen en ouders</p>
+    <LeerlingPoortScherm ondertitel="Bekijk je badges, deelbadges en rapporten.">
       {melding}
-      <p className="toegangspoort-tekst">
-        Meld je aan met je Smartschool-gebruikersnaam en -wachtwoord. Ouders gebruiken hun
-        co-account: de gebruikersnaam van hun kind met hun eigen wachtwoord.
-      </p>
-      {fout && <p className="toegangspoort-fout">{fout}</p>}
+      {fout && <p className="ll-login-fout">{fout}</p>}
       <button
         type="button"
-        className="knop-primair toegangspoort-knop"
+        className="ll-login-knop"
         onClick={() => {
           zetAfmeldReden(null);
           startSmartschoolAanmelding();
@@ -374,10 +402,17 @@ function Inloggen() {
         <SmartschoolIcoon />
         Aanmelden met Smartschool
       </button>
-      <p className="toegangspoort-wissel">
+      <p className="ll-login-uitleg">
+        Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord als voor Smartschool.
+      </p>
+      <div className="ll-login-tip">
+        <strong>Ouder?</strong> Meld je aan met je co-account: de gebruikersnaam van je kind en
+        je eigen wachtwoord.
+      </div>
+      <p className="ll-login-wissel">
         Personeel? <a href={`/?${PERSONEEL_PARAM}`}>Aanmelden met je Keerpunt-account</a>
       </p>
-    </PoortScherm>
+    </LeerlingPoortScherm>
   );
 }
 

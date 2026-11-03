@@ -1253,3 +1253,202 @@ details.ll-ballon[open] > summary::after {
     transition: none;
   }
 }
+
+/* --- Aanmeldscherm voor leerlingen en ouders ---------------------------------------------
+   Zelfde sfeer als het platform zelf (achtergrond, groene banner, Inter), zodat het meteen
+   anders voelt dan het sobere personeelsscherm (`.toegangspoort` in index.css). */
+
+.ll-login {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  font-family: "Inter", var(--sans);
+  color: var(--text);
+  background:
+    radial-gradient(900px 420px at 50% -80px, #d6e8dc 0%, rgba(214, 232, 220, 0) 70%),
+    #f6f7f5;
+}
+
+.ll-login-kaart {
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow:
+    0 2px 6px rgba(16, 24, 40, 0.05),
+    0 20px 48px rgba(16, 24, 40, 0.1);
+}
+
+/* Groene kop — dezelfde verloop + decoratieve cirkels als de welkomstbanner. */
+.ll-login-kop {
+  position: relative;
+  overflow: hidden;
+  padding: 30px 28px 26px;
+  background: linear-gradient(135deg, #3d684e 0%, #4f7f61 55%, #6a9a7a 100%);
+  color: #fff;
+  text-align: center;
+}
+
+.ll-login-kop::before,
+.ll-login-kop::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.ll-login-kop::before {
+  width: 200px;
+  height: 200px;
+  right: -70px;
+  top: -90px;
+}
+
+.ll-login-kop::after {
+  width: 130px;
+  height: 130px;
+  left: -50px;
+  bottom: -70px;
+}
+
+.ll-login-kop > * {
+  position: relative;
+}
+
+/* Het Keerpunt-logo op een wit tegeltje, zodat het groen/rood niet wegvalt op de groene kop. */
+.ll-login-logo {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.ll-login-logo img {
+  display: block;
+  width: 44px;
+  height: 44px;
+}
+
+.ll-login-kop h1 {
+  margin: 14px 0 4px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ll-login-kop p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.ll-login-inhoud {
+  padding: 24px 24px 20px;
+  text-align: center;
+}
+
+.ll-login-knop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 14px;
+  background: #2f5a41;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(47, 90, 65, 0.25);
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+
+.ll-login-knop svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ll-login-knop:hover {
+  background: #284e38;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(47, 90, 65, 0.3);
+}
+
+.ll-login-knop.is-secundair {
+  margin-top: 8px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--ll-rand, #e8ebe7);
+}
+
+.ll-login-knop.is-secundair:hover {
+  background: #f6f7f5;
+}
+
+.ll-login-uitleg {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Tip voor ouders: zacht kader, links uitgelijnd. */
+.ll-login-tip {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f4f6f3;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  color: #374151;
+}
+
+.ll-login-laden {
+  margin: 6px 0 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.ll-login-fout {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.ll-login-wissel {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ll-login-wissel a {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ll-login-wissel a:hover {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-login-knop {
+    transition: none;
+  }
+}
