@@ -84,9 +84,31 @@ export function LeerlingRapporten() {
           {mijn.map((r) => (
             <li key={r.id}>
               <Link to={`/mijn-rapporten/${r.id}`} className="ll-rapport-kaart">
-                <span className="ll-rapport-naam">{r.naam}</span>
-                <span className="ll-rapport-jaar">
-                  Schooljaar {r.schooljaar.replace("-", " – ")}
+                <span className="ll-rapport-icoon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M14 3v5h5M9.5 13h5M9.5 16.5h5"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span className="ll-rapport-tekst">
+                  <span className="ll-rapport-naam">{r.naam}</span>
+                  <span className="ll-rapport-jaar">
+                    Schooljaar {r.schooljaar.replace("-", " – ")}
+                  </span>
+                </span>
+                <span className="ll-pijl" aria-hidden="true">
+                  ›
                 </span>
               </Link>
             </li>

@@ -1,0 +1,1255 @@
+/* ===========================================================================
+   Leerlingweergave — eigen, vriendelijke layout (geen zijbalk, geen tabellen).
+   Geladen door `LeerlingShell`. Kaarten met zachte schaduwen, ruime hoeken; de
+   beoordelingskleuren (`--rating-*`, van de `rating-<kleur>`-klasse) blijven de enige
+   "betekenisvolle" kleuren — de cursusicoontjes gebruiken bewust een eigen, neutraal palet.
+   =========================================================================== */
+
+.ll-shell {
+  --ll-kaart-schaduw: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 14px rgba(16, 24, 40, 0.05);
+  --ll-kaart-schaduw-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 28px rgba(16, 24, 40, 0.09);
+  --ll-rand: #e8ebe7;
+  --ll-zacht: #f4f6f3;
+
+  min-height: 100svh;
+  font-family: "Inter", var(--sans);
+  color: var(--text);
+}
+
+/* Enkel op het scherm: bij afdrukken wint de witte achtergrond uit index.css (`@media print`). */
+@media screen {
+  .ll-shell {
+    background:
+      radial-gradient(1100px 380px at 50% -120px, #dcebe1 0%, rgba(220, 235, 225, 0) 70%),
+      #f6f7f5;
+  }
+
+  .ll-content {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 20px 56px;
+  }
+}
+
+/* --- Bovenbalk ------------------------------------------------------------ */
+
+.ll-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  /* Bewust géén `backdrop-filter`: dat maakt van de balk het referentievlak voor `position:
+     fixed`-kinderen, waardoor de achtergrond van het meldingenpaneel (klik ernaast = sluiten)
+     enkel de balk zelf bedekte. */
+  background: rgba(255, 255, 255, 0.97);
+  border-bottom: 1px solid var(--ll-rand);
+}
+
+/* Zelfde kolom als `.ll-content` (max 920px, 20px marge): logo en knoppen staan recht boven
+   de linker- en rechterrand van de inhoud. */
+.ll-topbar-binnen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 920px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.ll-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Het rugzakje in een groen tegeltje. */
+.ll-brand-icoon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Laat de titel afkappen i.p.v. de rest weg te duwen op smalle schermen. */
+.ll-brand-tekst {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tabs: "Mijn badges" · "Mijn rapporten" — een segmentknop, vlak naast het logo. Een grijze
+   bak zonder rand; de actieve tab wit (als een opgelicht knopje) met donkergroene
+   tekst — geen groen op groen. */
+.ll-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  margin-right: auto;
+  padding: 4px;
+  border-radius: 999px;
+  background: #eef0ec;
+}
+
+.ll-tab {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #4b5563;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.ll-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.ll-tab.is-actief {
+  background: #fff;
+  color: #2f5a41;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.14);
+}
+
+.ll-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ll-afmelden {
+  border: 1px solid var(--ll-rand);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.ll-afmelden:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ll-afmelden {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ll-afmelden-icoon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* Initialen-rondje: enkel op de gsm, in plaats van de volledige naam. */
+.ll-avatar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .ll-topbar-binnen {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 10px;
+    padding: 10px 16px;
+  }
+
+  .ll-tabs {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ll-tab {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Compacte balk: enkel het logo-tegeltje, initialen i.p.v. de naam, afmelden als icoon. */
+  .ll-brand-tekst,
+  .ll-naam,
+  .ll-afmelden-tekst {
+    display: none;
+  }
+
+  .ll-avatar {
+    display: inline-flex;
+  }
+
+  .ll-account {
+    gap: 8px;
+  }
+
+  .ll-afmelden {
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
+
+  .ll-afmelden-icoon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* --- Gedeelde bouwstenen -------------------------------------------------- */
+
+.ll-kop {
+  margin: 36px 0 14px;
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.ll-terug {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--text);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.ll-terug:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ll-leeg {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-muted);
+}
+
+/* Pijltje rechts op een kaart: eigen ruimte, zodat het niet tegen de strook of tekst plakt. */
+.ll-pijl {
+  flex: none;
+  width: 24px;
+  margin-left: 6px;
+  text-align: center;
+  font-size: 22px;
+  line-height: 1;
+  color: #b4bab3;
+  transition:
+    transform 0.15s,
+    color 0.15s;
+}
+
+/* Gekleurd bolletje: neemt de kleur van de `rating-<kleur>`-klasse op zichzelf of een ouder. */
+.ll-bol {
+  flex: none;
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--rating-solid, #c9cfd6);
+}
+
+.ll-bol.is-leeg,
+.rating-empty > .ll-bol {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #c3c9c2;
+}
+
+/* Kleurlabel: pil met bolletje, de tint van de mentormatrix. */
+.ll-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rating-border);
+  border-radius: 999px;
+  background: var(--rating-bg);
+  color: var(--rating-fg);
+  padding: 4px 11px 4px 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ll-status.is-klein {
+  padding: 2px 9px 2px 7px;
+  font-size: 11.5px;
+  gap: 5px;
+}
+
+.ll-status.is-klein .ll-bol {
+  width: 7px;
+  height: 7px;
+}
+
+/* "Nog niet beoordeeld": gedempte tekst, geen gekleurde pil. */
+.ll-status.rating-empty {
+  border: 1px dashed #cdd3cc;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Kleurenstrook: hoeveel badges in welke kleur. */
+.ll-strook {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eceeea;
+}
+
+.ll-strook > span {
+  display: block;
+  height: 100%;
+  background: var(--rating-solid);
+}
+
+.ll-strook-leeg {
+  background: #e3e6e1 !important;
+}
+
+/* Legende bij een strook: bolletje + aantal per kleur. */
+.ll-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.ll-legende li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+/* Cursusicoontje: initialen in een zacht gekleurd tegeltje. */
+.ll-cursus-icoon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.ll-cursus-icoon.is-groot {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 18px;
+}
+
+/* --- Startpagina ----------------------------------------------------------- */
+
+/* Rooster: groet, zin en legende links; de ring rechts over de volle hoogte. Op de gsm schuift
+   de ring naast de groet (zie onderaan). */
+.ll-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "graad   ring"
+    "titel   ring"
+    "cijfer  ring"
+    "legende ring";
+  align-items: center;
+  column-gap: 28px;
+  overflow: hidden;
+  padding: 30px 32px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #3d684e 0%, #4f7f61 55%, #6a9a7a 100%);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(61, 104, 78, 0.25);
+}
+
+/* Zachte decoratieve cirkels op de achtergrond. */
+.ll-hero::before,
+.ll-hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.ll-hero::before {
+  width: 280px;
+  height: 280px;
+  right: -60px;
+  top: -120px;
+}
+
+.ll-hero::after {
+  width: 180px;
+  height: 180px;
+  left: 38%;
+  bottom: -110px;
+}
+
+.ll-hero > * {
+  position: relative;
+}
+
+.ll-hero-graad {
+  grid-area: graad;
+  justify-self: start;
+  margin-bottom: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.ll-hero-titel {
+  grid-area: titel;
+  margin: 0 0 8px;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ll-hero-cijfer {
+  grid-area: cijfer;
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ll-hero-cijfer strong {
+  color: #fff;
+  font-size: 18px;
+}
+
+.ll-hero-klaar {
+  font-weight: 700;
+  color: #fff;
+}
+
+.ll-hero > .ll-legende {
+  grid-area: legende;
+}
+
+/* Legende in de groene banner: witte tekst, bolletjes in een wit randje. */
+.ll-hero .ll-legende {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.ll-hero .ll-legende li {
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ll-hero .ll-bol {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+
+.ll-hero .ll-bol.is-leeg {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+
+/* De ring op de groene banner: witte cijfers en een lichte achtergrondring. */
+.ll-hero .ring {
+  grid-area: ring;
+  justify-self: end;
+}
+
+.ll-hero .ring circle:first-child {
+  stroke: rgba(255, 255, 255, 0.2);
+}
+
+.ll-hero .ring circle:last-of-type {
+  stroke: #fff;
+}
+
+.ring-getal {
+  font-weight: 800;
+  fill: var(--text);
+  font-size: 20px;
+}
+
+.ring-groot .ring-getal {
+  font-size: 34px;
+}
+
+.ring-totaal {
+  fill: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.55em;
+}
+
+.ll-hero .ring-getal {
+  fill: #fff;
+}
+
+.ll-hero .ring-totaal {
+  fill: rgba(255, 255, 255, 0.7);
+}
+
+/* Cursuskaarten: dicht op elkaar, icoontje links, strook onderaan. */
+.ll-cursussen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.ll-cursus-kaart {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 14px 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  box-shadow: var(--ll-kaart-schaduw);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ll-cursus-kaart:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ll-kaart-schaduw-hover);
+  border-color: #d5dcd4;
+}
+
+.ll-cursus-kaart:hover .ll-pijl {
+  transform: translateX(2px);
+  color: var(--accent);
+}
+
+.ll-cursus-midden {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ll-cursus-naam {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.ll-cursus-stand {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.ll-cursus-midden .ll-strook {
+  margin-top: 6px;
+}
+
+/* --- Cursuspagina ------------------------------------------------------------ */
+
+.ll-cursus-hero {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 18px;
+  padding: 22px 24px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  box-shadow: var(--ll-kaart-schaduw);
+}
+
+.ll-cursus-hero-tekst {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.ll-cursus-hero-tekst h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ll-cursus-hero-tekst p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.ll-cursus-hero-strook {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ll-cursus-hero-strook .ll-strook {
+  height: 10px;
+}
+
+/* Elke badge = een eigen kaart met een kleurrand links. */
+.ll-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ll-badge-kaart {
+  position: relative;
+  padding: 16px 18px 16px 22px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  box-shadow: var(--ll-kaart-schaduw);
+  overflow: hidden;
+}
+
+.ll-badge-kaart::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--rating-solid);
+}
+
+/* Nog niet beoordeeld: rustiger — geen kleurrand, gestippelde rand, geen schaduw. */
+.ll-badge-kaart.is-open {
+  background: rgba(255, 255, 255, 0.6);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.ll-badge-kaart.is-open::before {
+  display: none;
+}
+
+.ll-badge-kop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.ll-badge-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ll-badge-tekst {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.ll-badge-beoordelaar {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Mentoropmerking als tekstballon. */
+.ll-ballon {
+  position: relative;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--ll-zacht);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ll-ballon p {
+  margin: 2px 0 0;
+}
+
+.ll-ballon-kop {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+details.ll-ballon > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+details.ll-ballon > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.ll-ballon > summary::after {
+  content: "Lees meer ▸";
+  font-weight: 600;
+  color: var(--accent);
+}
+
+details.ll-ballon[open] > summary::after {
+  content: "Minder ▾";
+}
+
+/* Deelbadges: binnen de kaart van hun badge, als kleine rijen met een kleurbolletje. */
+.ll-deelbadges {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eef0ed;
+}
+
+.ll-deelbadges-kop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ll-teller {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ll-zacht);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-align: center;
+  color: var(--text);
+}
+
+.ll-deelbadges ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ll-deel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  /* De globale `.rating-empty` zet `border-style: dashed`; een deelbadge heeft geen rand. */
+  border: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ll-zacht);
+}
+
+.ll-deel > .ll-bol {
+  margin-top: 6px;
+}
+
+.ll-deel-midden {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ll-deel-titel {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.ll-deel-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Opmerking bij een deelbadge: zelfde ballon, maar wit op de grijze rij. */
+.ll-deel .ll-ballon {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+/* "Waar we op letten": uitklapbare rubrics als kaarten. */
+.ll-rubrieken-uitleg {
+  margin: -6px 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ll-rubrieken-lijst {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ll-rubriek-uit {
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+}
+
+.ll-rubriek-uit > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 0;
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 14px;
+  list-style: none;
+}
+
+.ll-rubriek-uit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ll-rubriek-uit > summary::after {
+  content: "›";
+  font-size: 20px;
+  line-height: 1;
+  color: #b4bab3;
+  transition: transform 0.15s;
+}
+
+.ll-rubriek-uit[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.ll-rubriek-uit[open] {
+  padding-bottom: 14px;
+}
+
+/* --- Mijn rapporten ---------------------------------------------------------- */
+
+.ll-rapporten > .ll-kop {
+  margin-top: 4px;
+}
+
+.ll-rapporten-leeg {
+  padding: 28px 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px dashed #cdd3cc;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.ll-rapporten-lijst {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ll-rapport-kaart {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  box-shadow: var(--ll-kaart-schaduw);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ll-rapport-kaart:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ll-kaart-schaduw-hover);
+}
+
+.ll-rapport-kaart:hover .ll-pijl {
+  transform: translateX(2px);
+  color: var(--accent);
+}
+
+.ll-rapport-icoon {
+  flex: none;
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  padding: 9px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ll-rapport-icoon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ll-rapport-tekst {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ll-rapport-naam {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ll-rapport-jaar {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.ll-rapport-acties {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ll-rapport-acties .ll-terug {
+  margin-bottom: 0;
+}
+
+.ll-rapport-knoppen {
+  display: flex;
+  gap: 8px;
+}
+
+.ll-rapport-knoppen a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Het afgewerkte rapport op het scherm: dezelfde `.rapport-print`-opmaak als op papier, als
+   een wit blad. */
+.ll-rapport-blad .rapport-print {
+  display: block;
+}
+
+@media screen {
+  .ll-rapport-blad {
+    padding: 28px;
+    border-radius: 16px;
+    background: #fff;
+    border: 1px solid var(--ll-rand);
+    box-shadow: var(--ll-kaart-schaduw);
+  }
+}
+
+/* --- Meldingencentrum ------------------------------------------------------- */
+
+.ll-klok {
+  position: relative;
+  display: flex;
+}
+
+.ll-klok-knop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--ll-rand);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.ll-klok-icoon {
+  width: 19px;
+  height: 19px;
+}
+
+.ll-klok-knop:hover,
+.ll-klok-knop.is-actief {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ll-klok-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e5484d;
+  box-shadow: 0 0 0 2px #fff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.ll-klok-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.ll-klok-paneel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 330px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--ll-rand);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(16, 24, 40, 0.18);
+}
+
+.ll-klok-kop {
+  padding: 14px 16px;
+  font-weight: 750;
+  font-size: 15px;
+  border-bottom: 1px solid #eef0ed;
+}
+
+.ll-klok-leeg {
+  margin: 0;
+  padding: 18px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ll-klok-lijst {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.ll-klok-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ll-klok-item:hover,
+.ll-klok-item.is-nieuw {
+  background: var(--accent-soft);
+}
+
+.ll-klok-item.is-nieuw .ll-klok-item-tekst::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.ll-klok-item-tekst {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.ll-klok-item-tijd {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Gsm: het paneel hangt niet meer aan het klokje (liep links buiten beeld) maar ligt over de
+   volle breedte net onder de bovenste rij, met een lichte verduistering erachter. */
+@media (max-width: 720px) {
+  .ll-klok {
+    position: static;
+  }
+
+  .ll-klok-backdrop {
+    background: rgba(16, 24, 40, 0.28);
+  }
+
+  .ll-klok-paneel {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: 60vh;
+  }
+}
+
+/* --- Gsm ---------------------------------------------------------------------- */
+
+@media screen and (max-width: 560px) {
+  .ll-content {
+    padding: 18px 16px 48px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Compacte banner: kleine ring naast de groet, zin + legende eronder over de volle breedte. */
+  .ll-hero {
+    grid-template-areas:
+      "graad   ring"
+      "titel   ring"
+      "cijfer  cijfer"
+      "legende legende";
+    column-gap: 12px;
+    padding: 20px 18px 18px;
+    border-radius: 20px;
+  }
+
+  .ll-hero-graad {
+    margin-bottom: 6px;
+  }
+
+  .ll-hero-titel {
+    margin: 0;
+    font-size: 24px;
+  }
+
+  .ll-hero .ring {
+    width: 78px;
+    height: 78px;
+  }
+
+  .ll-hero-cijfer {
+    margin: 12px 0 12px;
+    font-size: 14.5px;
+  }
+
+  .ll-hero-cijfer strong {
+    font-size: 15.5px;
+  }
+
+  .ll-hero .ll-legende {
+    gap: 6px;
+    font-size: 11.5px;
+  }
+
+  .ll-hero .ll-legende li {
+    padding: 3px 8px 3px 6px;
+  }
+
+  .ll-cursussen,
+  .ll-rapporten-lijst {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .ll-cursus-kaart {
+    padding: 12px;
+  }
+
+  .ll-cursus-hero {
+    padding: 18px;
+  }
+
+  .ll-badge-kaart {
+    padding: 14px 14px 14px 18px;
+  }
+
+  /* Smal scherm: het kleurlabel onder de badgetekst i.p.v. ernaast. */
+  .ll-badge-kop {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ll-rapport-blad {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-cursus-kaart,
+  .ll-rapport-kaart,
+  .ll-pijl {
+    transition: none;
+  }
+}

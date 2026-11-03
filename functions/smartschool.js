@@ -63,7 +63,10 @@ export const smartschoolAanmelden = onCall(
     });
     const token = await tokenAntwoord.json().catch(() => null);
     if (!tokenAntwoord.ok || !token?.access_token) {
-      console.warn("Smartschool token mislukt:", tokenAntwoord.status, token?.error ?? "");
+      // Het antwoord bevat geen geheimen (enkel foutcode + uitleg); het secret zit in ons verzoek.
+      console.warn("Smartschool token mislukt:", tokenAntwoord.status, JSON.stringify(token ?? {}), {
+        redirect_uri: REDIRECT_URI.value(),
+      });
       throw new HttpsError("unauthenticated", "Smartschool weigerde de aanmelding.");
     }
 
