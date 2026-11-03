@@ -1643,9 +1643,10 @@ th {
 }
 
 .toegangspoort-logo {
-  width: 34px;
-  height: 33px;
-  color: var(--accent);
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto;
 }
 
 .toegangspoort-titel {
@@ -1677,11 +1678,34 @@ th {
   margin-left: 8px;
 }
 
-/* Scheiding tussen de personeels- (Google) en de leerlinglogin (Smartschool). */
-.toegangspoort-of {
-  margin: 20px 0 8px;
-  padding-top: 16px;
+/* Voor wie dit inlogscherm is ("Leerlingen en ouders" / "Personeel"). */
+.toegangspoort-voor {
+  display: inline-block;
+  margin: -6px 0 14px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Discreet linkje onderaan naar het andere inlogscherm. */
+.toegangspoort-wissel {
+  margin: 22px 0 0;
+  padding-top: 14px;
   border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.toegangspoort-wissel a {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.toegangspoort-wissel a:hover {
+  color: var(--accent);
 }
 
 /* Waarom je terug op het inlogscherm staat (automatisch afgemeld na inactiviteit). */

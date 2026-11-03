@@ -85,7 +85,10 @@ export const smartschoolAanmelden = onCall(
     if (!leerlingId) {
       throw new HttpsError(
         "not-found",
-        `Er staat geen leerling met gebruikersnaam "${gebruikersnaam}" in het badgeboek.`,
+        // Meestal personeel dat het via Smartschool probeert, of een leerling die nog niet
+        // (met gebruikersnaam) geïmporteerd is.
+        `"${gebruikersnaam}" is geen leerling in het badgeboek. Ben je personeel? Meld je dan ` +
+          "aan via de personeelsaanmelding met je Keerpunt-account.",
       );
     }
 

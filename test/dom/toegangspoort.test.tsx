@@ -137,11 +137,36 @@ describe("toegangspoort en sessieduur", () => {
     expect(container.textContent).not.toContain("geen toegang");
   });
 
-  it("inlogscherm toont ook de Smartschool-knop voor leerlingen", async () => {
+  it("gewone link = inlogscherm voor leerlingen en ouders: enkel Smartschool", async () => {
     m.status = { gebruiker: null, persoon: null, leerlingId: null, laden: false };
 
     await toon();
     expect(container.textContent).toContain("Aanmelden met Smartschool");
+    expect(container.textContent).not.toContain("Aanmelden met Google");
+  });
+
+  it("?personeel = inlogscherm voor personeel: enkel Google", async () => {
+    window.history.replaceState(null, "", "/?personeel");
+    m.status = { gebruiker: null, persoon: null, leerlingId: null, laden: false };
+
+    await toon();
+    expect(container.textContent).toContain("Aanmelden met Google");
+    expect(container.textContent).not.toContain("Aanmelden met Smartschool");
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("leerling met zijn Google-adres: doorverwezen naar Smartschool", async () => {
+    m.sessieBegin.mockResolvedValue(NU - 60_000);
+    m.status = {
+      gebruiker: { ...gebruiker, email: "emma.janssens.leerling@keerpuntscholen.be" },
+      persoon: null,
+      leerlingId: null,
+      laden: false,
+    };
+
+    await toon();
+    expect(container.textContent).toContain("leerlingenaccount");
+    expect(container.textContent).toContain("Smartschool");
   });
 
   it("na het afmelden toont het inlogscherm waarom", async () => {

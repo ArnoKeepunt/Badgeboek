@@ -13,7 +13,6 @@ import {
 } from "../lib/data/smartschool";
 import { zetLeerlingweergave } from "../lib/store";
 import { AutoAfmelden } from "./AutoAfmelden";
-import { LogoIcoon } from "./LogoIcoon";
 
 /**
  * Toegangspoort: in firebase-modus moet je je eerst aanmelden — personeel met een geverifieerd
@@ -81,6 +80,10 @@ function FirebasePoort({ children }: { children: ReactNode }) {
         <LeerlingGegevens leerlingId={status.leerlingId}>{children}</LeerlingGegevens>
       </>
     );
+  }
+  // Een leerling die het met zijn Google-adres (`….leerling@keerpuntscholen.be`) probeert.
+  if (/\.leerling@keerpuntscholen\.be$/i.test(status.gebruiker.email ?? "")) {
+    return <GeenToegang gebruiker={status.gebruiker} reden="leerling" />;
   }
   if (!isKeerpuntAccount(status.gebruiker)) {
     return <GeenToegang gebruiker={status.gebruiker} reden="domein" />;
@@ -210,7 +213,8 @@ function PoortScherm({ children }: { children: ReactNode }) {
   return (
     <div className="toegangspoort">
       <div className="toegangspoort-kaart">
-        <LogoIcoon className="toegangspoort-logo" />
+        {/* Het Keerpunt-logo = hetzelfde beeld als het favicon (public/). */}
+        <img className="toegangspoort-logo" src="/keerpunt-favicon.png" alt="Keerpunt" />
         <h1 className="toegangspoort-titel">Badgeboek</h1>
         {children}
       </div>
@@ -254,11 +258,24 @@ function SmartschoolIcoon() {
   );
 }
 
+/**
+ * Twee aparte inlogschermen, om misverstanden te vermijden:
+ * - de gewone link (`/`) = **leerlingen en ouders**, enkel Smartschool. Moet de site-root zijn:
+ *   daar stuurt Smartschool na het aanmelden naar terug (de geregistreerde redirect-URI).
+ * - `/?personeel` = **personeel**, enkel Google (`@keerpuntscholen.be`).
+ * Onderaan elk scherm een discreet linkje naar het andere. Zonder Smartschool (bv. local-modus
+ * of geen client id) is er enkel het personeelsscherm.
+ */
+const PERSONEEL_PARAM = "personeel";
+const isPersoneelsScherm = () =>
+  !SMARTSCHOOL_ACTIEF || new URLSearchParams(window.location.search).has(PERSONEEL_PARAM);
+
 function Inloggen() {
   const [laden, setLaden] = useState(false);
   const [smartschoolBezig, setSmartschoolBezig] = useState(isSmartschoolTerugkeer);
   const [fout, setFout] = useState("");
   const [afmeldReden] = useState(leesAfmeldReden);
+  const personeel = isPersoneelsScherm();
 
   useEffect(() => {
     if (!smartschoolTerugkeer && !isSmartschoolTerugkeer()) return;
@@ -302,57 +319,84 @@ function Inloggen() {
     );
   }
 
+  const melding = afmeldReden && (
+    <p className="toegangspoort-melding">
+      {afmeldReden === "sessie"
+        ? "Je sessie is verlopen. Meld je opnieuw aan om verder te werken."
+        : "Je werd automatisch afgemeld omdat je een tijdje niet actief was."}
+    </p>
+  );
+
+  if (personeel) {
+    return (
+      <PoortScherm>
+        <p className="toegangspoort-voor">Personeel</p>
+        {melding}
+        <p className="toegangspoort-tekst">
+          Meld je aan met je Keerpunt-account (<code>@keerpuntscholen.be</code>).
+        </p>
+        {fout && <p className="toegangspoort-fout">{fout}</p>}
+        <button
+          type="button"
+          className="knop-primair toegangspoort-knop"
+          onClick={aanmelden}
+          disabled={laden}
+        >
+          <GoogleIcoon />
+          {laden ? "Aanmelden…" : "Aanmelden met Google"}
+        </button>
+        {SMARTSCHOOL_ACTIEF && (
+          <p className="toegangspoort-wissel">
+            Leerling of ouder? <a href="/">Ga naar de aanmelding voor leerlingen</a>
+          </p>
+        )}
+      </PoortScherm>
+    );
+  }
+
   return (
     <PoortScherm>
-      {afmeldReden && (
-        <p className="toegangspoort-melding">
-          {afmeldReden === "sessie"
-            ? "Je sessie is verlopen. Meld je opnieuw aan om verder te werken."
-            : "Je werd automatisch afgemeld omdat je een tijdje niet actief was."}
-        </p>
-      )}
+      <p className="toegangspoort-voor">Leerlingen en ouders</p>
+      {melding}
       <p className="toegangspoort-tekst">
-        {SMARTSCHOOL_ACTIEF ? "Personeel: meld" : "Meld"} je aan met je Keerpunt-account
-        (<code>@keerpuntscholen.be</code>) om verder te gaan.
+        Meld je aan met je Smartschool-gebruikersnaam en -wachtwoord. Ouders gebruiken hun
+        co-account: de gebruikersnaam van hun kind met hun eigen wachtwoord.
       </p>
       {fout && <p className="toegangspoort-fout">{fout}</p>}
       <button
         type="button"
         className="knop-primair toegangspoort-knop"
-        onClick={aanmelden}
-        disabled={laden}
+        onClick={() => {
+          zetAfmeldReden(null);
+          startSmartschoolAanmelding();
+        }}
       >
-        <GoogleIcoon />
-        {laden ? "Aanmelden…" : "Aanmelden met Google"}
+        <SmartschoolIcoon />
+        Aanmelden met Smartschool
       </button>
-      {SMARTSCHOOL_ACTIEF && (
-        <>
-          <p className="toegangspoort-tekst toegangspoort-of">
-            Leerling? Meld je aan met je Smartschool-gebruikersnaam en -wachtwoord.
-          </p>
-          <button
-            type="button"
-            className="knop-secundair toegangspoort-knop"
-            onClick={() => {
-              zetAfmeldReden(null);
-              startSmartschoolAanmelding();
-            }}
-          >
-            <SmartschoolIcoon />
-            Aanmelden met Smartschool
-          </button>
-        </>
-      )}
+      <p className="toegangspoort-wissel">
+        Personeel? <a href={`/?${PERSONEEL_PARAM}`}>Aanmelden met je Keerpunt-account</a>
+      </p>
     </PoortScherm>
   );
 }
 
-function GeenToegang({ gebruiker, reden }: { gebruiker: User; reden: "domein" | "account" }) {
+function GeenToegang({
+  gebruiker,
+  reden,
+}: {
+  gebruiker: User;
+  reden: "domein" | "account" | "leerling";
+}) {
   return (
     <PoortScherm>
       <p className="toegangspoort-tekst">
         Je bent aangemeld als <strong>{gebruiker.email ?? gebruiker.displayName}</strong>.{" "}
-        {reden === "domein" ? (
+        {reden === "leerling" ? (
+          <>
+            Dat is een leerlingenaccount. Leerlingen (en ouders) melden zich aan met Smartschool.
+          </>
+        ) : reden === "domein" ? (
           <>
             Dat account hoort niet bij Keerpunt (<code>@keerpuntscholen.be</code>). Meld je aan
             met je Keerpunt-account.
@@ -366,9 +410,14 @@ function GeenToegang({ gebruiker, reden }: { gebruiker: User; reden: "domein" | 
       <button
         type="button"
         className="knop-primair toegangspoort-knop"
-        onClick={() => void meldAfVanFirebase()}
+        onClick={() =>
+          void meldAfVanFirebase().then(() => {
+            // Naar het leerlingenscherm, zodat de Smartschool-knop meteen klaarstaat.
+            if (reden === "leerling") window.location.assign("/");
+          })
+        }
       >
-        Afmelden
+        {reden === "leerling" ? "Afmelden en aanmelden met Smartschool" : "Afmelden"}
       </button>
     </PoortScherm>
   );
