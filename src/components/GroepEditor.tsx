@@ -67,6 +67,10 @@ export function GroepEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [collegas, maker, beperkt, bereik.vestigingen.join(","), meeMentoren],
   );
+  // Voor de keuzelijst: wie nog geen mentor van de groep is.
+  const toevoegbareMentoren = kiesbareMentoren.filter((c) => !meeMentoren.has(c.id));
+  const vestigingenVan = (id: string) =>
+    collegas.find((c) => c.id === id)?.vestigingen.join(", ") ?? "";
   const toggleMentor = (id: string) =>
     setMeeMentoren((prev) => {
       const next = new Set(prev);
@@ -191,40 +195,64 @@ export function GroepEditor({
         onChange={(e) => setNaam(e.target.value)}
       />
 
-      {(maker || kiesbareMentoren.length > 0) && (
-        <>
-          <div className="groep-editor-sectie">Mentoren van deze groep</div>
-          <p className="groep-editor-item-meta">
-            Wie je aanvinkt, ziet deze groep bij "Mijn groepen" en kan ze mee bewerken — ook als
-            ze privé is.
-            {maker && (
-              <>
-                {" "}
-                Aangemaakt door <strong>{maker === actorId ? "jou" : naamVan(maker)}</strong>{" "}
-                (blijft altijd mentor van de groep).
-              </>
-            )}
-          </p>
-          {kiesbareMentoren.length > 0 ? (
-            <div className="groep-editor-mentoren">
-              {kiesbareMentoren.map((c) => (
-                <label
-                  key={c.id}
-                  className={`groep-editor-mentor${meeMentoren.has(c.id) ? " is-gekozen" : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={meeMentoren.has(c.id)}
-                    onChange={() => toggleMentor(c.id)}
-                  />
-                  {c.id === actorId ? `${c.naam} (jij)` : c.naam}
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="groep-editor-item-meta">Geen collega's van je vestiging gevonden.</p>
-          )}
-        </>
+      <div className="groep-editor-sectie">Mentoren van deze groep</div>
+      <p className="groep-editor-item-meta">
+        Wie je toevoegt, ziet deze groep bij "Mijn groepen" en kan ze mee bewerken — ook als ze
+        privé is.
+      </p>
+      <ul className="groep-editor-mentorlijst">
+        {maker && (
+          <li>
+            <span className="groep-editor-mentornaam">
+              {maker === actorId ? `${naamVan(maker)} (jij)` : naamVan(maker)}
+            </span>
+            <span className="groep-editor-mentorrol">Maker</span>
+          </li>
+        )}
+        {[...meeMentoren].map((id) => (
+          <li key={id}>
+            <span className="groep-editor-mentornaam">
+              {id === actorId ? `${naamVan(id)} (jij)` : naamVan(id)}
+            </span>
+            <span className="groep-editor-mentorrol">{vestigingenVan(id)}</span>
+            <button
+              type="button"
+              className="linkknop linkknop-gevaar"
+              aria-label={`${naamVan(id)} als mentor verwijderen`}
+              onClick={() => toggleMentor(id)}
+            >
+              Verwijderen
+            </button>
+          </li>
+        ))}
+        {!maker && meeMentoren.size === 0 && (
+          <li className="groep-editor-mentorleeg">Nog geen mentoren gekozen.</li>
+        )}
+      </ul>
+      {toevoegbareMentoren.length > 0 ? (
+        <select
+          className="groep-editor-breed"
+          value=""
+          aria-label="Mentor toevoegen"
+          onChange={(e) => {
+            if (e.target.value) toggleMentor(e.target.value);
+            e.target.value = "";
+          }}
+        >
+          <option value="">+ Mentor toevoegen…</option>
+          {toevoegbareMentoren.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.id === actorId ? `${c.naam} (jij)` : c.naam}
+              {c.vestigingen.length > 0 ? ` — ${c.vestigingen.join(", ")}` : ""}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className="groep-editor-item-meta">
+          {kiesbareMentoren.length === 0
+            ? "Geen collega's van je vestiging gevonden."
+            : "Alle collega's van je vestiging zijn al mentor van deze groep."}
+        </p>
       )}
 
       <div className="groep-editor-sectie">In één keer een bestaande groep toevoegen</div>

@@ -2427,30 +2427,36 @@ th {
 }
 
 /* Kleine sectiekop binnen het formulier. */
-/* Mee-mentoren van een groep: aanvinkbare chips. */
-.groep-editor-mentoren {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-  max-height: 140px;
-  overflow-y: auto;
-}
-.groep-editor-mentor {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* Mentoren van een groep: overzichtelijke lijst + keuzelijst om toe te voegen. */
+.groep-editor-mentorlijst {
+  list-style: none;
+  margin: 6px 0 8px;
+  padding: 0;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.groep-editor-mentorlijst li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
   font-size: 13px;
-  cursor: pointer;
   background: var(--surface);
 }
-.groep-editor-mentor.is-gekozen {
-  border-color: var(--accent, #2563eb);
-  background: var(--accent-soft, #eff6ff);
+.groep-editor-mentorlijst li + li {
+  border-top: 1px solid var(--border);
+}
+.groep-editor-mentornaam {
   font-weight: 600;
+}
+.groep-editor-mentorrol {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.groep-editor-mentorlijst li.groep-editor-mentorleeg {
+  color: var(--text-muted);
 }
 
 .groep-editor-sectie {
