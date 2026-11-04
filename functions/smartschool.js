@@ -38,8 +38,11 @@ const REDIRECT_URI = defineString("SMARTSCHOOL_REDIRECT_URI", {
 });
 
 const OPTIES = { region: "europe-west1", timeoutSeconds: 30, memory: "256MiB" };
-/** Zelfde maximale sessieduur als in firestore.rules. */
-const MAX_SESSIE_S = 12 * 3600;
+/**
+ * Maximale sessieduur voor leerlingen/ouders: 30 dagen (elke nieuwe Smartschool-login vraagt de
+ * geboortedatum). Hou gelijk met `LEERLING_MAX_SESSIE_MS` in `src/lib/inactiviteit.ts`.
+ */
+const LEERLING_MAX_SESSIE_S = 30 * 24 * 3600;
 
 export const smartschoolAanmelden = onCall(
   { ...OPTIES, secrets: [CLIENT_SECRET] },
@@ -122,7 +125,7 @@ function leerlingVan(auth) {
   if (t?.rol !== "leerling" || typeof t.leerlingId !== "string") {
     throw new HttpsError("permission-denied", "Enkel voor leerlingen.");
   }
-  if (Date.now() / 1000 > (t.auth_time ?? 0) + MAX_SESSIE_S) {
+  if (Date.now() / 1000 > (t.auth_time ?? 0) + LEERLING_MAX_SESSIE_S) {
     throw new HttpsError("unauthenticated", "Je sessie is verlopen.");
   }
   return t.leerlingId;

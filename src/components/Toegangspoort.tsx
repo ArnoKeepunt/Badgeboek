@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { PERSISTENTIE_MODUS, meldAanMetGoogle, meldAfVanFirebase, sessieBeginVan } from "../lib/data";
 import { heeftToegang, isKeerpuntAccount, useAuthStatus } from "../lib/firebaseAuth";
-import { MAX_SESSIE_MS, leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
+import { maxSessieMs, leesAfmeldReden, zetAfmeldReden } from "../lib/inactiviteit";
 import { useGesynct } from "../lib/opslagStatus";
 import {
   SMARTSCHOOL_ACTIEF,
@@ -27,13 +27,14 @@ export function Toegangspoort({ children }: { children: ReactNode }) {
 }
 
 /**
- * Is de sessie van deze gebruiker verlopen (langer dan `MAX_SESSIE_MS` sinds de laatste echte
- * login)? `null` zolang dat nog niet gekend is. Een verlopen sessie wordt meteen afgemeld.
+ * Is de sessie van deze gebruiker verlopen (langer dan `maxSessieMs` sinds de laatste echte
+ * login — personeel en leerlingen hebben elk hun eigen duur)? `null` zolang dat nog niet gekend
+ * is (ook zolang de auth-status nog laadt: pas dan weten we of het een leerling is). Een verlopen sessie wordt meteen afgemeld.
  *
  * Moet vóór de accountcontrole: bij een verlopen sessie weigert de database ook het eigen
  * account, en dan zou de poort "Je hebt nog geen toegang" tonen in plaats van "sessie verlopen".
  */
-function useSessieVerlopen(gebruiker: User | null): boolean | null {
+function useSessieVerlopen(gebruiker: User | null, leerling: boolean): boolean | null {
   const [gecontroleerd, setGecontroleerd] = useState<{ uid: string; verlopen: boolean } | null>(
     null,
   );
@@ -42,7 +43,7 @@ function useSessieVerlopen(gebruiker: User | null): boolean | null {
     if (!gebruiker) return;
     let actief = true;
     sessieBeginVan(gebruiker)
-      .then((begin) => Date.now() >= begin + MAX_SESSIE_MS)
+      .then((begin) => Date.now() >= begin + maxSessieMs(leerling))
       .catch(() => false) // token onleesbaar: dan beslist de Firestore-regel
       .then((verlopen) => {
         if (!actief) return;
@@ -55,7 +56,7 @@ function useSessieVerlopen(gebruiker: User | null): boolean | null {
     return () => {
       actief = false;
     };
-  }, [gebruiker]);
+  }, [gebruiker, leerling]);
 
   if (!gebruiker) return false;
   return gecontroleerd?.uid === gebruiker.uid ? gecontroleerd.verlopen : null;
@@ -63,7 +64,10 @@ function useSessieVerlopen(gebruiker: User | null): boolean | null {
 
 function FirebasePoort({ children }: { children: ReactNode }) {
   const status = useAuthStatus();
-  const sessieVerlopen = useSessieVerlopen(status.gebruiker);
+  const sessieVerlopen = useSessieVerlopen(
+    status.laden ? null : status.gebruiker,
+    status.leerlingId !== null,
+  );
   const gesynct = useGesynct();
 
   // Een verlopen sessie wordt net afgemeld: niets tonen tot het inlogscherm verschijnt.

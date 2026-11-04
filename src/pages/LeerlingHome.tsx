@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { CursusIcoon, KleurLegende, KleurStrook } from "../components/LeerlingOnderdelen";
-import { Voortgangsring } from "../components/Voortgangsring";
 import { cursussenVoorStroom, leerdoelenVoorCursus } from "../lib/curriculum";
-import { aantalBehaald, telKleuren } from "../lib/kleurstats";
+import { aantalBehaald, aantalIngevuld, telKleuren } from "../lib/kleurstats";
 import { GRAAD_LABEL, graadVan, stroomVan } from "../lib/leerlingen";
 import { graadKleur } from "../lib/leerlingVoortgang";
 import { useStore } from "../lib/store";
@@ -27,7 +26,6 @@ export function LeerlingHome({ leerling }: { leerling: Student }) {
     };
   });
 
-  const totaal = perCursus.reduce((n, x) => n + x.totaal, 0);
   const behaald = perCursus.reduce((n, x) => n + x.behaald, 0);
   const klaar = perCursus.filter((x) => x.totaal > 0 && x.behaald === x.totaal).length;
   const alles = telKleuren(
@@ -35,16 +33,19 @@ export function LeerlingHome({ leerling }: { leerling: Student }) {
       leerdoelenVoorCursus(cursus.id).map((d) => graadKleur(kleuren, leerling.id, d.id)),
     ),
   );
+  // "Aangeboden" = de badge heeft al een kleur gekregen (wit/leeg = nog niet aangeboden;
+  // witte statussen zoals n.v.t. vallen erbuiten).
+  const aangeboden = aantalIngevuld(alles);
 
   return (
     <div className="ll-home">
-      {/* Rooster i.p.v. geneste blokken: op de gsm staat de (kleine) ring naast de groet en
-          lopen de zin + legende eronder over de volle breedte. Zie `.ll-hero` in Leerling.css. */}
+      {/* Rooster i.p.v. geneste blokken: op de gsm staat de teller naast de groet en lopen de
+          zin + legende eronder over de volle breedte. Zie `.ll-hero` in Leerling.css. */}
       <section className="ll-hero">
         <span className="ll-hero-graad">{graadLabel}</span>
         <h1 className="ll-hero-titel">Hoi {leerling.firstName}! 👋</h1>
         <p className="ll-hero-cijfer">
-          Je hebt al <strong>{behaald}</strong> van de {totaal} badges behaald.
+          Je hebt <strong>{behaald}</strong> {behaald === 1 ? "badge" : "badges"} behaald.
           {klaar > 0 && (
             <>
               {" "}
@@ -55,7 +56,19 @@ export function LeerlingHome({ leerling }: { leerling: Student }) {
           )}
         </p>
         <KleurLegende telling={alles} />
-        <Voortgangsring behaald={behaald} totaal={totaal} groot />
+        {/* Behaald t.o.v. de badges die al aangeboden (beoordeeld) zijn — niet t.o.v. alle badges
+            van het jaar, want dat gaf leerlingen een verkeerd beeld. */}
+        <div
+          className="ll-hero-teller"
+          role="img"
+          aria-label={`${behaald} van de ${aangeboden} aangeboden badges behaald`}
+        >
+          <span className="ll-hero-teller-getal">
+            {behaald}
+            <span className="ll-hero-teller-totaal">/{aangeboden}</span>
+          </span>
+          <span className="ll-hero-teller-label">aangeboden</span>
+        </div>
       </section>
 
       <h2 className="ll-kop">Mijn cursussen</h2>

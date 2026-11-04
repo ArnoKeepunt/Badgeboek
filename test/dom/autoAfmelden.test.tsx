@@ -27,6 +27,7 @@ import { AutoAfmelden } from "../../src/components/AutoAfmelden";
 import {
   ACTIVITEIT_SLEUTEL,
   INACTIEF_MS,
+  LEERLING_MAX_SESSIE_MS,
   MAX_SESSIE_MS,
   SESSIE_WAARSCHUWING_MS,
   WAARSCHUWING_MS,
@@ -347,5 +348,28 @@ describe("automatisch afmelden", () => {
       expect(meldAf).toHaveBeenCalledTimes(1);
       expect(leesAfmeldReden()).toBe("sessie");
     });
+  });
+});
+
+describe("leerlingen en ouders (Smartschool)", () => {
+  const toonLeerling = () =>
+    act(() => root.render(<AutoAfmelden gebruiker={gebruiker()} leerling />));
+
+  it("worden niet afgemeld bij inactiviteit, ook niet na de personeelssessie", async () => {
+    await toonLeerling();
+    await wacht(INACTIEF_MS + SPELING);
+    expect(dialoog()).toBeNull();
+    await wacht(MAX_SESSIE_MS + 60 * 60_000);
+    expect(dialoog()).toBeNull();
+    expect(meldAf).not.toHaveBeenCalled();
+  });
+
+  it("worden pas afgemeld na de lange leerlingsessie", async () => {
+    await toonLeerling();
+    // Laptop dicht tot net na het einde: bij het terug zichtbaar worden volgt de controle.
+    vi.setSystemTime(START + LEERLING_MAX_SESSIE_MS + 60_000);
+    await wacht(SPELING);
+    expect(meldAf).toHaveBeenCalledTimes(1);
+    expect(leesAfmeldReden()).toBe("sessie");
   });
 });

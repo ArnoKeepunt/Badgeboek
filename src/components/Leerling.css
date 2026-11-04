@@ -389,8 +389,8 @@
 
 /* --- Startpagina ----------------------------------------------------------- */
 
-/* Rooster: groet, zin en legende links; de ring rechts over de volle hoogte. Op de gsm schuift
-   de ring naast de groet (zie onderaan). */
+/* Rooster: groet, zin en legende links; de teller rechts over de volle hoogte. Op de gsm schuift
+   de teller naast de groet (zie onderaan). */
 .ll-hero {
   position: relative;
   display: grid;
@@ -500,42 +500,40 @@
   box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
 }
 
-/* De ring op de groene banner: witte cijfers en een lichte achtergrondring. */
-.ll-hero .ring {
+/* De teller rechts op de groene banner: behaald / aangeboden. */
+.ll-hero-teller {
   grid-area: ring;
   justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 132px;
+  height: 132px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
 }
 
-.ll-hero .ring circle:first-child {
-  stroke: rgba(255, 255, 255, 0.2);
-}
-
-.ll-hero .ring circle:last-of-type {
-  stroke: #fff;
-}
-
-.ring-getal {
+.ll-hero-teller-getal {
+  font-size: 38px;
   font-weight: 800;
-  fill: var(--text);
-  font-size: 20px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #fff;
 }
 
-.ring-groot .ring-getal {
-  font-size: 34px;
-}
-
-.ring-totaal {
-  fill: var(--text-muted);
+.ll-hero-teller-totaal {
+  font-size: 0.6em;
   font-weight: 600;
-  font-size: 0.55em;
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.ll-hero .ring-getal {
-  fill: #fff;
-}
-
-.ll-hero .ring-totaal {
-  fill: rgba(255, 255, 255, 0.7);
+.ll-hero-teller-label {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* Cursuskaarten: dicht op elkaar, icoontje links, strook onderaan. */
@@ -1173,7 +1171,7 @@ details.ll-ballon[open] > summary::after {
 }
 
 @media (max-width: 560px) {
-  /* Compacte banner: kleine ring naast de groet, zin + legende eronder over de volle breedte. */
+  /* Compacte banner: kleine teller naast de groet, zin + legende eronder over de volle breedte. */
   .ll-hero {
     grid-template-areas:
       "graad   ring"
@@ -1194,9 +1192,18 @@ details.ll-ballon[open] > summary::after {
     font-size: 24px;
   }
 
-  .ll-hero .ring {
-    width: 78px;
-    height: 78px;
+  .ll-hero-teller {
+    width: 82px;
+    height: 82px;
+  }
+
+  .ll-hero-teller-getal {
+    font-size: 24px;
+  }
+
+  .ll-hero-teller-label {
+    margin-top: 2px;
+    font-size: 10px;
   }
 
   .ll-hero-cijfer {

@@ -12,6 +12,18 @@ export const WAARSCHUWING_MS = 2 * 60 * 1000;
  * vraagt vooraf om de login te bevestigen, zodat er geen werk verloren gaat.
  */
 export const MAX_SESSIE_MS = 12 * 60 * 60 * 1000;
+/**
+ * Leerlingen en ouders (Smartschool-login) blijven veel langer aangemeld: elke nieuwe login vraagt
+ * bij Smartschool opnieuw de geboortedatum, en ze zien enkel hun eigen gegevens. Geen afmelden
+ * bij inactiviteit; enkel na deze periode of via "Afmelden". Hou gelijk met
+ * `LEERLING_MAX_SESSIE_S` in `functions/smartschool.js`.
+ */
+export const LEERLING_MAX_SESSIE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** De maximale sessieduur voor personeel of voor een leerling/ouder. */
+export const maxSessieMs = (leerling: boolean): number =>
+  leerling ? LEERLING_MAX_SESSIE_MS : MAX_SESSIE_MS;
+
 /** Zoveel vóór het einde van de sessie verschijnt de vraag om opnieuw te bevestigen. */
 export const SESSIE_WAARSCHUWING_MS = 5 * 60 * 1000;
 

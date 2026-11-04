@@ -7,6 +7,7 @@ import {
   type AfmeldReden,
   INACTIEF_MS,
   MAX_SESSIE_MS,
+  maxSessieMs,
   SESSIE_WAARSCHUWING_MS,
   WAARSCHUWING_MS,
   leesLaatsteActiviteit,
@@ -37,6 +38,10 @@ type Melding =
  * - na {@link MAX_SESSIE_MS} sinds de laatste echte Google-login, ook bij activiteit. Dat dwingen
  *   de Firestore-regels ook aan de serverkant af; vijf minuten vooraf vraagt dit om de login te
  *   bevestigen (Google-pop-up), zodat je verder kan zonder iets te verliezen.
+ *
+ * Leerlingen en ouders (`leerling`) worden niet afgemeld bij inactiviteit en hebben een veel
+ * langere sessie (`LEERLING_MAX_SESSIE_MS`), zodat ze niet telkens opnieuw via Smartschool
+ * (met geboortedatum) moeten aanmelden.
  *
  * Een slapende laptop of een tabblad op de achtergrond wordt opnieuw gecontroleerd zodra het weer
  * zichtbaar wordt. Vóór het afmelden wordt alles bewaard; lukt dat niet (bv. geen verbinding),
@@ -70,7 +75,7 @@ export function AutoAfmelden({ gebruiker, leerling = false }: { gebruiker: User;
     const gedeeld = leesLaatsteActiviteit();
     if (gedeeld && gedeeld > laatsteRef.current) laatsteRef.current = gedeeld;
     const nu = Date.now();
-    const overInactief = laatsteRef.current + INACTIEF_MS - nu;
+    const overInactief = leerling ? Infinity : laatsteRef.current + INACTIEF_MS - nu;
     const overSessie = (sessieEindeRef.current ?? Infinity) - nu;
 
     if (overSessie <= 0) return void afmelden("sessie");
@@ -83,7 +88,7 @@ export function AutoAfmelden({ gebruiker, leerling = false }: { gebruiker: User;
     } else {
       setMelding(null);
     }
-  }, [afmelden]);
+  }, [afmelden, leerling]);
 
   const registreer = useCallback(() => {
     const nu = Date.now();
@@ -102,11 +107,11 @@ export function AutoAfmelden({ gebruiker, leerling = false }: { gebruiker: User;
 
   const leesSessieEinde = useCallback(async () => {
     try {
-      sessieEindeRef.current = (await sessieBeginVan(gebruiker)) + MAX_SESSIE_MS;
+      sessieEindeRef.current = (await sessieBeginVan(gebruiker)) + maxSessieMs(leerling);
     } catch {
       // Token (nog) niet leesbaar: dan bewaakt enkel de Firestore-regel de sessieduur.
     }
-  }, [gebruiker]);
+  }, [gebruiker, leerling]);
 
   /** Google-login opnieuw bevestigen: nieuwe sessie, zonder af te melden of werk te verliezen. */
   const bevestig = useCallback(async () => {

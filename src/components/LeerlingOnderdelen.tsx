@@ -31,7 +31,7 @@ export function KleurStrook({ telling }: { telling: KleurTelling }) {
   );
 }
 
-/** Legende bij een strook: een bolletje + aantal per kleur die voorkomt. */
+/** Legende bij een strook: een bolletje + aantal per kleur die voorkomt (geen "nog niet beoordeeld"). */
 export function KleurLegende({ telling }: { telling: KleurTelling }) {
   return (
     <ul className="ll-legende">
@@ -42,12 +42,6 @@ export function KleurLegende({ telling }: { telling: KleurTelling }) {
             {telling[r]} {RATING_LABEL[r].toLowerCase()}
           </li>
         ) : null,
-      )}
-      {telling.leeg > 0 && (
-        <li>
-          <span className="ll-bol is-leeg" />
-          {telling.leeg} nog niet beoordeeld
-        </li>
       )}
     </ul>
   );
