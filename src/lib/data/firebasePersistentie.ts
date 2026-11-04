@@ -321,7 +321,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     });
     bezig++;
     try {
-      await metWaakhond(schrijfDocMap(schrijf, verwijder));
+      await metWaakhond(schrijfDocMap(schrijf, verwijder, vorigeBeheerd));
       wisBackup("docs", backupNr);
       vorigeDocs = volledigNu;
       // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
@@ -447,7 +447,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
             overgeslagen += gefilterd.overgeslagen.length;
           }
           if (schrijf.size > 0 || verwijder.length > 0) {
-            await schrijfDocMap(schrijf, verwijder);
+            await schrijfDocMap(schrijf, verwijder, server);
             hersteld += schrijf.size + verwijder.length;
           }
         }

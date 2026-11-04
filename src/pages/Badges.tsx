@@ -19,7 +19,7 @@ import { alleGroepDefs, groepLeden, stromenVanGroep } from "../lib/groepen";
 import { aantalBehaald, telKleuren } from "../lib/kleurstats";
 import { filterLeerlingen, isIngeschreven, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import { useHuidigeActorId, useZichtbareGroepen, useZichtbareLeerlingen } from "../lib/rechten";
 import { HUIDIG_SCHOOLJAAR, isAfgesloten } from "../lib/schooljaar";
 import { useScrollSync } from "../lib/useScrollSync";
 import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
@@ -27,11 +27,13 @@ import {
   doelKleurEnBron,
   getDoelKleur,
   getNotitie,
+  isDoelTeLaat,
   setDoelKleur,
   setDoelKleurBulk,
   setMatrixCursus,
   setMatrixStromen,
   useStore,
+  zetDoelTeLaat,
   zetNotitie,
 } from "../lib/store";
 import { STROOM_LABEL, doelSleutel } from "../lib/types";
@@ -111,6 +113,7 @@ function StroomMatrix({
 }: StroomMatrixProps) {
   const wijzigingLabel = useWijzigingLabel();
   const geschiedenis = useGeschiedenis();
+  const { teLaat } = useStore();
   const cursussen = useMemo(
     () => cursussenVoorStroom(stroom).filter((c) => !cursusFilter || c.naam === cursusFilter),
     [stroom, cursusFilter],
@@ -160,6 +163,8 @@ function StroomMatrix({
               value={kleur}
               geschiedenis={geschiedenis(sleutel)}
               onChange={(next) => setDoelKleur(schooljaar, s.id, nodeId, next)}
+              teLaat={isDoelTeLaat(teLaat, schooljaar, s.id, nodeId)}
+              onTeLaatChange={(aan) => zetDoelTeLaat(schooljaar, s.id, nodeId, aan)}
             />
             <NotitieVeld
               notitie={getNotitie(notities, schooljaar, s.id, nodeId)}
@@ -397,8 +402,8 @@ function StroomMatrix({
 }
 
 export function Badges() {
-  const { kleuren, notities, deelevaluaties, groepen, schooljaar, matrixStromen, matrixCursus } =
-    useStore();
+  const { kleuren, notities, deelevaluaties, schooljaar, matrixStromen, matrixCursus } = useStore();
+  const groepen = useZichtbareGroepen();
   const students = useZichtbareLeerlingen();
   const [filter, setFilter] = useLeerlingFilter();
   const [fold, setFold] = useState<Fold>(loadFold);

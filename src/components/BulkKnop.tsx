@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePopover } from "../lib/popover";
-import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL, STATUSSEN } from "../lib/ratings";
+import { RATINGS, RATING_EMPTY_LABEL, RATING_LABEL, STATUSSEN_AANGEBODEN } from "../lib/ratings";
 import type { Rating } from "../lib/types";
 
 /** Zet in één keer dezelfde kleur voor alle zichtbare leerlingen op deze badge-rij. */
@@ -85,7 +85,7 @@ export function BulkKnop({
               </button>
 
               <div className="rating-cell-scheiding" role="separator" />
-              {STATUSSEN.map((r) => (
+              {STATUSSEN_AANGEBODEN.map((r) => (
                 <button
                   key={r}
                   type="button"

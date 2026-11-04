@@ -57,6 +57,7 @@ import type {
   Sessie,
   Stroom,
   Student,
+  TeLaat,
 } from "./types";
 import {
   LEEG_RAPPORTITEM,
@@ -117,6 +118,7 @@ const seed = (): PersistedStore => ({
   deelevaluaties: [],
   deelKleuren: {},
   deelNotities: {},
+  teLaat: {},
   auditLog: {},
   meldingen: [],
   meldingGezien: {},
@@ -140,6 +142,8 @@ function verwerkRauw(bewaard: RauweStore | null): PersistedStore {
   basis.notities = { ...standaard.notities, ...(bewaard.notities ?? {}) };
   basis.deelKleuren = { ...standaard.deelKleuren, ...(bewaard.deelKleuren ?? {}) };
   basis.deelNotities = { ...standaard.deelNotities, ...(bewaard.deelNotities ?? {}) };
+  // "Te laat ingediend"-markeringen: de seed heeft er geen.
+  basis.teLaat = { ...(bewaard.teLaat ?? {}) };
   // Wijzigingsgeschiedenis: de seed heeft er geen, dus gewoon de bewaarde overnemen.
   basis.auditLog = { ...(bewaard.auditLog ?? {}) };
   // Bewust gewiste kleuren blijven weg, ook al zit er seed-data onder.
@@ -303,6 +307,14 @@ function schoonOrphans(basis: PersistedStore): void {
   };
   basis.deelKleuren = snoeiDeelMap(basis.deelKleuren);
   basis.deelNotities = snoeiDeelMap(basis.deelNotities);
+  // `teLaat` mengt badge- (3-delig) en deelbadge-sleutels (2-delig): elk op zijn eigen manier snoeien.
+  basis.teLaat = Object.fromEntries(
+    Object.entries(basis.teLaat).filter(([k]) =>
+      k.split(":").length === 2
+        ? deIds.has(k.slice(0, k.lastIndexOf(":")))
+        : geldigeBadges.has(badgeVanSleutel(k)),
+    ),
+  ) as TeLaat;
 
   basis.meldingen = basis.meldingen.map((m) =>
     m.cursusId && !geldigeCursusIds.has(m.cursusId) ? { ...m, cursusId: "" } : m,
@@ -746,6 +758,53 @@ export function setDoelKleurBulk(
   commit({ ...state, kleuren, auditLog: metAudit(state.auditLog, wijzigingen), meldingen, gewist });
 }
 
+// --- Te laat ingediend (markering naast de kleur) -------------------------
+
+/** Zet of wis de "te laat"-markering voor één sleutel, met een regel in de geschiedenis. */
+function zetTeLaatSleutel(sleutel: string, aan: boolean) {
+  const was = state.teLaat[sleutel] === true;
+  if (was === aan) return;
+  const teLaat = { ...state.teLaat };
+  if (aan) teLaat[sleutel] = true;
+  else delete teLaat[sleutel];
+  commit({
+    ...state,
+    teLaat,
+    auditLog: metAudit(state.auditLog, [
+      { sleutel, veld: "te-laat", van: was ? "ja" : "", naar: aan ? "ja" : "" },
+    ]),
+  });
+}
+
+/** Is deze badge voor deze leerling in dit schooljaar te laat ingediend? */
+export const isDoelTeLaat = (
+  teLaat: TeLaat,
+  schooljaar: string,
+  studentId: string,
+  nodeId: string,
+): boolean => teLaat[doelSleutel(schooljaar, studentId, nodeId)] === true;
+
+/** Markeer een badge als (niet) te laat ingediend — los van de kleur. */
+export function zetDoelTeLaat(
+  schooljaar: string,
+  studentId: string,
+  nodeId: string,
+  aan: boolean,
+) {
+  if (isAfgesloten(schooljaar)) return;
+  zetTeLaatSleutel(doelSleutel(schooljaar, studentId, nodeId), aan);
+}
+
+/** Is deze deelbadge voor deze leerling te laat ingediend? */
+export const isDeelTeLaat = (teLaat: TeLaat, deelevaluatieId: string, studentId: string): boolean =>
+  teLaat[deelSleutel(deelevaluatieId, studentId)] === true;
+
+/** Markeer een deelbadge als (niet) te laat ingediend — los van de kleur. */
+export function zetDeelTeLaat(deelevaluatieId: string, studentId: string, aan: boolean) {
+  if (deelevaluatieVergrendeld(deelevaluatieId)) return;
+  zetTeLaatSleutel(deelSleutel(deelevaluatieId, studentId), aan);
+}
+
 // --- Notities ------------------------------------------------------------
 
 export function getNotitie(
@@ -972,6 +1031,7 @@ export function verwijderFictieveData(): { leerlingen: number; deelbadges: numbe
     deelevaluaties: state.deelevaluaties.filter((d) => !deelWeg.has(d.id)),
     deelKleuren: filterMap(state.deelKleuren),
     deelNotities: filterMap(state.deelNotities),
+    teLaat: filterMap(state.teLaat),
     auditLog: Object.fromEntries(
       Object.entries(state.auditLog).filter(([k]) =>
         k.startsWith("rapport:") ? !rapportenWeg.has(k.split(":")[1]) : !hoortWeg(k),
@@ -1008,11 +1068,28 @@ export function importeerGebruikers(leerlingen: Student[], mentoren: Mentor[]) {
  * Een groep zonder eigenaar (aangemaakt vanuit een volledig beheerdersoverzicht) blijft, zoals
  * voorheen, voor iedereen zichtbaar.
  */
-export function maakGroep(naam: string, leerlingIds: string[], mentorId?: string): string {
+export function maakGroep(
+  naam: string,
+  leerlingIds: string[],
+  mentorId?: string,
+  mentorIds: string[] = [],
+): string {
   const id = `g${Date.now().toString(36)}`;
   commit({
     ...state,
-    groepen: [...state.groepen, { id, naam, leerlingIds, mentorId, prive: Boolean(mentorId) }],
+    groepen: [
+      ...state.groepen,
+      {
+        id,
+        naam,
+        leerlingIds,
+        mentorId,
+        // Enkel meeschrijven als er mee-mentoren zijn (Firestore weigert geen lege lijst, maar zo
+        // blijft het doc gelijk aan dat van vroeger voor wie de functie niet gebruikt).
+        ...(mentorIds.length > 0 ? { mentorIds } : {}),
+        prive: Boolean(mentorId),
+      },
+    ],
   });
   return id;
 }
@@ -1343,8 +1420,12 @@ export function wijzigDeelevaluatie(id: string, patch: Partial<Omit<Deelevaluati
 export function verwijderDeelevaluatie(id: string) {
   const deelKleuren = { ...state.deelKleuren };
   const deelNotities = { ...state.deelNotities };
+  const teLaat = { ...state.teLaat };
   for (const sleutel of Object.keys(deelKleuren)) {
     if (sleutel.startsWith(`${id}:`)) delete deelKleuren[sleutel];
+  }
+  for (const sleutel of Object.keys(teLaat)) {
+    if (sleutel.startsWith(`${id}:`) && sleutel.split(":").length === 2) delete teLaat[sleutel];
   }
   for (const sleutel of Object.keys(deelNotities)) {
     if (sleutel.startsWith(`${id}:`)) delete deelNotities[sleutel];
@@ -1354,6 +1435,7 @@ export function verwijderDeelevaluatie(id: string) {
     deelevaluaties: state.deelevaluaties.filter((d) => d.id !== id),
     deelKleuren,
     deelNotities,
+    teLaat,
   });
 }
 

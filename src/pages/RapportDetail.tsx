@@ -26,7 +26,12 @@ import {
   useLeerlingFilter,
 } from "../lib/leerlingen";
 import { RATING_EMPTY_LABEL, RATING_KORT, RATING_LABEL } from "../lib/ratings";
-import { magLeerlingZien, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import {
+  magLeerlingZien,
+  useBereik,
+  useZichtbareGroepen,
+  useZichtbareLeerlingen,
+} from "../lib/rechten";
 import { KLEUR_KEY, KLEUREN, rubriekenVoorCursus } from "../lib/rubrieken";
 import { useEffectieveRol } from "../lib/sessie";
 import {
@@ -294,7 +299,6 @@ export function RapportDetail() {
   const { studentId } = useParams();
   const {
     students,
-    groepen,
     kleuren,
     notities,
     rapporten,
@@ -375,6 +379,7 @@ export function RapportDetail() {
   // op /rapport (klas/graad/vestiging/groep/zoeken) bepaalt door wie je bladert — zo hoef je niet
   // telkens terug naar de volledige lijst en blijft de gekozen klas/graad vanzelf behouden.
   const zichtbareLeerlingen = useZichtbareLeerlingen();
+  const groepen = useZichtbareGroepen();
   const [leerlingFilter] = useLeerlingFilter();
   const navigeerbareLeerlingen = useMemo(() => {
     const leden = groepLeden(leerlingFilter.groepId, zichtbareLeerlingen, groepen);

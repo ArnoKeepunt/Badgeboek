@@ -14,10 +14,12 @@ import { useAangemeld } from "../lib/sessie";
 import {
   getDeelKleur,
   getDeelNotitie,
+  isDeelTeLaat,
   setDeelKleur,
   setDeelKleurBulk,
   useStore,
   zetDeelNotitie,
+  zetDeelTeLaat,
 } from "../lib/store";
 import { deelSleutel } from "../lib/types";
 import type { Deelevaluatie, Student } from "../lib/types";
@@ -65,7 +67,7 @@ export function DeelPaneel({
   /** Koppelt het scroll-kader aan de gesynchroniseerde horizontale scroll met de badgematrix. */
   scrollRef?: (el: HTMLDivElement | null) => void;
 }) {
-  const { deelevaluaties, deelKleuren, deelNotities } = useStore();
+  const { deelevaluaties, deelKleuren, deelNotities, teLaat } = useStore();
   const wijzigingLabel = useWijzigingLabel();
   const geschiedenis = useGeschiedenis();
   const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
@@ -201,6 +203,8 @@ export function DeelPaneel({
                             value={kleur}
                             geschiedenis={geschiedenis(sleutel)}
                             onChange={(next) => setDeelKleur(d.id, s.id, next)}
+                            teLaat={isDeelTeLaat(teLaat, d.id, s.id)}
+                            onTeLaatChange={(aan) => zetDeelTeLaat(d.id, s.id, aan)}
                           />
                           <NotitieVeld
                             notitie={getDeelNotitie(deelNotities, d.id, s.id)}

@@ -6,7 +6,14 @@ import {
   LEEG_FILTER,
   unieke,
 } from "../lib/leerlingen";
-import { SOORT_LABEL, SYSTEEM_SOORTEN, type GroepDef, type GroepSoort } from "../lib/groepen";
+import {
+  SOORT_LABEL,
+  SYSTEEM_SOORTEN,
+  splitsEigenGroepen,
+  type GroepDef,
+  type GroepSoort,
+} from "../lib/groepen";
+import { useHuidigeActorId } from "../lib/rechten";
 import type { Student } from "../lib/types";
 
 /**
@@ -43,6 +50,9 @@ export function LeerlingFilterBar({
   /** Open het formulier om een nieuwe groep te maken (onderaan de groep-keuzelijst). */
   onNieuweGroep?: () => void;
 }) {
+  const actorId = useHuidigeActorId();
+  // Eigen groepen bovenaan, die van collega's (zelfde vestiging) in een aparte rubriek.
+  const keuzeGroepen = splitsEigenGroepen(groepen, actorId);
   const toon = (veld: "graad" | "klasgroep") => !verbergVelden.includes(veld);
   const toonCursus = Boolean(cursusOpties && onCursusChange);
   const gekozenCursus = cursusOpties?.includes(cursus) ? cursus : "";
@@ -79,7 +89,7 @@ export function LeerlingFilterBar({
     onChange(next);
   };
 
-  const soortenMetGroepen: GroepSoort[] = ["eigen", ...SYSTEEM_SOORTEN];
+  const soortenMetGroepen: GroepSoort[] = ["eigen", "collega", ...SYSTEEM_SOORTEN];
 
   // "Wis filter" toont enkel wanneer een zichtbaar veld actief is.
   const heeftActieveFilter =
@@ -105,7 +115,7 @@ export function LeerlingFilterBar({
       >
         <option value="">Alle leerlingen</option>
         {soortenMetGroepen.map((soort) => {
-          const rijen = groepen.filter((g) => g.soort === soort);
+          const rijen = keuzeGroepen.filter((g) => g.soort === soort);
           if (rijen.length === 0) return null;
           return (
             <optgroup key={soort} label={SOORT_LABEL[soort]}>

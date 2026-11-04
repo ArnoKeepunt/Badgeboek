@@ -25,10 +25,14 @@ import {
   doelKleurEnBron,
   getDoelKleur,
   getNotitie,
+  isDeelTeLaat,
+  isDoelTeLaat,
   setDeelKleur,
   setDoelKleur,
   useStore,
   zetDeelNotitie,
+  zetDeelTeLaat,
+  zetDoelTeLaat,
   zetNotitie,
 } from "../lib/store";
 import { deelSleutel, doelSleutel } from "../lib/types";
@@ -69,8 +73,16 @@ const met = (arr: string[], id: string) => (arr.includes(id) ? arr : [...arr, id
 
 export function StudentDetail() {
   const { studentId } = useParams();
-  const { students, kleuren, notities, deelevaluaties, deelKleuren, deelNotities, schooljaar } =
-    useStore();
+  const {
+    students,
+    kleuren,
+    notities,
+    deelevaluaties,
+    deelKleuren,
+    deelNotities,
+    teLaat,
+    schooljaar,
+  } = useStore();
   const [fold, setFold] = useState<Fold>(loadFold);
   // Aangeduide badge: de gekoppelde deelevaluaties lichten op in het paneel rechts.
   const [gekozenBadge, setGekozenBadge] = useState<string | null>(null);
@@ -179,6 +191,8 @@ export function StudentDetail() {
             value={kleur}
             geschiedenis={geschiedenis(sleutel)}
             onChange={(next) => setDoelKleur(schooljaar, student.id, nodeId, next)}
+            teLaat={isDoelTeLaat(teLaat, schooljaar, student.id, nodeId)}
+            onTeLaatChange={(aan) => zetDoelTeLaat(schooljaar, student.id, nodeId, aan)}
           />
           <NotitieVeld
             notitie={getNotitie(notities, schooljaar, student.id, nodeId)}
@@ -405,6 +419,8 @@ export function StudentDetail() {
                               value={kleur}
                               geschiedenis={geschiedenis(deelKleurSleutel)}
                               onChange={(next) => setDeelKleur(d.id, student.id, next)}
+                              teLaat={isDeelTeLaat(teLaat, d.id, student.id)}
+                              onTeLaatChange={(aan) => zetDeelTeLaat(d.id, student.id, aan)}
                             />
                             <NotitieVeld
                               notitie={getDeelNotitie(deelNotities, d.id, student.id)}

@@ -2427,6 +2427,32 @@ th {
 }
 
 /* Kleine sectiekop binnen het formulier. */
+/* Mee-mentoren van een groep: aanvinkbare chips. */
+.groep-editor-mentoren {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.groep-editor-mentor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.groep-editor-mentor.is-gekozen {
+  border-color: var(--accent, #2563eb);
+  background: var(--accent-soft, #eff6ff);
+  font-weight: 600;
+}
+
 .groep-editor-sectie {
   margin: 16px 0 6px;
   font-size: 11px;
@@ -2760,6 +2786,46 @@ th {
 
 .rating-cell-btn.rating-empty {
   border-style: dashed;
+}
+
+/* "Te laat ingediend": markering naast de kleur — klein oranje klokje in de cel, de kleur
+   zelf blijft staan. */
+.te-laat-icoon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: #c2410c;
+}
+.rating-cell-btn.is-te-laat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* De schakelaar "Te laat ingediend" in het keuzemenu. */
+.rating-cell-telaat {
+  color: var(--text);
+}
+.rating-cell-telaat .te-laat-icoon {
+  margin-left: auto;
+}
+.rating-cell-vinkje {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #9ca3af;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  flex: none;
+}
+.rating-cell-telaat.is-aan .rating-cell-vinkje {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: #fff;
 }
 
 .rating-cell-btn:hover {

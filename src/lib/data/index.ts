@@ -18,7 +18,10 @@ export {
   abonneerGebruikers,
   schrijfGebruiker,
   verwijderGebruiker,
+  abonneerCollegas,
+  synchroniseerCollegas,
 } from "./firebaseApp";
+export type { Collega } from "./firebaseApp";
 export { migreerDatabase, verwijderOudeStructuur } from "./migratie";
 export type { MigratieResultaat } from "./migratie";
 

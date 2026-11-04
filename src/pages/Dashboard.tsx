@@ -8,11 +8,12 @@ import {
   type GroepSoort,
   SOORT_LABEL,
   alleGroepDefs,
+  splitsEigenGroepen,
   stromenVanGroep,
   systeemGroepen,
 } from "../lib/groepen";
 import { LEEG_FILTER, useLeerlingFilter } from "../lib/leerlingen";
-import { useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import { useHuidigeActorId, useZichtbareGroepen, useZichtbareLeerlingen } from "../lib/rechten";
 import { useEffectieveRol } from "../lib/sessie";
 import { RATINGS } from "../lib/ratings";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
@@ -21,6 +22,7 @@ import { type Voortgang, voortgangVoor } from "../lib/voortgang";
 const OVERZICHT_KEY = "keerpunt-badgeboek:overzicht-groepen";
 const SOORT_VOLGORDE: GroepSoort[] = [
   "eigen",
+  "collega",
   "graad",
   "leerjaar",
   "vestiging",
@@ -41,7 +43,8 @@ function loadOverzicht(): string[] {
 
 /** Mentor-/beheerderoverzicht: eigen gekozen groepen + de vaste indeling per graad en jaar. */
 export function Dashboard() {
-  const { groepen, kleuren, schooljaar } = useStore();
+  const { kleuren, schooljaar } = useStore();
+  const groepen = useZichtbareGroepen();
   const students = useZichtbareLeerlingen();
   // Een leerkracht krijgt een compact overzicht: enkel de eigen gekozen groepen, niet de
   // volledige indeling per graad en per leerjaar (die is er "voor iedereen").
@@ -95,7 +98,7 @@ export function Dashboard() {
     [systeem, kleuren, schooljaar, students],
   );
 
-  const toevoegbaar = alleDefs.filter((d) => !gekozen.includes(d.id));
+  const toevoegbaar = splitsEigenGroepen(alleDefs, actorId).filter((d) => !gekozen.includes(d.id));
 
   // De groep als actieve filter zetten en naar de gekozen pagina springen (badges,
   // deelevaluaties, later rubrics). De filter is gedeeld, dus blijft ook daar staan.

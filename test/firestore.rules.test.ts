@@ -436,6 +436,20 @@ describe("vestigingen en rubrieken — beheerder-write", () => {
   });
 });
 
+describe("collegas — leesbaar voor personeel, beheerder-write", () => {
+  it("mentor leest de collega-lijst maar schrijft ze niet; beheerder wel; buitenstaander niets", async () => {
+    await assertSucceeds(beheerder.doc("collegas/mentor2@keerpuntscholen.be").set({
+      naam: "Moos", vestigingen: ["Gent"], actief: true,
+    }));
+    await assertSucceeds(mentor.collection("collegas").get());
+    await assertFails(mentor.doc("collegas/mentor@keerpuntscholen.be").set({
+      naam: "Mien", vestigingen: ["Gent", "Molenbeek"], actief: true,
+    }));
+    await assertFails(geenAccount.collection("collegas").get());
+    await assertFails(anoniem.collection("collegas").get());
+  });
+});
+
 // --- Vestiging-afscherming (leerlingen / evaluaties / deelbadges) -----------
 describe("vestiging-afscherming", () => {
   it("een mentor leest enkel leerlingen van zijn eigen vestiging(en)", async () => {

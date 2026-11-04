@@ -2,6 +2,7 @@ import { cursusInitialen, cursusKleur } from "../lib/cursusKleur";
 import type { KleurTelling } from "../lib/kleurstats";
 import { RATINGS, RATING_LABEL } from "../lib/ratings";
 import type { Rating } from "../lib/types";
+import { TeLaatIcoon } from "./RatingCell";
 
 /** Gekleurd icoontje met de initialen van een cursus (leerlingweergave). */
 export function CursusIcoon({ id, naam, groot = false }: { id: string; naam: string; groot?: boolean }) {
@@ -47,12 +48,33 @@ export function KleurLegende({ telling }: { telling: KleurTelling }) {
   );
 }
 
-/** Kleurlabel (pil met bolletje) — zelfde tint als de cellen in de mentormatrix. */
-export function Status({ kleur, klein = false }: { kleur: Rating | null; klein?: boolean }) {
-  return (
+/**
+ * Kleurlabel (pil met bolletje) — zelfde tint als de cellen in de mentormatrix. `teLaat` zet er
+ * een apart labeltje "Te laat ingediend" naast: de kleur blijft gewoon staan.
+ */
+export function Status({
+  kleur,
+  klein = false,
+  teLaat = false,
+}: {
+  kleur: Rating | null;
+  klein?: boolean;
+  teLaat?: boolean;
+}) {
+  const pil = (
     <span className={`ll-status rating-${kleur ?? "empty"}${klein ? " is-klein" : ""}`}>
       {kleur && <span className="ll-bol" />}
       {kleur ? RATING_LABEL[kleur] : "Nog niet beoordeeld"}
+    </span>
+  );
+  if (!teLaat) return pil;
+  return (
+    <span className="ll-status-groep">
+      {pil}
+      <span className={`ll-telaat${klein ? " is-klein" : ""}`}>
+        <TeLaatIcoon />
+        Te laat ingediend
+      </span>
     </span>
   );
 }

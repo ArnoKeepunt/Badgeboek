@@ -193,11 +193,18 @@ export const mijnBadgeboek = onCall(OPTIES, async (request) => {
       const r = laatsteBeoordeling(regels);
       if (r.length) auditLog[k] = r;
     }
-    zet(e, { kleuren: d.kleuren ?? {}, notities, gewist: d.gewist ?? [], auditLog, vestiging });
+    zet(e, {
+      kleuren: d.kleuren ?? {},
+      notities,
+      gewist: d.gewist ?? [],
+      auditLog,
+      teLaat: d.teLaat ?? {},
+      vestiging,
+    });
   }
 
   for (const s of deelbadges.docs) {
-    const { scores, scoreNotities, scoreAudit, ...def } = schoon(s.data());
+    const { scores, scoreNotities, scoreAudit, teLaat, ...def } = schoon(s.data());
     if (def.verborgenVoorLeerlingen) continue;
     const sleutel = `${def.id ?? s.id}:${id}`;
     const eigenNotitie = scoreNotities?.[id];
@@ -207,6 +214,7 @@ export const mijnBadgeboek = onCall(OPTIES, async (request) => {
       scores: scores?.[id] ? { [id]: scores[id] } : {},
       scoreNotities: eigenNotitie?.zichtbaar ? { [id]: zonderVerborgen(eigenNotitie) } : {},
       scoreAudit: audit.length ? { [sleutel]: audit } : {},
+      teLaat: teLaat?.[id] ? { [id]: true } : {},
     });
   }
 

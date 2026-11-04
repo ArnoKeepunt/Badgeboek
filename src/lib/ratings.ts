@@ -21,6 +21,13 @@ export const STATUSSEN: Rating[] = [
 
 export const isStatus = (r: Rating): boolean => (STATUSSEN as string[]).includes(r);
 
+/**
+ * De statussen die de keuzemenu's nog aanbieden. "Te laat ingediend" is sinds 2026-11-04 een
+ * aparte markering **naast** de kleur (`TeLaat` in types.ts) — de oude status verving de kleur
+ * en wordt enkel nog getoond waar hij van vroeger staat.
+ */
+export const STATUSSEN_AANGEBODEN: Rating[] = STATUSSEN.filter((r) => r !== "te-laat-ingediend");
+
 export const RATING_LABEL: Record<Rating, string> = {
   blue: "Blauw",
   green: "Groen",

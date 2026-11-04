@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/Modal";
-import { PERSISTENTIE_MODUS, abonneerGebruikers, schrijfGebruiker, verwijderGebruiker } from "../lib/data";
+import {
+  PERSISTENTIE_MODUS,
+  abonneerGebruikers,
+  schrijfGebruiker,
+  synchroniseerCollegas,
+  verwijderGebruiker,
+} from "../lib/data";
+import { useCollegas } from "../lib/collegas";
 import { useAuthStatus, useDevToegang } from "../lib/firebaseAuth";
 import {
   PERSONEEL_ROLLEN,
@@ -45,6 +52,21 @@ export function Gebruikers() {
     if (PERSISTENTIE_MODUS !== "firebase") return;
     return abonneerGebruikers((l) => setLijst(l));
   }, []);
+
+  // De collega-lijst (`collegas/{email}`, leesbaar voor mentoren — om mee-mentoren van een groep
+  // te kiezen) gelijk houden met de accounts. Even wachten tot beide snapshots binnen zijn, zodat
+  // een nog lege collega-lijst niet alles opnieuw laat schrijven. `lijst === null` = nog niet
+  // geladen: dan nooit synchroniseren (anders zou alles uit de collega-lijst gewist worden).
+  const collegas = useCollegas();
+  useEffect(() => {
+    if (PERSISTENTIE_MODUS !== "firebase" || !lijst) return;
+    const t = setTimeout(() => {
+      synchroniseerCollegas(lijst, collegas).catch((e) =>
+        console.warn("Collega-lijst bijwerken mislukt:", e),
+      );
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [lijst, collegas]);
 
   const vestigingen = useMemo(
     () => vestigingKeuzes((lijst ?? []).flatMap((p) => p.vestigingen)),

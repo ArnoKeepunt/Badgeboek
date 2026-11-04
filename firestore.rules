@@ -173,6 +173,9 @@ service cloud.firestore {
     // leerling-PII die per vestiging afgeschermd moet). `leerlingen` wél per vestiging.
     match /mentoren/{id}     { allow read, write: if isPersoneel(); }
     match /groepen/{id}      { allow read, write: if isPersoneel(); }
+    // Collega-lijst: afgeslankte kopie van `gebruikers` (naam, vestigingen, actief) zodat mentoren
+    // elkaar kunnen kiezen als mee-mentor van een groep. Enkel de beheerder schrijft ze.
+    match /collegas/{email}  { allow read: if isPersoneel(); allow write: if isBeheerder(); }
     match /meldingen/{id}    { allow read, write: if isPersoneel(); }
 
     // Leerlingen: een mentor ziet enkel de eigen vestiging(en).

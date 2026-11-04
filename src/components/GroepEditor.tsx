@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { SOORT_LABEL, alleGroepDefs } from "../lib/groepen";
 import { GRAAD_LABEL, graadVan, unieke } from "../lib/leerlingen";
-import { bereikBeperkt, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
-import { maakGroep, useStore, verwijderGroep, wijzigGroep } from "../lib/store";
+import { useCollegas } from "../lib/collegas";
+import {
+  bereikBeperkt,
+  useBereik,
+  useHuidigeActorId,
+  useZichtbareGroepen,
+  useZichtbareLeerlingen,
+} from "../lib/rechten";
+import { maakGroep, verwijderGroep, wijzigGroep } from "../lib/store";
 import type { Groep } from "../lib/types";
 
 const SNEL_SOORTEN = [
@@ -34,9 +41,39 @@ export function GroepEditor({
   /** Bij het aanmaken van een nieuwe groep: de id ervan (bv. om 'm meteen te selecteren). */
   onGemaakt?: (id: string) => void;
 }) {
-  const { groepen } = useStore();
+  const groepen = useZichtbareGroepen();
   const students = useZichtbareLeerlingen();
-  const beperkt = bereikBeperkt(useBereik());
+  const bereik = useBereik();
+  const beperkt = bereikBeperkt(bereik);
+  const actorId = useHuidigeActorId();
+  const collegas = useCollegas();
+  // De maker blijft altijd mentor van de groep; de mee-mentoren kies je hieronder zelf.
+  const maker = groep ? groep.mentorId : mentorId;
+  const [meeMentoren, setMeeMentoren] = useState<Set<string>>(
+    () => new Set((groep?.mentorIds ?? []).filter((id) => id !== maker)),
+  );
+  const naamVan = (id: string) => collegas.find((c) => c.id === id)?.naam ?? id;
+  // Kiesbaar: actieve collega's van (één van) je eigen vestiging(en) — wie alles ziet, kiest uit
+  // iedereen. Wie al mee-mentor is, blijft altijd in de lijst staan (om te kunnen uitvinken).
+  const kiesbareMentoren = useMemo(
+    () =>
+      collegas.filter(
+        (c) =>
+          c.id !== maker &&
+          (meeMentoren.has(c.id) ||
+            (c.actief &&
+              (!beperkt || c.vestigingen.some((v) => bereik.vestigingen.includes(v))))),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [collegas, maker, beperkt, bereik.vestigingen.join(","), meeMentoren],
+  );
+  const toggleMentor = (id: string) =>
+    setMeeMentoren((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [naam, setNaam] = useState(groep?.naam ?? "");
   const [zoek, setZoek] = useState("");
   const [vestiging, setVestiging] = useState("");
@@ -129,14 +166,15 @@ export function GroepEditor({
   const opslaan = () => {
     const ids = [...gekozen];
     const naamOk = naam.trim() || "Naamloze groep";
+    const mentorIds = [...meeMentoren];
     if (groep) {
-      wijzigGroep(groep.id, { naam: naamOk, leerlingIds: ids });
+      wijzigGroep(groep.id, { naam: naamOk, leerlingIds: ids, mentorIds });
     } else {
       // Let op: `onGemaakt?.(maakGroep(...))` zou `maakGroep()` NOOIT aanroepen wanneer
       // `onGemaakt` niet is meegegeven — optional chaining (`a?.(x)`) evalueert het argument `x`
       // niet als `a` nullish is. Groepen.tsx geeft geen `onGemaakt` mee, dus daar zou een groep
       // aanmaken dan stilzwijgend niets doen. Vandaar de aanroep losgetrokken van de callback.
-      const id = maakGroep(naamOk, ids, mentorId);
+      const id = maakGroep(naamOk, ids, mentorId, mentorIds);
       onGemaakt?.(id);
     }
     onSluit();
@@ -152,6 +190,42 @@ export function GroepEditor({
         value={naam}
         onChange={(e) => setNaam(e.target.value)}
       />
+
+      {(maker || kiesbareMentoren.length > 0) && (
+        <>
+          <div className="groep-editor-sectie">Mentoren van deze groep</div>
+          <p className="groep-editor-item-meta">
+            Wie je aanvinkt, ziet deze groep bij "Mijn groepen" en kan ze mee bewerken — ook als
+            ze privé is.
+            {maker && (
+              <>
+                {" "}
+                Aangemaakt door <strong>{maker === actorId ? "jou" : naamVan(maker)}</strong>{" "}
+                (blijft altijd mentor van de groep).
+              </>
+            )}
+          </p>
+          {kiesbareMentoren.length > 0 ? (
+            <div className="groep-editor-mentoren">
+              {kiesbareMentoren.map((c) => (
+                <label
+                  key={c.id}
+                  className={`groep-editor-mentor${meeMentoren.has(c.id) ? " is-gekozen" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={meeMentoren.has(c.id)}
+                    onChange={() => toggleMentor(c.id)}
+                  />
+                  {c.id === actorId ? `${c.naam} (jij)` : c.naam}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="groep-editor-item-meta">Geen collega's van je vestiging gevonden.</p>
+          )}
+        </>
+      )}
 
       <div className="groep-editor-sectie">In één keer een bestaande groep toevoegen</div>
       <select

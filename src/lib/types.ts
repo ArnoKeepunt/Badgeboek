@@ -136,6 +136,13 @@ export interface Groep {
   /** Koppeling: de mentor die deze groep aanmaakte / opvolgt. */
   mentorId?: string;
   /**
+   * Andere mentoren die de groep mee beheren (zelfde soort id als `mentorId`: het e-mailadres
+   * van het personeelsaccount). Ze kiezen dat zelf in het groepsformulier. Voor hen is het
+   * evengoed "hun" groep: bovenaan bij "Mijn groepen", bewerkbaar, en ook zichtbaar als ze
+   * privé is. Ontbreekt = enkel de maker.
+   */
+  mentorIds?: string[];
+  /**
    * `true` = enkel de eigenaar (`mentorId`) ziet deze groep; andere mentoren niet. Nieuwe
    * groepen zijn voortaan standaard privé (afspraak: iedereen maakt zijn eigen groepen aan).
    * Ontbreekt dit veld (oudere groep, van vóór die afspraak), dan blijft ze zichtbaar voor
@@ -228,6 +235,13 @@ export const deelSleutel = (deelevaluatieId: string, studentId: string): string 
   `${deelevaluatieId}:${studentId}`;
 
 /**
+ * "Te laat ingediend" als aparte markering **naast** de kleur (een cel kan dus "Groen + te laat"
+ * zijn). Sleutel = `doelSleutel` (badge) of `deelSleutel` (deelbadge) → `true`; ontbreekt = op
+ * tijd. Los van de (oudere) witte status `"te-laat-ingediend"`, die de kleur verving.
+ */
+export type TeLaat = Record<string, true>;
+
+/**
  * Eén regel in de wijzigingsgeschiedenis van een evaluatiecel (kleur of notitie). De log is
  * append-only: een nieuwe waarde overschrijft de vorige niet in de geschiedenis, ze komt erbij.
  * `door` = de gebruikers-id (demo-mentor-id of, bij een Firebase-login, het e-mailadres van het
@@ -235,13 +249,14 @@ export const deelSleutel = (deelevaluatieId: string, studentId: string): string 
  * het moment van de wijziging, meegeschreven zodat de leerlingweergave de beoordelaar kan tonen
  * zonder de (beheerder-only) `gebruikers`-collectie te lezen. `op` = epoch-ms. `van`/`naar` =
  * de waarde als tekst ("" = leeg; voor een kleur de `Rating`, voor een notitie/opmerking een
- * korte weergave). `veld: "opmerking"` is de rapport-tegenhanger van `"notitie"`.
+ * korte weergave). `veld: "opmerking"` is de rapport-tegenhanger van `"notitie"`. Bij
+ * `veld: "te-laat"` is de waarde `"ja"` of `""`.
  */
 export interface AuditRegel {
   op: number;
   door: string;
   doorNaam?: string;
-  veld: "kleur" | "notitie" | "opmerking";
+  veld: "kleur" | "notitie" | "opmerking" | "te-laat";
   van: string;
   naar: string;
 }

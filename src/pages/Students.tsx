@@ -14,7 +14,13 @@ import {
   stroomVan,
   useLeerlingFilter,
 } from "../lib/leerlingen";
-import { bereikBeperkt, useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import {
+  bereikBeperkt,
+  useBereik,
+  useHuidigeActorId,
+  useZichtbareGroepen,
+  useZichtbareLeerlingen,
+} from "../lib/rechten";
 import { useEffectieveRol } from "../lib/sessie";
 import { getDoelKleur, upsertStudenten, useStore, verwijderLeerling } from "../lib/store";
 import type { Student } from "../lib/types";
@@ -30,7 +36,8 @@ const leegLeerling = (): Student => ({
 });
 
 export function Students() {
-  const { kleuren, groepen, schooljaar, students: alleStudenten } = useStore();
+  const { kleuren, schooljaar, students: alleStudenten } = useStore();
+  const groepen = useZichtbareGroepen();
   const students = useZichtbareLeerlingen();
   const bereik = useBereik();
   const [filter, setFilter] = useLeerlingFilter();

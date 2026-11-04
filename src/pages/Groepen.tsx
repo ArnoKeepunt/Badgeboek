@@ -3,9 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { GroepEditor } from "../components/GroepEditor";
 import { GroepOpenen } from "../components/GroepOpenen";
 import { Modal } from "../components/Modal";
-import { SOORT_LABEL, SYSTEEM_SOORTEN, stromenVanGroep, systeemGroepen } from "../lib/groepen";
+import {
+  SOORT_LABEL,
+  SYSTEEM_SOORTEN,
+  groepEigenaars,
+  isGroepVan,
+  stromenVanGroep,
+  systeemGroepen,
+} from "../lib/groepen";
+import { useCollegaNaam } from "../lib/collegas";
 import { LEEG_FILTER, stroomVan, useLeerlingFilter } from "../lib/leerlingen";
-import { bereikBeperkt, useBereik, useHuidigeActorId, useZichtbareLeerlingen } from "../lib/rechten";
+import {
+  bereikBeperkt,
+  useBereik,
+  useHuidigeActorId,
+  useZichtbareGroepen,
+  useZichtbareLeerlingen,
+} from "../lib/rechten";
 import { setMatrixCursus, setMatrixStromen, useStore } from "../lib/store";
 import type { Student } from "../lib/types";
 
@@ -30,7 +44,7 @@ function PotloodIcoon() {
  * wie erin zit (avatars) en de samenstelling per stroom.
  */
 export function Groepen() {
-  const { mentoren, groepen } = useStore();
+  const { groepen } = useStore();
   const students = useZichtbareLeerlingen();
   const bereik = useBereik();
   const beperkt = bereikBeperkt(bereik);
@@ -45,19 +59,26 @@ export function Groepen() {
     ids.map((id) => studById.get(id)).filter((s): s is Student => !!s);
 
   const systeem = useMemo(() => systeemGroepen(students), [students]);
-  const mentorNaam = (id?: string): string => {
-    const m = mentoren.find((x) => x.id === id);
-    return m ? `${m.voornaam} ${m.naam}` : "";
+  const collegaNaam = useCollegaNaam();
+  /** "van mij" / "van mij en An Peeters" / "van An Peeters en Tom Claes". */
+  const mentorenTekst = (ids: string[]): string => {
+    const namen = [
+      ...(mentorId && ids.includes(mentorId) ? ["mij"] : []),
+      ...ids.filter((id) => id !== mentorId).map(collegaNaam),
+    ];
+    if (namen.length === 0) return "";
+    const laatste = namen.pop();
+    return `van ${namen.length ? `${namen.join(", ")} en ${laatste}` : laatste}`;
   };
-  const zichtbareGroepen = (
-    alleenVanMij && mentorId ? groepen.filter((g) => g.mentorId === mentorId) : groepen
-  ).filter((g) => {
-    if (!beperkt) return true; // beheerder/coördinator-overzicht: alles
-    if (g.mentorId === mentorId) return true; // eigen groep altijd zichtbaar/bewerkbaar
-    if (g.prive) return false; // privégroep van een andere mentor
-    // Oudere, niet-privé groep: enkel tonen als er minstens één zichtbare leerling in zit.
-    return leden(g.leerlingIds).length > 0;
-  });
+  // Volledige groep (de lijst hieronder heeft de leden al tot je bereik beperkt) — voor "x van y".
+  const volledig = (id: string) => groepen.find((g) => g.id === id);
+  // Wie welke groep ziet (eigen vestiging, geen privégroepen van anderen): zie `useZichtbareGroepen`.
+  const toegestaneGroepen = useZichtbareGroepen();
+  const zichtbareGroepen =
+    alleenVanMij && mentorId
+      ? toegestaneGroepen.filter((g) => isGroepVan(g, mentorId))
+      : toegestaneGroepen;
+  // Bewerken gebeurt op de volledige groep (ook leden buiten je bereik blijven erbij horen).
   const teBewerken = editor?.id ? groepen.find((g) => g.id === editor.id) : undefined;
 
   // Groep als filter zetten + de stromen erop afstemmen (anders kan de stroomkeuze een andere
@@ -98,7 +119,7 @@ export function Groepen() {
       <div className="pagina-kop">
         <h2>Eigen groepen</h2>
         <div className="pagina-kop-acties">
-          {mentorId && groepen.some((g) => g.mentorId === mentorId) && (
+          {mentorId && groepen.some((g) => isGroepVan(g, mentorId)) && (
             <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
               <input
                 type="checkbox"
@@ -127,10 +148,12 @@ export function Groepen() {
         <div className="groep-kaarten">
           {zichtbareGroepen.map((g) => {
             const ll = leden(g.leerlingIds);
+            const totaal = volledig(g.id)?.leerlingIds.length ?? g.leerlingIds.length;
+            const eigenaars = groepEigenaars(g);
             // Enkel eigen groepen bewerken/verwijderen — nooit een gedeelde/oudere groep van
             // iemand anders. Een onbeperkt overzicht (beheerder/coördinator) mag, zoals
             // voorheen, alles beheren.
-            const magBewerken = !beperkt || g.mentorId === mentorId;
+            const magBewerken = !beperkt || isGroepVan(g, mentorId);
             return (
               <div key={g.id} className="groep-kaart">
                 {magBewerken && (
@@ -146,12 +169,10 @@ export function Groepen() {
                 )}
                 <div className="groep-kaart-naam">{g.naam}</div>
                 <div className="groep-kaart-meta">
-                  {beperkt && ll.length !== g.leerlingIds.length
-                    ? `${ll.length} van ${g.leerlingIds.length} leerlingen · rest in andere vestigingen`
-                    : `${g.leerlingIds.length} leerlingen`}
-                  {g.mentorId && (
-                    <> · {g.mentorId === mentorId ? "van mij" : mentorNaam(g.mentorId)}</>
-                  )}
+                  {beperkt && ll.length !== totaal
+                    ? `${ll.length} van ${totaal} leerlingen · rest in andere vestigingen`
+                    : `${totaal} leerlingen`}
+                  {eigenaars.length > 0 && <> · {mentorenTekst(eigenaars)}</>}
                   {g.prive && <> · privé</>}
                 </div>
 

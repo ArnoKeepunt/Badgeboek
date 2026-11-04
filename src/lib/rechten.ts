@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useBeheerderWeergave } from "./beheerderWeergave";
 import { useHuidigPersoneelslid } from "./firebaseAuth";
+import { isGroepVan } from "./groepen";
 import { opAchternaam } from "./leerlingen";
 import { useAangemeld, useBasisRol } from "./sessie";
 import { useStore } from "./store";
-import type { Student } from "./types";
+import type { Groep, Student } from "./types";
 import { actieveVestigingen } from "./vestigingen";
 
 /**
@@ -115,4 +116,36 @@ export function useZichtbareLeerlingen(): Student[] {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [students, bereik.allesZichtbaar, bereik.vestigingen.join(","), bereik.eigenLeerlingId],
   );
+}
+
+/**
+ * Hook: de zelfgemaakte groepen die de huidige gebruiker mag zien (gebruik dit i.p.v.
+ * `store.groepen`). Wie alles ziet (beheerder/coördinator), krijgt alles. Een mentor ziet:
+ *  - zijn eigen groepen (zelf gemaakt of als mee-mentor gekozen), altijd;
+ *  - niet de privégroepen van anderen;
+ *  - van de oudere, niet-privé groepen enkel die met leerlingen van zijn eigen vestiging(en) —
+ *    een mentor van Oudenaarde ziet dus geen groepen van andere vestigingen.
+ * De ledenlijst wordt bovendien beperkt tot de leerlingen binnen zijn bereik, zodat ook de
+ * tellers ("Groep X (12)") niets verraden over leerlingen van een andere vestiging.
+ */
+export function useZichtbareGroepen(): Groep[] {
+  const { groepen, students } = useStore();
+  const bereik = useBereik();
+  const actorId = useHuidigeActorId();
+  return useMemo(() => {
+    if (!bereikBeperkt(bereik)) return groepen;
+    const zichtbaar = new Set(
+      leerlingenBinnenBereik(bereik, students).map((s) => s.id),
+    );
+    const uit: Groep[] = [];
+    for (const g of groepen) {
+      const leden = g.leerlingIds.filter((id) => zichtbaar.has(id));
+      const eigen = isGroepVan(g, actorId);
+      if (!eigen && (g.prive || leden.length === 0)) continue;
+      uit.push(leden.length === g.leerlingIds.length ? g : { ...g, leerlingIds: leden });
+    }
+    return uit;
+    // `bereik` wisselt van identiteit bij elke render; de primitieven vatten de inhoud samen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groepen, students, actorId, bereik.allesZichtbaar, bereik.vestigingen.join(","), bereik.eigenLeerlingId]);
 }

@@ -6,7 +6,14 @@ import { stroomVan } from "../lib/leerlingen";
 import { graadKleur, graadNotitie } from "../lib/leerlingVoortgang";
 import { HUIDIG_SCHOOLJAAR } from "../lib/schooljaar";
 import { useAangemeld } from "../lib/sessie";
-import { getDeelKleur, getDeelNotitie, rubriekenLijst, useStore } from "../lib/store";
+import {
+  getDeelKleur,
+  getDeelNotitie,
+  isDeelTeLaat,
+  isDoelTeLaat,
+  rubriekenLijst,
+  useStore,
+} from "../lib/store";
 import { useBeoordelaar } from "../lib/wijzigingslog";
 import { deelSleutel, doelSleutel, type Kleurcriteria } from "../lib/types";
 
@@ -50,7 +57,7 @@ function MentorNotitie({ tekst }: { tekst: string }) {
 
 export function LeerlingCursus() {
   const { cursusId } = useParams();
-  const { kleuren, notities, deelevaluaties, deelKleuren, deelNotities } = useStore();
+  const { kleuren, notities, deelevaluaties, deelKleuren, deelNotities, teLaat } = useStore();
   const aangemeld = useAangemeld();
   const beoordelaar = useBeoordelaar();
 
@@ -107,6 +114,7 @@ export function LeerlingCursus() {
         (d.vestiging === "" || d.vestiging === leerling.vestiging) &&
         d.leerdoelIds.some((id) => cursusDoelIds.has(id)) &&
         (getDeelKleur(deelKleuren, d.id, leerling.id) !== null ||
+          isDeelTeLaat(teLaat, d.id, leerling.id) ||
           getDeelNotitie(deelNotities, d.id, leerling.id).zichtbaar !== ""),
     )
     .sort((a, b) => {
@@ -160,7 +168,10 @@ export function LeerlingCursus() {
                       <h3 className="ll-badge-tekst">{doel.omschrijving}</h3>
                       {wie && <span className="ll-badge-beoordelaar">Beoordeeld door {wie}</span>}
                     </div>
-                    <Status kleur={kleur} />
+                    <Status
+                      kleur={kleur}
+                      teLaat={isDoelTeLaat(teLaat, HUIDIG_SCHOOLJAAR, leerling.id, doel.id)}
+                    />
                   </div>
                   {notitie && <MentorNotitie tekst={notitie} />}
 
@@ -190,7 +201,11 @@ export function LeerlingCursus() {
                                 )}
                                 {dn && <MentorNotitie tekst={dn} />}
                               </div>
-                              <Status kleur={deelKleur} klein />
+                              <Status
+                                kleur={deelKleur}
+                                klein
+                                teLaat={isDeelTeLaat(teLaat, d.id, leerling.id)}
+                              />
                             </li>
                           );
                         })}

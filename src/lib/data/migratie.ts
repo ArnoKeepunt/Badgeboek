@@ -55,6 +55,8 @@ export async function migreerDatabase(): Promise<MigratieResultaat> {
     deelevaluaties: (globaal.deelevaluaties ?? []) as PersistedStore["deelevaluaties"],
     deelKleuren: deelKleuren as PersistedStore["deelKleuren"],
     deelNotities: deelNotities as PersistedStore["deelNotities"],
+    // "Te laat" als aparte markering bestond nog niet in de oude structuur.
+    teLaat: {},
     kleuren: kleuren as PersistedStore["kleuren"],
     notities: notities as PersistedStore["notities"],
     auditLog: auditLog as PersistedStore["auditLog"],

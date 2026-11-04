@@ -10,6 +10,7 @@ import type { Groep, Stroom, Student } from "./types";
 
 export type GroepSoort =
   | "eigen"
+  | "collega"
   | "graad"
   | "leerjaar"
   | "vestiging"
@@ -23,10 +24,13 @@ export interface GroepDef {
   naam: string;
   soort: GroepSoort;
   leerlingIds: string[];
+  /** Enkel bij `soort: "eigen"`: wie de groep beheren (maker + mee-mentoren, zie `groepEigenaars`). */
+  eigenaars?: string[];
 }
 
 export const SOORT_LABEL: Record<GroepSoort, string> = {
   eigen: "Mijn groepen",
+  collega: "Groepen van collega's",
   graad: "Per graad",
   leerjaar: "Per leerjaar",
   vestiging: "Per vestiging",
@@ -130,7 +134,36 @@ export const eigenGroepDefs = (groepen: Groep[]): GroepDef[] =>
     naam: g.naam,
     soort: "eigen",
     leerlingIds: g.leerlingIds,
+    eigenaars: groepEigenaars(g),
   }));
+
+/** Wie een zelfgemaakte groep beheren: de maker (`mentorId`) + de mee-mentoren (`mentorIds`). */
+export const groepEigenaars = (g: Pick<Groep, "mentorId" | "mentorIds">): string[] => [
+  ...new Set([...(g.mentorId ? [g.mentorId] : []), ...(g.mentorIds ?? [])]),
+];
+
+/** Is dit (ook) een groep van `actorId`? Zonder `actorId` nooit. */
+export const isGroepVan = (
+  g: Pick<Groep, "mentorId" | "mentorIds">,
+  actorId: string | undefined,
+): boolean => actorId !== undefined && groepEigenaars(g).includes(actorId);
+
+/**
+ * Voor de keuzelijsten: de zelfgemaakte groepen splitsen in "Mijn groepen" (gemaakt of mee
+ * beheerd door `actorId`) en "Groepen van collega's" (de rest: van collega's of zonder eigenaar), zodat je
+ * eigen groepen bovenaan staan en niet verdrinken in die van anderen. Welke groepen er überhaupt
+ * in komen (eigen vestiging, geen privégroepen van anderen) bepaalt `useZichtbareGroepen`.
+ * Zonder `actorId` (local-modus, geen account) blijft alles onder "Mijn groepen". De id blijft
+ * dezelfde (`eigen:…`), enkel de rubriek in de keuzelijst verschilt.
+ */
+export const splitsEigenGroepen = (defs: GroepDef[], actorId: string | undefined): GroepDef[] =>
+  actorId
+    ? defs.map((d) =>
+        d.soort === "eigen" && !d.eigenaars?.includes(actorId)
+          ? { ...d, soort: "collega" as const }
+          : d,
+      )
+    : defs;
 
 export const alleGroepDefs = (students: Student[], groepen: Groep[]): GroepDef[] => [
   ...eigenGroepDefs(groepen),

@@ -12,7 +12,7 @@ import {
   useLeerlingFilter,
 } from "../lib/leerlingen";
 import type { LeerlingFilter } from "../lib/leerlingen";
-import { bereikBeperkt, useBereik, useZichtbareLeerlingen } from "../lib/rechten";
+import { bereikBeperkt, useBereik, useZichtbareGroepen, useZichtbareLeerlingen } from "../lib/rechten";
 import { downloadBlob } from "../lib/download";
 import { PDF_ARCHIEF_ACTIEF, archiveerRapportPdf } from "../lib/rapportArchief";
 import { PDF_SERVER_ACTIEF, maakRapportenZip } from "../lib/rapportPdf";
@@ -34,7 +34,8 @@ import type { Rapport as RapportDoc } from "../lib/types";
  * enkel voor de beheerder.
  */
 export function Rapport() {
-  const { rapporten, groepen, schooljaar, rubriekenOverride, rubriekWijzigingen } = useStore();
+  const { rapporten, schooljaar, rubriekenOverride, rubriekWijzigingen } = useStore();
+  const groepen = useZichtbareGroepen();
   const students = useZichtbareLeerlingen();
   const bereik = useBereik();
   const rol = useEffectieveRol();

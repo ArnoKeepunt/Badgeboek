@@ -7,9 +7,28 @@ import {
   RATING_EMPTY_LABEL,
   RATING_KORT,
   RATING_LABEL,
-  STATUSSEN,
+  STATUSSEN_AANGEBODEN,
 } from "../lib/ratings";
 import type { GeschiedenisRegel } from "../lib/wijzigingslog";
+
+/** Klein klokje: "te laat ingediend" (naast de kleur). */
+export function TeLaatIcoon({ className = "te-laat-icoon" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 
 /**
  * Eén cel in de doelenmatrix, in de stijl van een Notion "status"-eigenschap:
@@ -23,6 +42,8 @@ export function RatingCell({
   readonly = false,
   readonlyTitel = "Vergrendeld — dit schooljaar is afgesloten",
   geschiedenis,
+  teLaat = false,
+  onTeLaatChange,
 }: {
   value: Rating | null;
   onChange: (next: Rating | null) => void;
@@ -34,6 +55,10 @@ export function RatingCell({
   readonlyTitel?: string;
   /** Volledige wijzigingsgeschiedenis (nieuwste eerst), uitklapbaar onderaan het keuzemenu. */
   geschiedenis?: GeschiedenisRegel[];
+  /** "Te laat ingediend" — een markering naast de kleur, geen kleur op zich. */
+  teLaat?: boolean;
+  /** Zonder deze callback toont het menu geen "te laat"-schakelaar (bv. in het rapport). */
+  onTeLaatChange?: (aan: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [toonGeschiedenis, setToonGeschiedenis] = useState(false);
@@ -45,7 +70,7 @@ export function RatingCell({
   const pos = usePopover(open, trigger, () => setOpen(false), {
     paneel,
     breedte: heeftGeschiedenis ? 264 : 188,
-    hoogte: toonGeschiedenis ? 680 : heeftGeschiedenis ? 540 : 490,
+    hoogte: (toonGeschiedenis ? 680 : heeftGeschiedenis ? 540 : 490) + (onTeLaatChange ? 40 : 0),
     uitlijn: "midden",
   });
 
@@ -54,14 +79,29 @@ export function RatingCell({
     setOpen(false);
   };
 
+  // De oude status "Te laat ingediend" (verving de kleur) enkel nog tonen als de cel hem heeft.
+  const statussen =
+    value && !STATUSSEN_AANGEBODEN.includes(value) && !RATINGS.includes(value)
+      ? [...STATUSSEN_AANGEBODEN, value]
+      : STATUSSEN_AANGEBODEN;
+  const waardeTekst = `${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL}${
+    teLaat ? ", te laat ingediend" : ""
+  }`;
+  const inhoud = (
+    <>
+      {value ? RATING_KORT[value] : "–"}
+      {teLaat && <TeLaatIcoon />}
+    </>
+  );
+
   if (readonly) {
     return (
       <span
-        className={`rating-cell-btn rating-${value ?? "empty"} is-readonly`}
-        title={readonlyTitel}
-        aria-label={`${label} — ${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL} (vergrendeld)`}
+        className={`rating-cell-btn rating-${value ?? "empty"} is-readonly${teLaat ? " is-te-laat" : ""}`}
+        title={teLaat ? `Te laat ingediend · ${readonlyTitel}` : readonlyTitel}
+        aria-label={`${label} — ${waardeTekst} (vergrendeld)`}
       >
-        {value ? RATING_KORT[value] : "–"}
+        {inhoud}
       </span>
     );
   }
@@ -71,13 +111,13 @@ export function RatingCell({
       <button
         ref={trigger}
         type="button"
-        className={`rating-cell-btn rating-${value ?? "empty"}`}
+        className={`rating-cell-btn rating-${value ?? "empty"}${teLaat ? " is-te-laat" : ""}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`${label} — ${value ? RATING_LABEL[value] : RATING_EMPTY_LABEL}`}
+        aria-label={`${label} — ${waardeTekst}`}
         onClick={() => setOpen((o) => !o)}
       >
-        {value ? RATING_KORT[value] : "–"}
+        {inhoud}
       </button>
 
       {open &&
@@ -118,8 +158,28 @@ export function RatingCell({
                 {RATING_EMPTY_LABEL}
               </button>
 
+              {onTeLaatChange && (
+                <>
+                  <div className="rating-cell-scheiding" role="separator" />
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={teLaat}
+                    className={`rating-cell-option rating-cell-telaat${teLaat ? " is-aan" : ""}`}
+                    title="Markering naast de kleur: de kleur blijft gewoon staan"
+                    onClick={() => onTeLaatChange(!teLaat)}
+                  >
+                    <span className="rating-cell-vinkje" aria-hidden="true">
+                      {teLaat ? "✓" : ""}
+                    </span>
+                    Te laat ingediend
+                    <TeLaatIcoon />
+                  </button>
+                </>
+              )}
+
               <div className="rating-cell-scheiding" role="separator" />
-              {STATUSSEN.map((r) => (
+              {statussen.map((r) => (
                 <button
                   key={r}
                   type="button"

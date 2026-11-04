@@ -49,6 +49,12 @@ interface EvalDoc {
   notities: Record<string, Notitie>;
   gewist: string[];
   auditLog: Record<string, AuditRegel[]>;
+  /**
+   * Badge-id → `true` = "te laat ingediend" (naast de kleur). Enkel aanwezig als er minstens
+   * één is: zo ziet de diff bestaande docs (zonder dit veld) niet als gewijzigd — anders zou elke
+   * save ze allemaal herschrijven.
+   */
+  teLaat?: Record<string, true>;
   /** Gedenormaliseerd van de leerling — nodig om de regels per vestiging te laten afschermen. */
   vestiging: string;
 }
@@ -57,6 +63,12 @@ interface DeelbadgeDoc extends Deelevaluatie {
   scores: Record<string, Rating>;
   scoreNotities: Record<string, Notitie>;
   scoreAudit: Record<string, AuditRegel[]>;
+  /**
+   * Leerling-id → `true` = "te laat ingediend". Enkel aanwezig als er minstens één is (zelfde
+   * reden als bij `EvalDoc.teLaat`: een deelbadge van een afgesloten jaar mag niet herschreven
+   * worden, Firestore zou de hele batch weigeren).
+   */
+  teLaat?: Record<string, true>;
 }
 
 interface MeldingDoc {
@@ -129,6 +141,11 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
     for (const [k, v] of Object.entries(s.auditLog)) {
       if (isDeelSleutel(k) && k.slice(0, k.lastIndexOf(":")) === d.id) doc.scoreAudit[k] = v;
     }
+    for (const k of Object.keys(s.teLaat ?? {})) {
+      if (!isDeelSleutel(k)) continue;
+      const i = k.lastIndexOf(":");
+      if (k.slice(0, i) === d.id) (doc.teLaat ??= {})[k.slice(i + 1)] = true;
+    }
     m.set(`deelbadges/${d.id}`, doc as unknown as DocData);
   }
 
@@ -177,6 +194,11 @@ export function storeNaarDocs(s: PersistedStore, alleenSchooljaar?: string): Doc
   for (const [k, v] of Object.entries(s.notities)) {
     const [sj, sid, ...rest] = k.split(":");
     if (rest.length && neemJaar(sj)) evalDoc(sj, sid).notities[rest.join(":")] = v;
+  }
+  for (const k of Object.keys(s.teLaat ?? {})) {
+    if (isDeelSleutel(k)) continue; // hoort bij een deelbadge-doc
+    const [sj, sid, ...rest] = k.split(":");
+    if (rest.length && neemJaar(sj)) (evalDoc(sj, sid).teLaat ??= {})[rest.join(":")] = true;
   }
   for (const k of s.gewist) {
     if (isDeelSleutel(k)) continue; // deelbadge: afwezigheid = gewist
@@ -289,6 +311,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   const deelKleuren: Record<string, Rating> = {};
   const deelNotities: Record<string, Notitie> = {};
   const auditLog: Record<string, AuditRegel[]> = {};
+  const teLaat: Record<string, true> = {};
   const gewist: string[] = [];
   const meldingen: Melding[] = [];
   const meldingGezien: Record<string, number> = {};
@@ -382,12 +405,14 @@ export function docsNaarStore(docs: DocMap): RauweStore {
         break;
       }
       case "deelbadges": {
-        const { scores, scoreNotities, scoreAudit, ...def } = data as unknown as DeelbadgeDoc;
+        const { scores, scoreNotities, scoreAudit, teLaat: laat, ...def } =
+          data as unknown as DeelbadgeDoc;
         deelevaluaties.push(def as Deelevaluatie);
         for (const [sid, v] of Object.entries(scores ?? {})) deelKleuren[`${def.id}:${sid}`] = v;
         for (const [sid, v] of Object.entries(scoreNotities ?? {}))
           deelNotities[`${def.id}:${sid}`] = v;
         for (const [k, v] of Object.entries(scoreAudit ?? {})) auditLog[k] = v;
+        for (const sid of Object.keys(laat ?? {})) teLaat[`${def.id}:${sid}`] = true;
         break;
       }
       case "rapporten": {
@@ -406,6 +431,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
         for (const [b, v] of Object.entries(d.kleuren ?? {})) kleuren[`${sj}:${sid}:${b}`] = v;
         for (const [b, v] of Object.entries(d.notities ?? {})) notities[`${sj}:${sid}:${b}`] = v;
         for (const b of d.gewist ?? []) gewist.push(`${sj}:${sid}:${b}`);
+        for (const b of Object.keys(d.teLaat ?? {})) teLaat[`${sj}:${sid}:${b}`] = true;
         for (const [k, v] of Object.entries(d.auditLog ?? {})) auditLog[k] = v;
         break;
       }
@@ -467,6 +493,7 @@ export function docsNaarStore(docs: DocMap): RauweStore {
   r.deelKleuren = deelKleuren;
   r.deelNotities = deelNotities;
   r.auditLog = auditLog;
+  r.teLaat = teLaat;
   r.gewist = gewist;
   r.meldingen = meldingen;
   r.meldingGezien = meldingGezien;
@@ -510,6 +537,56 @@ function stabielJson(x: unknown): string {
 }
 
 export const zelfde = (a: unknown, b: unknown) => stabielJson(a) === stabielJson(b);
+
+/**
+ * Top-level velden die `storeNaarDocs` weglaat zolang ze leeg zijn (zie `EvalDoc.teLaat`). Staan
+ * ze op de server maar niet meer in het nieuwe doc, dan moeten ze echt gewist worden.
+ */
+const WEGLAATBARE_VELDEN = new Set(["teLaat"]);
+
+const isMap = (x: unknown): x is Record<string, unknown> =>
+  !!x && typeof x === "object" && !Array.isArray(x);
+
+/**
+ * Firestore schrijft met `merge: true` (zodat gelijktijdige wijzigingen van collega's in hetzelfde
+ * doc niet verloren gaan). Gevolg: een sleutel die je lokaal uit een map haalt — een notitie die
+ * je wist, een "te laat"-vinkje dat je weghaalt — blijft op de server staan en komt via de
+ * volgende snapshot terug. Deze functie zet daarom op elke plek waar `oud` (de serverstand) iets
+ * had dat `nieuw` niet meer heeft een wis-markering (`wis()` = `deleteField()`), recursief door
+ * geneste maps. Top-level enkel voor `WEGLAATBARE_VELDEN` en velden die expliciet `undefined`
+ * zijn — onbekende velden (bv. van een nieuwere app-versie) blijven zo ongemoeid.
+ */
+export function metWissingen(
+  oud: DocData | undefined,
+  nieuw: DocData,
+  wis: () => unknown,
+): DocData {
+  if (!oud) return nieuw;
+  const uit: DocData = { ...nieuw };
+  for (const [k, oudeWaarde] of Object.entries(oud)) {
+    const n = nieuw[k];
+    if (n === undefined) {
+      if (WEGLAATBARE_VELDEN.has(k) || k in nieuw) uit[k] = wis();
+    } else if (isMap(oudeWaarde) && isMap(n)) {
+      uit[k] = mapMetWissingen(oudeWaarde, n, wis);
+    }
+  }
+  return uit;
+}
+
+function mapMetWissingen(
+  oud: Record<string, unknown>,
+  nieuw: Record<string, unknown>,
+  wis: () => unknown,
+): Record<string, unknown> {
+  const uit: Record<string, unknown> = { ...nieuw };
+  for (const [k, oudeWaarde] of Object.entries(oud)) {
+    const n = nieuw[k];
+    if (n === undefined) uit[k] = wis();
+    else if (isMap(oudeWaarde) && isMap(n)) uit[k] = mapMetWissingen(oudeWaarde, n, wis);
+  }
+  return uit;
+}
 
 /** De documenten die veranderd/nieuw zijn, en de paden die verdwenen. */
 export function diffDocs(oud: DocMap, nieuw: DocMap): { schrijf: DocMap; verwijder: string[] } {

@@ -15,6 +15,7 @@ import type {
   Rubriek,
   Stroom,
   Student,
+  TeLaat,
 } from "./types";
 
 /**
@@ -349,6 +350,7 @@ const EVAL_KOP = [
   "deelbadge",
   "datum",
   "kleur",
+  "te_laat",
   "behaald",
   "notitie_leerling",
   "notitie_mentor",
@@ -361,6 +363,8 @@ export interface EvaluatieBron {
   deelevaluaties: Deelevaluatie[];
   deelKleuren: DeelKleuren;
   deelNotities: DeelNotities;
+  /** "Te laat ingediend"-markeringen (optioneel: oudere aanroepers geven ze niet mee). */
+  teLaat?: TeLaat;
 }
 
 /**
@@ -384,7 +388,13 @@ export function exportEvaluaties(bron: EvaluatieBron, alleenSchooljaar?: string)
   const rijen: string[][] = [];
 
   // Badges — sleutel = `${schooljaar}:${studentId}:${nodeId}`.
-  for (const sleutel of new Set([...Object.keys(bron.kleuren), ...Object.keys(bron.notities)])) {
+  const teLaat = bron.teLaat ?? {};
+  const isBadgeSleutel = (k: string) => k.split(":").length >= 3;
+  for (const sleutel of new Set([
+    ...Object.keys(bron.kleuren),
+    ...Object.keys(bron.notities),
+    ...Object.keys(teLaat).filter(isBadgeSleutel),
+  ])) {
     const i1 = sleutel.indexOf(":");
     const i2 = sleutel.indexOf(":", i1 + 1);
     const schooljaar = sleutel.slice(0, i1);
@@ -411,6 +421,7 @@ export function exportEvaluaties(bron: EvaluatieBron, alleenSchooljaar?: string)
       "",
       "",
       kleur ? RATING_LABEL[kleur] : "",
+      teLaat[sleutel] ? "ja" : "",
       kleur ? (kleur === "green" || kleur === "blue" ? "ja" : "nee") : "",
       notitie?.zichtbaar ?? "",
       notitie?.verborgen ?? "",
@@ -421,6 +432,7 @@ export function exportEvaluaties(bron: EvaluatieBron, alleenSchooljaar?: string)
   for (const sleutel of new Set([
     ...Object.keys(bron.deelKleuren),
     ...Object.keys(bron.deelNotities),
+    ...Object.keys(teLaat).filter((k) => !isBadgeSleutel(k)),
   ])) {
     const i = sleutel.lastIndexOf(":");
     const de = deelById.get(sleutel.slice(0, i));
@@ -443,6 +455,7 @@ export function exportEvaluaties(bron: EvaluatieBron, alleenSchooljaar?: string)
       de.titel,
       de.datum,
       kleur ? RATING_LABEL[kleur] : "",
+      teLaat[sleutel] ? "ja" : "",
       "",
       notitie?.zichtbaar ?? "",
       notitie?.verborgen ?? "",

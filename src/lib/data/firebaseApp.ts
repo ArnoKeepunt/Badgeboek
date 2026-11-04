@@ -14,6 +14,7 @@ import {
   collection,
   collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -24,7 +25,13 @@ import {
 } from "firebase/firestore";
 import type { CurriculumRuw } from "../curriculum";
 import { STROMEN } from "../types";
-import { type DocData, type DocMap, curriculumNaarDocs, overlaysNaarDoc } from "./firestoreLayout";
+import {
+  type DocData,
+  type DocMap,
+  curriculumNaarDocs,
+  metWissingen,
+  overlaysNaarDoc,
+} from "./firestoreLayout";
 import type { Overlays } from "./persistentie";
 import { type Personeelslid, normaliseerGebruiker } from "../gebruikers";
 
@@ -196,15 +203,26 @@ const refVoorPad = (pad: string) => {
 /**
  * Schrijf (`merge`) en verwijder documenten in batches van ≤ 450, met `updatedAt`/`updatedBy`
  * op elk geschreven doc. Gedeeld door de persistentielaag en de migratie.
+ *
+ * `vorige`: de serverstand van die docs (zonder meta). Wat daarin stond maar in het nieuwe doc
+ * ontbreekt (bv. een gewiste notitie in een map), wordt met `deleteField()` echt gewist — `merge`
+ * alleen zou het laten staan (zie `metWissingen`). Zonder `vorige` = puur samenvoegen.
  */
-export async function schrijfDocMap(schrijf: DocMap, verwijder: string[] = []): Promise<void> {
+export async function schrijfDocMap(
+  schrijf: DocMap,
+  verwijder: string[] = [],
+  vorige?: DocMap,
+): Promise<void> {
   if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
   const meta = {
     updatedAt: new Date().toISOString(),
     updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
   };
   const ops: Array<{ soort: "set" | "del"; pad: string; data?: DocData }> = [];
-  for (const [pad, data] of schrijf) ops.push({ soort: "set", pad, data: { ...data, ...meta } });
+  for (const [pad, data] of schrijf) {
+    const metWis = metWissingen(vorige?.get(pad), data, deleteField);
+    ops.push({ soort: "set", pad, data: { ...metWis, ...meta } });
+  }
   for (const pad of verwijder) ops.push({ soort: "del", pad });
   for (let i = 0; i < ops.length; i += BATCH_MAX) {
     const batch = writeBatch(db);
@@ -288,9 +306,85 @@ export async function schrijfGebruiker(p: Personeelslid): Promise<void> {
       updatedAt: new Date().toISOString(),
       updatedBy: auth.currentUser.email ?? auth.currentUser.uid,
     });
+    await setDoc(collegaRef(p.email), collegaData(p));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `gebruikers/${p.email}`);
   }
+}
+
+// --- Collega-lijst (collectie /collegas, doc-id = e-mailadres) -----------------------------
+//
+// Mentoren mogen `gebruikers` niet lezen (rollen, dev-toegang… zijn beheerderszaken), maar moeten
+// wel collega's kunnen kiezen als mee-mentor van een groep. Daarom een afgeslankte kopie: enkel
+// naam, vestigingen en actief. Leesbaar voor al het personeel, schrijfbaar enkel door de
+// beheerder — bijgehouden door `schrijfGebruiker`/`verwijderGebruiker` en `synchroniseerCollegas`.
+
+/** Eén collega zoals een mentor die mag zien (geen rol, geen rechten). */
+export interface Collega {
+  /** Het e-mailadres = dezelfde id als `Groep.mentorId`. */
+  id: string;
+  naam: string;
+  vestigingen: string[];
+  actief: boolean;
+}
+
+const collegaRef = (email: string) => doc(db, "collegas", email);
+const collegaData = (p: Personeelslid) => ({
+  naam: p.naam,
+  vestigingen: [...new Set(p.vestigingen)],
+  actief: p.actief,
+});
+
+/** Luister naar de collega-lijst (voor al het personeel). */
+export function abonneerCollegas(cb: (lijst: Collega[]) => void): Unsubscribe {
+  return onSnapshot(
+    collection(db, "collegas"),
+    (snap) =>
+      cb(
+        snap.docs.map((d) => {
+          const x = d.data();
+          return {
+            id: d.id,
+            naam: typeof x.naam === "string" ? x.naam : d.id,
+            vestigingen: Array.isArray(x.vestigingen) ? (x.vestigingen as string[]) : [],
+            actief: x.actief !== false,
+          };
+        }),
+      ),
+    (err) => console.warn("Firestore collegas snapshot melding:", err.message),
+  );
+}
+
+/**
+ * Zet de collega-lijst gelijk aan de personeelslijst (beheerder, bij het openen van Gebruikers):
+ * zo komen ook de accounts van vóór deze lijst erin. Schrijft enkel wat verschilt.
+ */
+export async function synchroniseerCollegas(
+  personeel: Personeelslid[],
+  huidig: Collega[],
+): Promise<void> {
+  const perId = new Map(huidig.map((c) => [c.id, c]));
+  const batch = writeBatch(db);
+  let n = 0;
+  for (const p of personeel) {
+    const nu = perId.get(p.email);
+    const data = collegaData(p);
+    if (
+      !nu ||
+      nu.naam !== data.naam ||
+      nu.actief !== data.actief ||
+      nu.vestigingen.join("|") !== data.vestigingen.join("|")
+    ) {
+      batch.set(collegaRef(p.email), data);
+      n++;
+    }
+    perId.delete(p.email);
+  }
+  for (const weg of perId.keys()) {
+    batch.delete(collegaRef(weg));
+    n++;
+  }
+  if (n > 0) await batch.commit();
 }
 
 /** Verwijder een personeelslid definitief (beheerder). Deactiveren gaat via `schrijfGebruiker`. */
@@ -298,6 +392,7 @@ export async function verwijderGebruiker(email: string): Promise<void> {
   if (!auth.currentUser) throw new Error("Niet aangemeld bij Firebase.");
   try {
     await deleteDoc(gebruikerRef(email));
+    await deleteDoc(collegaRef(email));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `gebruikers/${email}`);
   }

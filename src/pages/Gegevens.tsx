@@ -42,6 +42,7 @@ export function Gegevens() {
     deelevaluaties,
     deelKleuren,
     deelNotities,
+    teLaat,
     schooljaar,
     doelWijzigingen,
     doelenImport,
@@ -237,7 +238,15 @@ export function Gegevens() {
               downloadTekst(
                 `keerpunt-evaluaties-${schooljaar}-${datumStempel()}.csv`,
                 exportEvaluaties(
-                  { studenten: students, kleuren, notities, deelevaluaties, deelKleuren, deelNotities },
+                  {
+                    studenten: students,
+                    kleuren,
+                    notities,
+                    deelevaluaties,
+                    deelKleuren,
+                    deelNotities,
+                    teLaat,
+                  },
                   schooljaar,
                 ),
               )
@@ -320,6 +329,10 @@ export function Gegevens() {
             al <code>|</code>. Wordt meteen de nieuwe databaseversie, net als "Rubrics
             wegschrijven" hieronder.
           </p>
+          <p>
+            <strong>Exporteren</strong> geeft de huidige rubrics (met alle bewerkingen) in
+            precies dit formaat: aanpassen in Excel en terug importeren kan rechtstreeks.
+          </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <label className="knop-secundair gegevens-upload-knop">
               CSV kiezen…
@@ -331,7 +344,7 @@ export function Gegevens() {
             </label>
             <button
               type="button"
-              className="linkknop"
+              className="knop-secundair"
               onClick={() =>
                 downloadTekst(
                   `keerpunt-rubrics-${datumStempel()}.csv`,
@@ -339,7 +352,7 @@ export function Gegevens() {
                 )
               }
             >
-              Sjabloon downloaden
+              Rubrics exporteren (CSV)
             </button>
           </div>
         </div>

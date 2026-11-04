@@ -14,6 +14,7 @@ import type {
   Rapport,
   Rubriek,
   Student,
+  TeLaat,
 } from "../types";
 
 /**
@@ -68,6 +69,8 @@ export interface PersistedStore {
   deelevaluaties: Deelevaluatie[];
   deelKleuren: DeelKleuren;
   deelNotities: DeelNotities;
+  /** "Te laat ingediend"-markering per badge-/deelbadgecel, los van de kleur (zie `TeLaat`). */
+  teLaat: TeLaat;
   /** Append-only wijzigingsgeschiedenis per evaluatiecel (kleur of notitie): wie, wanneer, van→naar. */
   auditLog: AuditLog;
   meldingen: Melding[];

@@ -24,6 +24,7 @@ import {
   bereikVestiging,
   useBereik,
   useHuidigeActorId,
+  useZichtbareGroepen,
   useZichtbareLeerlingen,
 } from "../lib/rechten";
 import { vestigingKeuzes } from "../lib/vestigingen";
@@ -32,12 +33,14 @@ import { useAangemeld } from "../lib/sessie";
 import {
   getDeelKleur,
   getDeelNotitie,
+  isDeelTeLaat,
   setDeelKleur,
   setDeelKleurBulk,
   setMatrixCursus,
   setMatrixStromen,
   useStore,
   zetDeelNotitie,
+  zetDeelTeLaat,
 } from "../lib/store";
 import { STROOM_LABEL, deelSleutel } from "../lib/types";
 import type { DeelKleuren, DeelNotities, Deelevaluatie, Stroom, Student } from "../lib/types";
@@ -100,8 +103,8 @@ type EditorState = {
 };
 
 export function Deelevaluaties() {
+  const groepen = useZichtbareGroepen();
   const {
-    groepen,
     schooljaar,
     deelevaluaties,
     deelKleuren,
@@ -381,6 +384,7 @@ function DeelCursusSectie({
   const wijzigingLabel = useWijzigingLabel();
   const geschiedenis = useGeschiedenis();
   const deelWijzigingLabel = useDeelevaluatieWijzigingLabel();
+  const { teLaat } = useStore();
   const types = typesVoorCursus(stroom, cursus);
   const aantalPerType = new Map<string | null, number>();
   for (const d of rijen) aantalPerType.set(d.typeId, (aantalPerType.get(d.typeId) ?? 0) + 1);
@@ -565,6 +569,8 @@ function DeelCursusSectie({
                                   value={kleur}
                                   geschiedenis={geschiedenis(sleutel)}
                                   onChange={(next) => setDeelKleur(d.id, s.id, next)}
+                                  teLaat={isDeelTeLaat(teLaat, d.id, s.id)}
+                                  onTeLaatChange={(aan) => zetDeelTeLaat(d.id, s.id, aan)}
                                 />
                                 <NotitieVeld
                                   notitie={getDeelNotitie(deelNotities, d.id, s.id)}

@@ -54,6 +54,9 @@ const waardeTekst = (veld: AuditRegel["veld"], v: string): string => {
 
 /** "Geel aangepast naar Groen" / "Ingesteld op Groen" / "Notitie toegevoegd: …". */
 function overgangTekst(regel: AuditRegel): string {
+  if (regel.veld === "te-laat") {
+    return regel.naar ? "Gemarkeerd als te laat ingediend" : "Markering te laat ingediend weggehaald";
+  }
   const van = waardeTekst(regel.veld, regel.van);
   const naar = waardeTekst(regel.veld, regel.naar);
   if (regel.veld === "kleur") {
