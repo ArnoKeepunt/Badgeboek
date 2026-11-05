@@ -310,23 +310,6 @@ export interface Rapport {
   gewijzigdDoor: string;
   afgewerktOp?: number;
   afgewerktDoor?: string;
-  /**
-   * De bewaarde pdf's van dit rapport, oudste eerst: bij elke keer afwerken komt er een versie
-   * bij (heropenen + opnieuw afwerken overschrijft niets). Het bestand zelf staat in Firebase
-   * Storage; `url` is de download-link (met token) — wie het rapport-doc mag lezen (Firestore-
-   * regels), kan de pdf openen. Ontbreekt = nog geen pdf bewaard.
-   */
-  pdfVersies?: RapportPdfVersie[];
-}
-
-export interface RapportPdfVersie {
-  /** Pad in Firebase Storage, bv. "rapporten/rap123/1730000000000.pdf". */
-  pad: string;
-  url: string;
-  /** Epoch-ms van het bewaren. */
-  op: number;
-  /** Wie afwerkte (gebruikers-id/e-mail, zoals `afgewerktDoor`). */
-  door: string;
 }
 
 /**

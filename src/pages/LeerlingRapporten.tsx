@@ -46,8 +46,6 @@ export function LeerlingRapporten() {
         </div>
       );
     }
-    // De bewaarde pdf (nieuwste versie) van het afgewerkte rapport, als die er is.
-    const pdf = rapport.pdfVersies?.at(-1);
     return (
       <div className="ll-rapport">
         <div className="ll-rapport-acties no-print">
@@ -55,11 +53,6 @@ export function LeerlingRapporten() {
             ← Mijn rapporten
           </Link>
           <span className="ll-rapport-knoppen">
-            {pdf && (
-              <a className="ll-afmelden" href={pdf.url} target="_blank" rel="noreferrer">
-                Pdf downloaden
-              </a>
-            )}
             <button type="button" className="ll-afmelden" onClick={() => window.print()}>
               Afdrukken
             </button>

@@ -51,7 +51,6 @@ import type {
   Notities,
   Rapport,
   RapportItem,
-  RapportPdfVersie,
   Rating,
   Rubriek,
   Sessie,
@@ -1857,21 +1856,6 @@ export function rondRapportenAfBulk(ids: string[]): number {
     ),
   });
   return teDoen.size;
-}
-
-/**
- * Koppel een bewaarde pdf (Firebase Storage) aan een afgewerkt rapport: een nieuwe versie achteraan,
- * de vorige blijven staan. Bewust ook op een vergrendeld rapport — het bewaren gebeurt net ná het
- * afwerken. Enkel de beheerder werkt af (UI + Firestore-regels voor een afgewerkt rapport).
- */
-export function voegRapportPdfToe(id: string, versie: Omit<RapportPdfVersie, "door">) {
-  const wie = huidigeGebruiker();
-  commit({
-    ...state,
-    rapporten: state.rapporten.map((r) =>
-      r.id === id ? { ...r, pdfVersies: [...(r.pdfVersies ?? []), { ...versie, door: wie }] } : r,
-    ),
-  });
 }
 
 /** Heropen een afgewerkt rapport (terug naar concept). De UI gate dit tot een beheerder. */

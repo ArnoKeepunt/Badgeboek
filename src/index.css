@@ -3874,36 +3874,6 @@ th {
   border-top: 1px solid var(--border);
 }
 
-/* Bewaarde pdf('s) van een afgewerkt rapport, onder de statusbalk. */
-.rapport-pdf-archief {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.rapport-pdf-archief a {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.rapport-pdf-ouder {
-  display: inline-block;
-  margin-left: 10px;
-}
-
-.rapport-pdf-ouder summary {
-  cursor: pointer;
-}
-
-.rapport-pdf-ouder ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
-}
-
 .rapport-pdf-fout {
   flex-basis: 100%;
   margin: 6px 0 0;

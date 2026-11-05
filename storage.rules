@@ -1,39 +1,11 @@
 rules_version = '2';
 
-// Firebase Storage: enkel de pdf's van afgewerkte rapporten (`rapporten/{rapportId}/{tijd}.pdf`).
-//
-// Lezen loopt via de download-link (met token) die op het rapport-doc in Firestore staat: wie dat
-// doc mag lezen (personeel van die vestiging, later de leerling/ouder), kan de pdf openen. Via de
-// regels zelf enkel `get` van één bestand voor personeel (nodig voor `getDownloadURL` na het
-// uploaden; het pad bevat een tijdstempel in ms, dus raden is onbegonnen werk) — nooit oplijsten.
-//
-// Schrijven: enkel een geverifieerd Keerpunt-personeelsaccount (geen `….leerling@`-adres), enkel
-// een nieuw pdf-bestand — nooit overschrijven of wissen, zodat elke bewaarde versie blijft staan.
-// De rol (beheerder) kan Storage hier niet nakijken (de rollen staan in de named Firestore-
-// database); een mentor kan dus een los bestand uploaden, maar het niet aan een afgewerkt rapport
-// koppelen — dat doc wijzigen is beheerder-only in `firestore.rules`.
+// Firebase Storage wordt niet (meer) gebruikt: rapporten worden niet als pdf bewaard — de
+// rapportgegevens staan in Firestore en de pdf wordt telkens op aanvraag gemaakt. Alles dicht.
 service firebase.storage {
   match /b/{bucket}/o {
     match /{alles=**} {
       allow read, write: if false;
-    }
-
-    match /rapporten/{rapportId}/{bestand} {
-      // Zelfde maximale sessieduur als in firestore.rules: 12 uur na de laatste echte login.
-      function isPersoneelsaccount() {
-        return request.auth != null
-          && request.time < timestamp.value(request.auth.token.auth_time * 1000) + duration.value(12, 'h')
-          && request.auth.token.email_verified == true
-          && request.auth.token.email.matches('.*@keerpuntscholen[.]be$')
-          && !request.auth.token.email.matches('.*[.]leerling@keerpuntscholen[.]be$');
-      }
-      allow get: if isPersoneelsaccount();
-      // `resource == null`: enkel een nieuw bestand — anders telt een overschrijving ook als create.
-      allow create: if isPersoneelsaccount()
-        && resource == null
-        && bestand.matches('[0-9]+[.]pdf')
-        && request.resource.contentType == 'application/pdf'
-        && request.resource.size < 10 * 1024 * 1024;
     }
   }
 }

@@ -14,7 +14,6 @@ import {
 import type { LeerlingFilter } from "../lib/leerlingen";
 import { bereikBeperkt, useBereik, useZichtbareGroepen, useZichtbareLeerlingen } from "../lib/rechten";
 import { downloadBlob } from "../lib/download";
-import { PDF_ARCHIEF_ACTIEF, archiveerRapportPdf } from "../lib/rapportArchief";
 import { PDF_SERVER_ACTIEF, maakRapportenZip } from "../lib/rapportPdf";
 import { useEffectieveRol } from "../lib/sessie";
 import {
@@ -57,7 +56,7 @@ export function Rapport() {
   // Rapporten die nu (onzichtbaar) klaarstaan voor het printvenster; null = niet aan het printen.
   const [printLijst, setPrintLijst] = useState<RapportDoc[] | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
-  // Pdf's maken (zip) of bewaren (na afwerken) loopt even: voortgang "3/24", null = niet bezig.
+  // Pdf's maken (zip) loopt even: voortgang "3/24", null = niet bezig.
   const [pdfVoortgang, setPdfVoortgang] = useState<string | null>(null);
   // Zelfde bron als RapportDetail/Rubrics: bundel + overrides uit de store.
   const alleRubrieken = useMemo(
@@ -112,7 +111,6 @@ export function Rapport() {
     const moment = gekozenMoment;
     const n = rondRapportenAfBulk(teDoen.map((r) => r.id));
     setBulkMelding(`"${moment}" afgewerkt voor ${n} leerling${n === 1 ? "" : "en"}.`);
-    if (PDF_ARCHIEF_ACTIEF) void bewaarPdfs(teDoen, moment, n);
   };
 
   const metLeerling = (lijst: RapportDoc[]) =>
@@ -120,29 +118,6 @@ export function Rapport() {
       const student = students.find((s) => s.id === rapport.studentId);
       return student ? [{ student, rapport }] : [];
     });
-
-  // Na bulk afwerken: per rapport de pdf als versie in de database, na elkaar. Een mislukte pdf
-  // houdt de rest niet tegen; die kan de beheerder later per rapport opnieuw laten bewaren.
-  const bewaarPdfs = async (lijst: RapportDoc[], moment: string, n: number) => {
-    const items = metLeerling(lijst);
-    let mislukt = 0;
-    for (const [i, { student, rapport }] of items.entries()) {
-      setPdfVoortgang(`Pdf's bewaren ${i + 1}/${items.length}`);
-      try {
-        await archiveerRapportPdf(student, rapport, alleRubrieken);
-      } catch (err) {
-        console.error(`Pdf bewaren mislukt (${rapport.id}):`, err);
-        mislukt++;
-      }
-    }
-    setPdfVoortgang(null);
-    setBulkMelding(
-      `"${moment}" afgewerkt voor ${n} leerling${n === 1 ? "" : "en"}` +
-        (mislukt === 0
-          ? " — pdf's bewaard."
-          : ` — ${mislukt} pdf${mislukt === 1 ? "" : "'s"} niet bewaard; open die rapporten en kies "Pdf bewaren".`),
-    );
-  };
 
   // Eén zip met per leerling een eigen pdf, in de volgorde van de leerlingenlijst.
   const bulkPdfs = async () => {

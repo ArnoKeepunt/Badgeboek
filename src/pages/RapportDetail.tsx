@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ColorBar } from "../components/ColorBar";
 import { useBewerkSlot } from "../lib/bewerkSlot";
 import { downloadBlob } from "../lib/download";
-import { PDF_ARCHIEF_ACTIEF, archiveerRapportPdf } from "../lib/rapportArchief";
 import { rapportBestandsnaam } from "../lib/rapportInhoud";
 import { PDF_SERVER_ACTIEF, maakRapportPdf } from "../lib/rapportPdf";
 import { usePopover } from "../lib/popover";
@@ -54,7 +53,7 @@ import {
   zetRapportKlassenraadCommentaar,
   zetRapportRubriekKleur,
 } from "../lib/store";
-import type { Rapport, RapportPdfVersie } from "../lib/types";
+import type { Rapport } from "../lib/types";
 import { rapportItemSleutel } from "../lib/types";
 import { useGeschiedenis, useWijzigingLabel } from "../lib/wijzigingslog";
 
@@ -205,70 +204,6 @@ function AlgemeneOpmerkingVeld({
   );
 }
 
-const datumTijd = (ms: number) =>
-  new Date(ms).toLocaleString("nl-BE", { dateStyle: "medium", timeStyle: "short" });
-
-/**
- * De bewaarde pdf's van een afgewerkt rapport (Firebase Storage), nieuwste eerst — zichtbaar voor
- * elk personeelslid dat het rapport mag zien. Heropenen + opnieuw afwerken geeft een nieuwe versie;
- * de vorige blijven staan. Ontbreekt de pdf (bv. het bewaren mislukte), dan kan de beheerder ze
- * hier opnieuw laten bewaren.
- */
-function RapportPdfArchief({
-  rapport,
-  bezig,
-  fout,
-  magBewaren,
-  onBewaar,
-}: {
-  rapport: Rapport;
-  bezig: boolean;
-  fout: string | null;
-  magBewaren: boolean;
-  onBewaar: () => void;
-}) {
-  const versies: RapportPdfVersie[] = [...(rapport.pdfVersies ?? [])].reverse();
-  const [nieuwste, ...ouder] = versies;
-  return (
-    <div className="rapport-pdf-archief no-print">
-      {bezig ? (
-        <span>Pdf wordt bewaard…</span>
-      ) : nieuwste ? (
-        <span>
-          Bewaarde pdf:{" "}
-          <a href={nieuwste.url} target="_blank" rel="noreferrer">
-            {datumTijd(nieuwste.op)}
-          </a>
-          {ouder.length > 0 && (
-            <details className="rapport-pdf-ouder">
-              <summary>
-                {ouder.length} oudere versie{ouder.length === 1 ? "" : "s"}
-              </summary>
-              <ul>
-                {ouder.map((v) => (
-                  <li key={v.pad}>
-                    <a href={v.url} target="_blank" rel="noreferrer">
-                      {datumTijd(v.op)}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </span>
-      ) : (
-        <span>Er is nog geen pdf van dit rapport bewaard.</span>
-      )}
-      {!bezig && magBewaren && (!nieuwste || fout) && (
-        <button type="button" className="linkknop" onClick={onBewaar}>
-          Pdf bewaren
-        </button>
-      )}
-      {fout && <p className="rapport-pdf-fout">{fout}</p>}
-    </div>
-  );
-}
-
 /**
  * Rapport voor één leerling: links het rapport zelf, rechts een alleen-lezen naslagpaneel met
  * alle badges van de leerling — zodat de mentor bij het kiezen van een rubric-kleur meteen de
@@ -335,7 +270,7 @@ export function RapportDetail() {
   const [deelOpen, setDeelOpen] = useState<Set<string>>(new Set());
   const [gekozenId, setGekozenId] = useState<string | null>(null);
   // Een pdf maken duurt even (bibliotheek laden + opbouwen): knoppen intussen uit.
-  const [pdfBezig, setPdfBezig] = useState<"download" | "bewaren" | null>(null);
+  const [pdfBezig, setPdfBezig] = useState<"download" | null>(null);
   // Per rapport: een fout bij het ene rapport hoort niet bij het volgende dat je opent.
   const [pdfFoutVan, setPdfFoutVan] = useState<{ rapportId: string; tekst: string } | null>(null);
   // Cursusfilter — zelfde idee als op Badges/Deelevaluaties, maar hier lokaal (niet de gedeelde
@@ -493,25 +428,6 @@ export function RapportDetail() {
     } catch (err) {
       console.error("Pdf maken mislukt:", err);
       zetPdfFout(gekozen.id, "De pdf kon niet gemaakt worden. Probeer opnieuw of gebruik Printen.");
-    } finally {
-      setPdfBezig(null);
-    }
-  };
-
-  // Na het afwerken (of opnieuw, via "Pdf bewaren"): de pdf als nieuwe versie in de database.
-  const bewaarPdf = async (rapport: Rapport) => {
-    if (!PDF_ARCHIEF_ACTIEF) return;
-    setPdfBezig("bewaren");
-    zetPdfFout(rapport.id, null);
-    try {
-      await archiveerRapportPdf(student, rapport, alleRubrieken);
-    } catch (err) {
-      console.error("Pdf bewaren mislukt:", err);
-      zetPdfFout(
-        rapport.id,
-        "Het rapport is afgewerkt, maar de pdf kon niet in de database bewaard worden. " +
-          "Probeer opnieuw met \"Pdf bewaren\".",
-      );
     } finally {
       setPdfBezig(null);
     }
@@ -733,7 +649,6 @@ export function RapportDetail() {
                           onClick={() => {
                             if (confirm(`Rapport "${gekozen.naam}" afwerken? Het staat dan vast.`)) {
                               rondRapportAf(gekozen.id);
-                              void bewaarPdf(gekozen);
                             }
                           }}
                         >
@@ -777,16 +692,7 @@ export function RapportDetail() {
               </div>
             )}
 
-            {gekozen && vergrendeld && PDF_ARCHIEF_ACTIEF && (
-              <RapportPdfArchief
-                rapport={gekozen}
-                bezig={pdfBezig === "bewaren"}
-                fout={pdfFout}
-                magBewaren={magAfwerken}
-                onBewaar={() => void bewaarPdf(gekozen)}
-              />
-            )}
-            {pdfFout && !vergrendeld && <p className="rapport-pdf-fout no-print">{pdfFout}</p>}
+            {pdfFout && <p className="rapport-pdf-fout no-print">{pdfFout}</p>}
           </div>
 
           {gekozen ? (
