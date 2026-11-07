@@ -258,8 +258,9 @@ service cloud.firestore {
       allow update: if isPersoneel()
         && magVestiging(request.resource.data.get('vestiging', ''))
         && (jaarOpen(schooljaar) || alleenVestigingToegevoegd());
-      allow delete: if isPersoneel() && jaarOpen(schooljaar)
-        && magVestiging(resource.data.get('vestiging', ''));
+      // Nooit vanuit de app: op 6/11/2026 wiste een oud tabblad zo alle docs van een schooljaar. De
+      // app wist enkel losse velden (`voegWijzigingenToe`); opruimen kan via de console.
+      allow delete: if false;
     }
 
     // --- Legacy: oude AI-Studio-documenten -----------------------------------

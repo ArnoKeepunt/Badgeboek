@@ -609,6 +609,19 @@ describe("gerichte saves", () => {
     expect(d.notities).toEqual({});
   });
 
+  it("niemand verwijdert een evaluatie-doc; zo'n batch van een oud tabblad faalt in zijn geheel", async () => {
+    await assertFails(mentor.doc(pad).delete());
+    await assertFails(coordinator.doc(pad).delete());
+    await assertFails(beheerder.doc(pad).delete());
+    await assertFails(bootstrap.doc(pad).delete());
+
+    const batch = beheerder.batch();
+    batch.set(beheerder.doc(pad), { kleuren: { b9: "red" } }, { merge: true });
+    batch.delete(beheerder.doc(`evaluaties/${JAAR}/leerlingen/ll-molenbeek`));
+    await assertFails(batch.commit());
+    expect((await stand()).kleuren).toEqual({ b1: "green", b2: "blue" });
+  });
+
   it("daarom nooit een lege map: een merge vervangt daarmee de hele map op de server", async () => {
     await assertSucceeds(mentor.doc(pad).set({ kleuren: {} }, { merge: true }));
     expect((await stand()).kleuren).toEqual({});
