@@ -363,7 +363,7 @@ function commit(next: State) {
   // de ene mentor wat een andere mentor of de beheerder te zien krijgt.
   const { sessie, matrixStromen, matrixCursus, ...rest } = state;
   try {
-    void opslag.bewaar(rest);
+    void opslag.bewaar(rest, vorige);
   } catch (error) {
     // Een fout in de persistentielaag mag de in-memory store nooit blokkeren — anders zou
     // een falende `bewaar()` ook de lokale UI-update (hieronder, `listeners.forEach`) laten

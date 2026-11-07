@@ -598,3 +598,166 @@ export function diffDocs(oud: DocMap, nieuw: DocMap): { schrijf: DocMap; verwijd
   for (const pad of oud.keys()) if (!nieuw.has(pad)) verwijder.push(pad);
   return { schrijf, verwijder };
 }
+
+// --- gerichte wijzigingen -----------------------------------------------------
+
+/**
+ * Markering in een patch: "dit veld heeft de gebruiker gewist" (bij het schrijven `deleteField()`).
+ * Een gewone string, zodat een patch JSON-veilig en zonder Firestore-SDK te testen blijft.
+ */
+export const WEG = "__keerpunt_weg__";
+
+/** Enkel de velden die een gebruiker wijzigde; `null` = het hele document verwijderen. */
+export interface DocWijziging {
+  patch: DocData | null;
+  /** Het volledige doc, voor als het op de server (nog) niet bestaat. `null` = dan niets doen. */
+  volledig: DocData | null;
+}
+export type Wijzigingen = Map<string, DocWijziging>;
+
+function verschil(
+  basis: Record<string, unknown>,
+  nieuw: Record<string, unknown>,
+  bovenaan: boolean,
+): Record<string, unknown> {
+  const uit: Record<string, unknown> = {};
+  for (const [k, n] of Object.entries(nieuw)) {
+    const b = basis[k];
+    if (n === undefined) {
+      if (b !== undefined) uit[k] = WEG;
+    } else if (isMap(n) && (b === undefined || isMap(b))) {
+      // Nooit een hele map meesturen: een `merge` vervangt de map op de server als ze leeg is, en
+      // zo blijven ook sleutels van collega's in dezelfde map ongemoeid.
+      const sub = verschil((b as Record<string, unknown>) ?? {}, n, false);
+      if (Object.keys(sub).length > 0) uit[k] = sub;
+    } else if (!zelfde(b, n)) {
+      uit[k] = n;
+    }
+  }
+  for (const [k, b] of Object.entries(basis)) {
+    if (k in nieuw || b === undefined) continue;
+    if (bovenaan && isMap(b)) {
+      // Een weggelaten veld bovenaan (`teLaat`): enkel de sleutels wissen die de gebruiker kende.
+      const sub = Object.fromEntries(Object.keys(b).map((s) => [s, WEG]));
+      if (Object.keys(sub).length > 0) uit[k] = sub;
+    } else {
+      uit[k] = WEG;
+    }
+  }
+  return uit;
+}
+
+/** Wat veranderde er tussen `basis` en `nieuw`? Enkel de gewijzigde bladeren, nooit een lege map. */
+export function verschilTussenDocs(basis: DocData, nieuw: DocData): DocData {
+  return verschil(basis, nieuw, true);
+}
+
+/** Past een patch toe op een document, zonder het origineel te wijzigen. */
+export function pasPatchToe(doc: DocData, patch: DocData): DocData {
+  const uit: DocData = { ...doc };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === WEG) delete uit[k];
+    else if (isMap(v)) uit[k] = pasPatchToe(isMap(uit[k]) ? uit[k] : {}, v);
+    else uit[k] = v;
+  }
+  return uit;
+}
+
+function combineerPatches(oud: DocData, nieuw: DocData): DocData {
+  const uit: DocData = { ...oud };
+  for (const [k, v] of Object.entries(nieuw)) {
+    const o = uit[k];
+    uit[k] = isMap(v) && isMap(o) ? combineerPatches(o, v) : v;
+  }
+  return uit;
+}
+
+/** Vervangt de `WEG`-markeringen door de echte wis-waarde (`deleteField()`). */
+export function vervangWeg(patch: DocData, wis: () => unknown): DocData {
+  const uit: DocData = {};
+  for (const [k, v] of Object.entries(patch)) {
+    uit[k] = v === WEG ? wis() : isMap(v) ? vervangWeg(v, wis) : v;
+  }
+  return uit;
+}
+
+/**
+ * Voegt toe wat de gebruiker wijzigde tussen twee stoorstanden (`basis` → `nu`). Dit is de enige
+ * bron van wat er geschreven wordt: wat de gebruiker niet aanraakte, kan zo nooit verdwijnen, hoe
+ * oud deze browserstand ook is.
+ */
+export function voegWijzigingenToe(lopend: Wijzigingen, basis: DocMap, nu: DocMap): void {
+  for (const [pad, doc] of nu) {
+    const b = basis.get(pad);
+    const volledig = verschilTussenDocs({}, doc);
+    if (!b) {
+      lopend.set(pad, { patch: volledig, volledig });
+      continue;
+    }
+    const patch = verschilTussenDocs(b, doc);
+    const eerder = lopend.get(pad);
+    if (Object.keys(patch).length === 0) {
+      if (eerder) lopend.set(pad, { ...eerder, volledig });
+      continue;
+    }
+    lopend.set(pad, {
+      patch: eerder?.patch ? combineerPatches(eerder.patch, patch) : eerder ? volledig : patch,
+      volledig,
+    });
+  }
+  for (const [pad, b] of basis) {
+    if (nu.has(pad)) continue;
+    if (pad.startsWith("evaluaties/")) {
+      // Een evaluatie-doc bestaat enkel zolang er iets in staat: "weg" betekent hier dat deze
+      // gebruiker niets meer ziet, niet dat ook wat een collega intussen toevoegde weg moet.
+      const leeg: DocData = { kleuren: {}, notities: {}, gewist: [], auditLog: {} };
+      const patch = verschilTussenDocs(b, { ...leeg, vestiging: b.vestiging });
+      lopend.set(pad, { patch, volledig: null });
+    } else {
+      lopend.set(pad, { patch: null, volledig: null });
+    }
+  }
+}
+
+/** De serverstand met de openstaande wijzigingen erover: wat de gebruiker hoort te zien. */
+export function pasWijzigingenToe(docs: DocMap, lopend: Wijzigingen): DocMap {
+  const uit: DocMap = new Map(docs);
+  for (const [pad, w] of lopend) {
+    const op = uit.get(pad);
+    if (w.patch === null) uit.delete(pad);
+    else if (op) uit.set(pad, pasPatchToe(op, w.patch));
+    else if (w.volledig) uit.set(pad, w.volledig);
+  }
+  return uit;
+}
+
+/**
+ * Wat er nu echt naar de server moet: `patches` om te versturen, `resultaat` = het volledige doc
+ * erna (voor de back-up). Wat er intussen al staat of al weg is, valt af.
+ */
+export function planSchrijfactie(
+  lopend: Wijzigingen,
+  server: DocMap,
+): { patches: DocMap; resultaat: DocMap; verwijder: string[] } {
+  const patches: DocMap = new Map();
+  const resultaat: DocMap = new Map();
+  const verwijder: string[] = [];
+  for (const [pad, w] of lopend) {
+    const op = server.get(pad);
+    if (w.patch === null) {
+      if (op) verwijder.push(pad);
+    } else if (!op) {
+      if (w.volledig) {
+        patches.set(pad, w.volledig);
+        resultaat.set(pad, w.volledig);
+      }
+    } else {
+      const na = pasPatchToe(op, w.patch);
+      if (!zelfde(na, op)) {
+        patches.set(pad, w.patch);
+        resultaat.set(pad, na);
+      }
+    }
+  }
+  return { patches, resultaat, verwijder };
+}

@@ -96,8 +96,12 @@ export interface BadgeboekPersistentie {
    */
   laadDirect(): RauweStore | null;
 
-  /** De volledige store wegschrijven. Mag asynchroon zijn; de app wacht er niet op. */
-  bewaar(store: PersistedStore): void | Promise<void>;
+  /**
+   * De store wegschrijven. Mag asynchroon zijn; de app wacht er niet op. `vorige` = de stand vlak
+   * vóór deze wijziging: een gedeelde backend bepaalt daarmee wat deze gebruiker echt wijzigde,
+   * zodat hij enkel dat verstuurt en nooit het werk van anderen overschrijft.
+   */
+  bewaar(store: PersistedStore, vorige?: PersistedStore): void | Promise<void>;
 
   /**
    * Optioneel: schrijf de database-versie van de badges weg (of wis ze met `null`). Alleen de

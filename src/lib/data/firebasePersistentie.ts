@@ -30,10 +30,14 @@ import { verwijderSleutel, wezen, wisBackup, zetBackup } from "./onbewaardBackup
 import {
   type DocData,
   type DocMap,
+  type Wijzigingen,
   diffDocs,
   docsNaarStore,
   normaliseerRapportDoc,
+  pasWijzigingenToe,
+  planSchrijfactie,
   storeNaarDocs,
+  voegWijzigingenToe,
   zelfde,
 } from "./firestoreLayout";
 import type { CurriculumRuw } from "../curriculum";
@@ -109,6 +113,8 @@ async function metWaakhond<T>(schrijfactie: Promise<T>): Promise<T> {
 
 /** Collecties die enkel de beheerder mag schrijven, maar die wel in `bewaar()` meerijden. */
 const BEHEERDER_ONLY = /^(vestigingen|rubrieken)\//;
+/** `rubrieken/{stroom}` is een leeg marker-doc waar geen luisteraar op zit: nooit "ontbrekend". */
+const RUBRIEK_MARKER = /^rubrieken\/[^/]+$/;
 
 /**
  * Haal uit de diff wat de regels deze (niet-beheerder) gebruiker hoe dan ook weigeren. Eén
@@ -215,16 +221,14 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   /** Gezet door `abonneer`: herabonneer de evaluaties-luisteraar op een ander schooljaar. */
   let herabonneerEvaluaties: ((sj: string) => void) | null = null;
   /**
-   * De eigen, nog niet bevestigde schrijfactie (gezet zodra `bewaar()` binnenkomt, dus al vóór
-   * de 600ms-debounce afloopt). Zonder dit kan een ongerelateerde live-update van elders — iemand
-   * klikt een kleurtje aan, wat in een actieve school voortdurend gebeurt — tussen het lokaal
-   * aanmaken van bv. een groep en de eigen (gedebouncete) Firestore-schrijfactie in komen: de
-   * snapshot-merge in `emitNu` zou de nog-niet-geschreven groep dan alweer wegvegen (ook uit de
-   * lokale cache) nog vóór de eigen schrijfactie de kans kreeg om te lopen. `emitNu` legt dit
-   * overheen wat het toont aan de app; `vorigeDocs` zelf blijft de kale serverstand, anders zou
-   * de schrijfactie zelf denken dat er niets te doen is en zichzelf overslaan.
+   * Wat deze gebruiker wijzigde en de server nog niet bevestigde: per document enkel de velden die
+   * hij zelf aanraakte (gezet zodra `bewaar()` binnenkomt, dus al vóór de 600ms-debounce). Dit is
+   * het enige wat er geschreven wordt. Nooit de hele browserstand: die kan verouderd zijn (een
+   * collega bewaart tijdens de debounce, of een mislukte schrijfactie wordt pas veel later
+   * herprobeerd), en dan zou ze het werk van collega's wissen. Dit blijft staan tot de server
+   * bevestigt, en `emitNu` legt het over elke live-update heen.
    */
-  let pendingOverlay: DocMap | null = null;
+  const openstaand: Wijzigingen = new Map();
   /** Overlays waarvan de schrijfactie nog loopt of mislukte — opnieuw te proberen. */
   let onbewaardeOverlays: Overlays | null = null;
   /**
@@ -240,10 +244,10 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   let herstelFout: OpslagStatus | null = null;
 
   /**
-   * Staat er iets dat de server nog niet bevestigde? `pendingOverlay` blijft staan tot een
+   * Staat er iets dat de server nog niet bevestigde? `openstaand` blijft gevuld tot een
    * schrijfactie slaagt, dus dekt ook mislukte en (offline) hangende schrijfacties.
    */
-  const onbewaard = () => timer !== null || pendingOverlay !== null || onbewaardeOverlays !== null;
+  const onbewaard = () => timer !== null || openstaand.size > 0 || onbewaardeOverlays !== null;
 
   /**
    * De foutbalk enkel sluiten als er echt niets meer openstaat. Eén geslaagde schrijfactie
@@ -270,7 +274,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     }
     if (!auth.currentUser || !laatsteStore) return;
     if (pendingEmail && auth.currentUser.email !== pendingEmail) {
-      pendingOverlay = null; // van een ander account — zie `pendingEmail`
+      openstaand.clear(); // van een ander account — zie `pendingEmail`
       return;
     }
     // Nooit schrijven zonder serverstand: dan valt er niets te diffen en zou de hele (mogelijk
@@ -281,30 +285,34 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     // Wacht met schrijven tot `abonneer` opnieuw gesynct is voor het huidige schooljaar — anders
     // zou de diff de evaluatie-docs van een ander jaar als "verdwenen" zien.
     if (vorigeDocsSchooljaar !== actiefSchooljaar) return;
-    // Vastleggen welke overlay dit specifiek is: als er ondertussen een NIEUWERE `bewaar()`-
-    // aanroep gebeurde (die `pendingOverlay` alweer verving), mag succes hier die nieuwere
-    // overlay niet opheffen — die heeft zijn eigen (nog lopende) schrijfactie nodig.
-    const dezeOverlay = pendingOverlay;
-    const volledigNu = storeNaarDocs(laatsteStore, actiefSchooljaar);
-    // Alleen het actieve schooljaar aanraken, en alleen de door `bewaar` beheerde collecties —
-    // anders ziet de diff het curriculum (dat `storeNaarDocs` niet teruggeeft), het meegeladen
-    // vorige schooljaar of `instellingen/overlays` (aparte schrijfweg) als "verdwenen" en
-    // wist/overschrijft het.
-    const nu = beheerd(volledigNu);
-    const vorigeBeheerd = beheerd(vorigeDocs);
-    let { schrijf, verwijder } = diffDocs(vorigeBeheerd, nu);
+    // Vastleggen wat deze ronde verstuurt: wijzigt de gebruiker intussen hetzelfde document, dan
+    // mag succes hier die nieuwere wijziging niet opheffen.
+    const ronde: Wijzigingen = new Map(openstaand);
+    const serverVoor = vorigeDocs;
+    const plan = planSchrijfactie(ronde, serverVoor);
+    const { patches } = plan;
+    let { resultaat: schrijf, verwijder } = plan;
     if (!huidigBereik().beheerder) {
-      const gefilterd = zonderVerbodenVoorNietBeheerder(schrijf, verwijder, vorigeBeheerd);
+      const gefilterd = zonderVerbodenVoorNietBeheerder(schrijf, verwijder, serverVoor);
       ({ schrijf, verwijder } = gefilterd);
       if (gefilterd.overgeslagen.length > 0) {
         console.warn(
           "Firestore: beheerder-only docs niet meegestuurd (anders weigert de hele batch):",
           gefilterd.overgeslagen,
         );
+        // De regels weigeren dit toch: niet blijven herproberen.
+        for (const pad of gefilterd.overgeslagen) {
+          ronde.delete(pad);
+          openstaand.delete(pad);
+          patches.delete(pad);
+        }
       }
     }
+    const rondeAfronden = () => {
+      for (const [pad, w] of ronde) if (openstaand.get(pad) === w) openstaand.delete(pad);
+    };
     if (schrijf.size === 0 && verwijder.length === 0) {
-      if (pendingOverlay === dezeOverlay) pendingOverlay = null;
+      rondeAfronden();
       meldOkAlsAllesBewaard(); // bv. een herpoging na een fout die intussen niets meer te doen heeft
       return;
     }
@@ -312,20 +320,22 @@ export function firebasePersistentie(): BadgeboekPersistentie {
     // serverstand van vóór deze schrijfactie (`voor`): enkel waar die nog klopt, mag het herstel
     // later schrijven.
     const voor: Record<string, DocData | null> = {};
-    for (const pad of [...schrijf.keys(), ...verwijder]) voor[pad] = vorigeBeheerd.get(pad) ?? null;
+    for (const pad of [...schrijf.keys(), ...verwijder]) voor[pad] = serverVoor.get(pad) ?? null;
     const backupNr = zetBackup("docs", {
       email: auth.currentUser.email ?? "",
       schrijf: [...schrijf],
       verwijder,
       voor,
+      gericht: true,
     });
     bezig++;
     try {
-      await metWaakhond(schrijfDocMap(schrijf, verwijder, vorigeBeheerd));
+      await metWaakhond(schrijfDocMap(patches, verwijder));
       wisBackup("docs", backupNr);
-      vorigeDocs = volledigNu;
+      // Op de intussen mogelijk nieuwere serverstand toepassen, niet erover heen schrijven.
+      vorigeDocs = pasWijzigingenToe(vorigeDocs ?? serverVoor, ronde);
       // De server heeft 'm nu — vanaf hier mag een live-snapshot er weer gewoon over beslissen.
-      if (pendingOverlay === dezeOverlay) pendingOverlay = null;
+      rondeAfronden();
       meldOkAlsAllesBewaard();
     } catch (error) {
       // Niet (her)gooien: `bewaar` draait los van de UI. De status-balk in `Layout` toont de
@@ -361,7 +371,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
   const bewaarAlles = async () => {
     if (onbewaardeOverlays && auth.currentUser?.email !== overlaysEmail) onbewaardeOverlays = null;
     await Promise.all([
-      pendingOverlay || timer ? schrijfNu() : undefined,
+      openstaand.size > 0 || timer ? schrijfNu() : undefined,
       onbewaardeOverlays ? schrijfOverlaysNu(onbewaardeOverlays) : undefined,
     ]);
   };
@@ -421,7 +431,7 @@ export function firebasePersistentie(): BadgeboekPersistentie {
             await schrijfOverlaysDoc(backup.overlays);
             hersteld++;
           }
-        } else if (soort === "docs" && !backup.voor) {
+        } else if (soort === "docs" && (!backup.voor || !backup.gericht)) {
           overgeslagen += (backup.schrijf?.length ?? 0) + (backup.verwijder?.length ?? 0);
         } else if (soort === "docs" && backup.voor) {
           const server: DocMap = new Map();
@@ -502,10 +512,11 @@ export function firebasePersistentie(): BadgeboekPersistentie {
       return schrijfOverlaysNu(overlays);
     },
 
-    bewaar(store: PersistedStore): void {
+    bewaar(store: PersistedStore, vorige?: PersistedStore): void {
       // Leerling-login (custom token, geen e-mail): niets te bewaren — Firestore is dicht voor
       // leerlingen, en hun gefilterde gegevens horen niet in de lokale cache.
       if (auth.currentUser && !auth.currentUser.email) return;
+      const vorigeStand = vorige ?? laatsteStore;
       laatsteStore = store;
       pendingEmail = auth.currentUser?.email ?? null;
       bewaarCache(store);
@@ -513,10 +524,29 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         actiefSchooljaar = store.schooljaar;
         herabonneerEvaluaties?.(store.schooljaar);
       }
-      // Meteen (niet pas na de debounce) vastleggen wat we van plan zijn te schrijven, zodat een
+      // Meteen (niet pas na de debounce) vastleggen wat deze gebruiker wijzigde, zodat een
       // live-update van elders dit niet kan wegvegen vóór de echte schrijfactie kans krijgt —
-      // zie de uitleg bij `pendingOverlay` hierboven.
-      pendingOverlay = beheerd(storeNaarDocs(store, actiefSchooljaar));
+      // zie de uitleg bij `openstaand` hierboven. Alleen het actieve schooljaar en de door `bewaar`
+      // beheerde collecties (zie `magBewarenSchrijven`).
+      const nu = beheerd(storeNaarDocs(store, actiefSchooljaar));
+      const basis = vorigeStand
+        ? beheerd(storeNaarDocs(vorigeStand, actiefSchooljaar))
+        : beheerd(vorigeDocs ?? new Map());
+      voegWijzigingenToe(openstaand, basis, nu);
+      // Vestigingen en rubrics herstellen zichzelf: houdt de app ze nog vast terwijl ze op de server
+      // ontbreken, dan gaan ze terug (ook via de knoppen op /gegevens). Enkel wat echt ontbreekt.
+      if (vorigeDocs) {
+        const herstel: DocMap = new Map(
+          [...nu].filter(
+            ([pad]) =>
+              BEHEERDER_ONLY.test(pad) &&
+              !RUBRIEK_MARKER.test(pad) &&
+              !vorigeDocs?.has(pad) &&
+              !openstaand.has(pad),
+          ),
+        );
+        voegWijzigingenToe(openstaand, new Map(), herstel);
+      }
 
       if (timer) clearTimeout(timer);
       timer = setTimeout(schrijfNu, 600);
@@ -557,14 +587,14 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         for (const frag of Object.values(bron)) {
           if (frag) for (const [pad, data] of frag) docs.set(pad, data);
         }
-        if (vorigeDocs === null && (timer || pendingOverlay)) {
+        if (vorigeDocs === null && (timer || openstaand.size > 0)) {
           // Een schrijfactie van vóór de eerste snapshot steunt op de lokale cache, niet op de
           // database — die mag nooit vertrekken (zie `schrijfNu`). De app toont vanaf nu de
           // serverstand; de UI liet intussen geen bewerkingen toe (toegangspoort).
           console.warn("Firestore: wijziging van vóór de eerste snapshot niet verstuurd.");
           if (timer) clearTimeout(timer);
           timer = null;
-          pendingOverlay = null;
+          openstaand.clear();
         }
         zetGesynct(true);
         if (!vestigingGebackfild && huidigBereik().alles && auth.currentUser) {
@@ -584,19 +614,11 @@ export function firebasePersistentie(): BadgeboekPersistentie {
         }
         vorigeDocs = docs;
         vorigeDocsSchooljaar = actiefSchooljaar;
-        // Aan de app (en de lokale cache) tonen we onze eigen, nog niet bevestigde schrijfactie
-        // erover heen — zie `pendingOverlay` hierboven. Voor de beheerde paden (groepen, …) is
-        // onze eigen volledige stand leidend, inclusief een intussen lokaal verwijderd item (dat
-        // ontbreekt dan gewoon in `pendingOverlay`, i.p.v. te blijven hangen uit de oudere
-        // serverstand). Niet-beheerde paden (curriculum, een ander schooljaar, …) komen gewoon
-        // van de server. `vorigeDocs` zelf blijft de kale serverstand: die gebruikt `schrijfNu`
-        // om te bepalen wat nog geschreven moet worden, en zou anders denken dat het al gebeurd is.
-        const getoond = pendingOverlay
-          ? new Map([
-              ...[...docs].filter(([pad]) => !magBewarenSchrijven(pad, actiefSchooljaar)),
-              ...pendingOverlay,
-            ])
-          : docs;
+        // Aan de app (en de lokale cache) tonen we de serverstand met onze eigen, nog niet
+        // bevestigde wijzigingen erover — zie `openstaand` hierboven. Zo blijft wat een collega
+        // intussen bewaarde zichtbaar. `vorigeDocs` zelf blijft de kale serverstand: die gebruikt
+        // `schrijfNu` om te bepalen wat nog geschreven moet worden.
+        const getoond = openstaand.size > 0 ? pasWijzigingenToe(docs, openstaand) : docs;
         const rauw = docsNaarStore(getoond);
         bewaarCache(rauw);
         luister(rauw);

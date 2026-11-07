@@ -322,6 +322,28 @@ describe("back-up van onbewaarde wijzigingen", () => {
     expect(status.leesHerstelMelding()).toEqual({ hersteld: 0, overgeslagen: 2 });
   });
 
+  it("back-ups met de hele browserstand (van vóór de gerichte saves) worden niet meer verstuurd", async () => {
+    // Zo'n back-up zou bij het herstel wissen wat er op de server staat maar niet in de oude stand.
+    fb.server.set(PAD, { naam: "Oud", kleuren: { b1: "green" } });
+    opslagData.set(
+      "keerpunt-badgeboek:onbewaard:docs:oud-tabblad",
+      JSON.stringify({
+        email: MENTOR.email,
+        tijd: Date.now() - 60_000,
+        nr: 1,
+        schrijf: [[PAD, { naam: "Oud", kleuren: {} }]],
+        verwijder: [],
+        voor: { [PAD]: { naam: "Oud", kleuren: { b1: "green" } } },
+      }),
+    );
+    const { status } = await laadPagina();
+    await wacht(30_000);
+
+    expect(fb.schrijfDocMap).not.toHaveBeenCalled();
+    expect(backups()).toHaveLength(0);
+    expect(status.leesHerstelMelding()).toEqual({ hersteld: 0, overgeslagen: 1 });
+  });
+
   it("een mentor herstelt geen afgewerkt rapport, maar de rest wel", async () => {
     fb.server.set("rapporten/r1", { status: "afgewerkt", leerlingId: "l1" });
     fb.schrijfDocMap.mockImplementation(geenVerbinding);

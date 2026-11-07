@@ -30,6 +30,7 @@ import {
   type DocMap,
   curriculumNaarDocs,
   metWissingen,
+  vervangWeg,
   overlaysNaarDoc,
 } from "./firestoreLayout";
 import type { Overlays } from "./persistentie";
@@ -204,9 +205,13 @@ const refVoorPad = (pad: string) => {
  * Schrijf (`merge`) en verwijder documenten in batches van ≤ 450, met `updatedAt`/`updatedBy`
  * op elk geschreven doc. Gedeeld door de persistentielaag en de migratie.
  *
- * `vorige`: de serverstand van die docs (zonder meta). Wat daarin stond maar in het nieuwe doc
- * ontbreekt (bv. een gewiste notitie in een map), wordt met `deleteField()` echt gewist — `merge`
- * alleen zou het laten staan (zie `metWissingen`). Zonder `vorige` = puur samenvoegen.
+ * Zonder `vorige` = puur samenvoegen: `schrijf` bevat gerichte patches, waarin een `WEG`-markering
+ * het veld wist. Dit is de gewone weg (zie `planSchrijfactie`).
+ *
+ * `vorige`: enkel voor het herstel van een back-up, dat `schrijf` als volledig doc verstuurt nadat
+ * het de serverstand net vergeleek. Wat in `vorige` stond maar in het doc ontbreekt, wordt gewist
+ * (zie `metWissingen`). Geef nooit een `vorige` mee met een doc uit een mogelijk oude browserstand:
+ * dan verdwijnt het werk van collega's.
  */
 export async function schrijfDocMap(
   schrijf: DocMap,
@@ -220,7 +225,9 @@ export async function schrijfDocMap(
   };
   const ops: Array<{ soort: "set" | "del"; pad: string; data?: DocData }> = [];
   for (const [pad, data] of schrijf) {
-    const metWis = metWissingen(vorige?.get(pad), data, deleteField);
+    const metWis = vorige
+      ? metWissingen(vorige.get(pad), data, deleteField)
+      : vervangWeg(data, deleteField);
     ops.push({ soort: "set", pad, data: { ...metWis, ...meta } });
   }
   for (const pad of verwijder) ops.push({ soort: "del", pad });

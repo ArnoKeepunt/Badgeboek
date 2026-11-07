@@ -33,6 +33,12 @@ export interface Backup {
    * schrijft enkel waar de server nog zo staat. Ontbreekt bij back-ups van vóór 28/10/2026.
    */
   voor?: Record<string, DocData | null>;
+  /**
+   * `true` = `schrijf` is de serverstand plus enkel de eigen wijzigingen. Oudere back-ups (van vóór
+   * 7/11/2026) bevatten de hele, mogelijk verouderde browserstand: die zouden bij het herstel werk
+   * van collega's wissen en worden dus niet meer verstuurd.
+   */
+  gericht?: true;
   overlays?: Overlays;
 }
 

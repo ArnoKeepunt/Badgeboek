@@ -9,7 +9,8 @@
  * niet de modulaire `firebase/firestore`-API.
  */
 import { readFileSync } from "node:fs";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { deleteField } from "firebase/firestore";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   assertFails,
   assertSucceeds,
@@ -567,5 +568,49 @@ describe("maximale sessieduur: 12 uur na de laatste echte login", () => {
       aangemeldGeleden("beheerder", "beheerder@keerpuntscholen.be", 13).collection("gebruikers").get(),
     );
     await assertFails(aangemeldGeleden("bootstrap", BOOTSTRAP, 13).doc("leerlingen/ll-gent").get());
+  });
+});
+
+// Gerichte saves (`planSchrijfactie` / `schrijfDocMap`) tegen de echte merge van Firestore. Hoe de
+// patches tot stand komen, test `test/dom/opslagGericht.test.ts`.
+describe("gerichte saves", () => {
+  const pad = `evaluaties/${JAAR}/leerlingen/ll-gent`;
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc(pad).set({
+        kleuren: { b1: "green", b2: "blue" },
+        notities: { b1: { zichtbaar: "ok", verborgen: "" } },
+        gewist: [],
+        auditLog: {},
+        vestiging: "Gent",
+      });
+    });
+  });
+
+  const stand = async () => {
+    let d: Record<string, unknown> | undefined;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      d = (await context.firestore().doc(pad).get()).data();
+    });
+    return d!;
+  };
+
+  it("een mentor mag een patch schrijven; de kleuren van collega's blijven staan", async () => {
+    await assertSucceeds(mentor.doc(pad).set({ kleuren: { b9: "red" } }, { merge: true }));
+    expect((await stand()).kleuren).toEqual({ b1: "green", b2: "blue", b9: "red" });
+  });
+
+  it("een gewiste sleutel verdwijnt, de rest van de map niet", async () => {
+    const patch = { kleuren: { b1: deleteField() }, notities: { b1: deleteField() } };
+    await assertSucceeds(mentor.doc(pad).set(patch, { merge: true }));
+    const d = await stand();
+    expect(d.kleuren).toEqual({ b2: "blue" });
+    expect(d.notities).toEqual({});
+  });
+
+  it("daarom nooit een lege map: een merge vervangt daarmee de hele map op de server", async () => {
+    await assertSucceeds(mentor.doc(pad).set({ kleuren: {} }, { merge: true }));
+    expect((await stand()).kleuren).toEqual({});
   });
 });
