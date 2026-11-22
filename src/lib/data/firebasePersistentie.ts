@@ -129,8 +129,14 @@ function zonderVerbodenVoorNietBeheerder(
   server: DocMap | null,
 ): { schrijf: DocMap; verwijder: string[]; overgeslagen: string[] } {
   const overgeslagen: string[] = [];
-  const verboden = (pad: string, isVerwijder: boolean): boolean => {
+  const verboden = (pad: string, isVerwijder: boolean, data?: DocData): boolean => {
     if (BEHEERDER_ONLY.test(pad)) return true;
+    // Overkoepelende deelbadge (`vestiging: ""`): enkel coördinator/beheerder (zie de regels).
+    // Een mentor met meerdere vestigingen kon die vroeger kiezen ("Alle vestigingen") — dan
+    // weigerde de database daarna élke save van die sessie, omdat dit doc in de batch bleef.
+    if (pad.startsWith("deelbadges/") && !isVerwijder && !huidigBereik().alles) {
+      if ((data?.vestiging ?? "") === "") return true;
+    }
     // Zonder serverstand (eerste save vóór de eerste snapshot) valt er niets te beoordelen.
     if (pad.startsWith("rapporten/") && server) {
       if (isVerwijder) return true;
@@ -142,7 +148,7 @@ function zonderVerbodenVoorNietBeheerder(
   };
   const schrijfOk: DocMap = new Map();
   for (const [pad, data] of schrijf) {
-    if (verboden(pad, false)) overgeslagen.push(pad);
+    if (verboden(pad, false, data)) overgeslagen.push(pad);
     else schrijfOk.set(pad, data);
   }
   const verwijderOk = verwijder.filter((pad) => {

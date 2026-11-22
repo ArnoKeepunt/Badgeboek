@@ -16,6 +16,7 @@ export function DeelevaluatieEditor({
   schooljaar,
   vestiging,
   vestigingOpties,
+  magAlleVestigingen = false,
   mentorId,
   bestaand,
   voorinvulling,
@@ -31,6 +32,12 @@ export function DeelevaluatieEditor({
   vestiging: string;
   /** Alle vestigingen om uit te kiezen wanneer `vestiging === ""`. */
   vestigingOpties: string[];
+  /**
+   * Mag de gebruiker een overkoepelende deelbadge ("Alle vestigingen", `vestiging: ""`) maken?
+   * Enkel coördinator/beheerder: de Firestore-regels weigeren dat een mentor. Een mentor met
+   * meerdere vestigingen krijgt hier dus enkel zijn eigen vestigingen te zien.
+   */
+  magAlleVestigingen?: boolean;
   mentorId?: string;
   bestaand?: Deelevaluatie;
   voorinvulling?: { cursus: string; typeId: string | null; leerdoelIds?: string[] };
@@ -115,7 +122,7 @@ export function DeelevaluatieEditor({
             onChange={(e) => setVestigingKeuze(e.target.value)}
           >
             <option value="">— kies een vestiging —</option>
-            <option value={ALLE_VESTIGINGEN}>Alle vestigingen</option>
+            {magAlleVestigingen && <option value={ALLE_VESTIGINGEN}>Alle vestigingen</option>}
             {vestigingOpties.map((v) => (
               <option key={v} value={v}>
                 {v}

@@ -284,6 +284,7 @@ export function Deelevaluaties() {
             schooljaar={schooljaar}
             vestiging={vestiging}
             vestigingOpties={vestigingOpties}
+            magAlleVestigingen={!bereikBeperkt(bereik)}
             mentorId={mentorId}
             bestaand={editor.bestaand}
             voorinvulling={editor.voorinvulling}
